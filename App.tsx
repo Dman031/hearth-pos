@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -6,7 +6,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import HearthOrb from './src/components/HearthOrb';
 import useAuth from './src/hooks/useAuth';
-import { supabase } from './src/services/supabase';
+import useVendor from './src/hooks/useVendor';
 import AuthScreen from './src/screens/AuthScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import TabNavigator from './src/navigation/TabNavigator';
@@ -21,45 +21,18 @@ function SplashScreen() {
 }
 
 function Root() {
-  const { user, isLoading } = useAuth();
-  const [hasVendorProfile, setHasVendorProfile] = useState<boolean | null>(
-    null,
-  );
+  const { user, isLoading: authLoading } = useAuth();
+  const { vendor, isLoading: vendorLoading } = useVendor();
 
-  useEffect(() => {
-    if (!user) {
-      setHasVendorProfile(null);
-      return;
-    }
-
-    let mounted = true;
-    supabase
-      .from('vendor_profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (error) {
-          console.error('[Root] vendor_profiles lookup failed:', error);
-        }
-        if (!mounted) {
-          return;
-        }
-        setHasVendorProfile(!!data);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, [user]);
-
-  if (isLoading || (user && hasVendorProfile === null)) {
+  if (authLoading || vendorLoading) {
     return <SplashScreen />;
   }
   if (!user) {
     return <AuthScreen />;
   }
-  if (hasVendorProfile === false) {
+  // No vendor row yet, or a row that hasn't picked a business type — both mean
+  // onboarding is unfinished.
+  if (vendor === null || vendor.template_id === null) {
     return <OnboardingScreen />;
   }
   return (

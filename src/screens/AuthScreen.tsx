@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -25,22 +25,34 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Synchronous gate. `submitting` state only disables the button on the next
+  // render; a double-tap inside that gap would otherwise fire signUp/signIn
+  // twice and trip Supabase's per-email cooldown.
+  const inFlight = useRef(false);
 
   const isSignUp = mode === 'signup';
 
   const handleSubmit = async () => {
-    setError(null);
-    if (!email.trim() || !password.trim()) {
-      setError('Enter both your email and a password.');
+    if (inFlight.current) {
       return;
     }
-    setSubmitting(true);
-    const { error: authError } = isSignUp
-      ? await signUp(email.trim(), password)
-      : await signIn(email.trim(), password);
-    setSubmitting(false);
-    if (authError) {
-      setError(authError.message);
+    inFlight.current = true;
+    try {
+      setError(null);
+      if (!email.trim() || !password.trim()) {
+        setError('Enter both your email and a password.');
+        return;
+      }
+      setSubmitting(true);
+      const { error: authError } = isSignUp
+        ? await signUp(email.trim(), password)
+        : await signIn(email.trim(), password);
+      if (authError) {
+        setError(authError.message);
+      }
+    } finally {
+      setSubmitting(false);
+      inFlight.current = false;
     }
   };
 
