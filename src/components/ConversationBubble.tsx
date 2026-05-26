@@ -15,16 +15,30 @@ import Animated, {
 } from 'react-native-reanimated';
 import { theme } from '../styles/theme';
 
-interface ConversationButton {
+// Conversation actions are intentionally restricted to INPUT (carries a typed-
+// or template-selection payload) or NAVIGATION (continue / try again / retry).
+// A button must NEVER carry a binary decision (e.g. yes/no confirm). Onboarding
+// models decisions as free-text replies that re-run classification — see
+// src/screens/OnboardingScreen.tsx. The runtime guard below drops the trailing
+// action and warns if a 2-action stack has no 'navigation' member, since that
+// is the structural shape of a yes/no decision pair.
+type ActionKind = 'input' | 'navigation';
+
+interface ConversationAction {
   label: string;
   onPress: () => void;
+  kind: ActionKind;
+  tone?: 'default' | 'danger';
 }
+
+type BubbleTone = 'default' | 'danger';
 
 interface ConversationBubbleProps {
   speaker: 'hearth' | 'vendor';
   text: string;
-  buttons?: ConversationButton[];
+  actions?: ConversationAction[];
   isStreaming?: boolean;
+  tone?: BubbleTone;
 }
 
 const ENTRANCE_DURATION_MS = 240;
@@ -61,14 +75,41 @@ function TypingIndicator() {
   );
 }
 
+// Returns actions safe to render. If the stack looks like a yes/no decision
+// pair (exactly two actions, neither tagged 'navigation'), drops the trailing
+// action and warns loudly — the no-WIMP rule says decisions belong in the text
+// channel, not in a button row. Fails loud but does not crash.
+function guardActions(
+  actions: ConversationAction[] | undefined,
+): ConversationAction[] | undefined {
+  if (!actions || actions.length === 0) {
+    return actions;
+  }
+  if (
+    actions.length === 2 &&
+    actions.every((a) => a.kind !== 'navigation')
+  ) {
+    console.warn(
+      '[ConversationBubble] refusing to render a 2-action stack where ' +
+        "neither action is 'navigation' — this is the shape of a binary " +
+        'decision and violates the no-WIMP rule. Dropping the trailing action.',
+      actions.map((a) => `${a.kind}:${a.label}`),
+    );
+    return [actions[0]];
+  }
+  return actions;
+}
+
 export default function ConversationBubble({
   speaker,
   text,
-  buttons,
+  actions,
   isStreaming = false,
+  tone = 'default',
 }: ConversationBubbleProps) {
   const isVendor = speaker === 'vendor';
   const showTyping = isStreaming && speaker === 'hearth';
+  const safeActions = guardActions(actions);
 
   const opacity = useSharedValue<number>(0);
   const translateY = useSharedValue<number>(ENTRANCE_OFFSET);
@@ -116,6 +157,8 @@ export default function ConversationBubble({
     transform: [{ translateY: translateY.value }],
   }));
 
+  const isDanger = !isVendor && tone === 'danger';
+
   return (
     <Animated.View
       style={[
@@ -128,6 +171,7 @@ export default function ConversationBubble({
         style={[
           styles.bubble,
           isVendor ? styles.bubbleVendor : styles.bubbleHearth,
+          isDanger ? styles.bubbleHearthDanger : null,
         ]}
       >
         {isVendor ? (
@@ -144,41 +188,49 @@ export default function ConversationBubble({
             style={[
               styles.text,
               isVendor ? styles.textVendor : styles.textHearth,
+              isDanger ? styles.textHearthDanger : null,
             ]}
           >
             {text}
           </Text>
         )}
 
-        {buttons && buttons.length > 0 ? (
+        {safeActions && safeActions.length > 0 ? (
           <View style={styles.buttonStack}>
-            {buttons.map((button, index) => (
-              <Pressable
-                key={`${index}-${button.label}`}
-                style={[
-                  styles.button,
-                  isVendor ? styles.buttonVendor : styles.buttonHearth,
-                ]}
-                onPress={button.onPress}
-              >
-                <Text
+            {safeActions.map((action, index) => {
+              const danger = action.tone === 'danger';
+              return (
+                <Pressable
+                  key={`${index}-${action.label}`}
                   style={[
-                    styles.buttonLabel,
-                    isVendor
-                      ? styles.buttonLabelVendor
-                      : styles.buttonLabelHearth,
+                    styles.button,
+                    isVendor ? styles.buttonVendor : styles.buttonHearth,
+                    danger ? styles.buttonDanger : null,
                   ]}
+                  onPress={action.onPress}
                 >
-                  {button.label}
-                </Text>
-              </Pressable>
-            ))}
+                  <Text
+                    style={[
+                      styles.buttonLabel,
+                      isVendor
+                        ? styles.buttonLabelVendor
+                        : styles.buttonLabelHearth,
+                      danger ? styles.buttonLabelDanger : null,
+                    ]}
+                  >
+                    {action.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
         ) : null}
       </View>
     </Animated.View>
   );
 }
+
+export type { ConversationAction, ActionKind, BubbleTone };
 
 const styles = StyleSheet.create({
   row: {
@@ -204,6 +256,10 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: theme.borderRadius.card,
     borderBottomLeftRadius: TAIL_CORNER_RADIUS,
   },
+  bubbleHearthDanger: {
+    borderWidth: 1,
+    borderColor: theme.colors.danger,
+  },
   bubbleVendor: {
     borderBottomLeftRadius: theme.borderRadius.card,
     borderBottomRightRadius: TAIL_CORNER_RADIUS,
@@ -219,6 +275,9 @@ const styles = StyleSheet.create({
   },
   textHearth: {
     color: theme.colors.textPrimary,
+  },
+  textHearthDanger: {
+    color: theme.colors.danger,
   },
   textVendor: {
     color: theme.colors.background,
@@ -252,6 +311,9 @@ const styles = StyleSheet.create({
   buttonVendor: {
     borderColor: theme.colors.background,
   },
+  buttonDanger: {
+    borderColor: theme.colors.danger,
+  },
   buttonLabel: {
     ...theme.typography.body,
     fontWeight: '600',
@@ -261,5 +323,8 @@ const styles = StyleSheet.create({
   },
   buttonLabelVendor: {
     color: theme.colors.background,
+  },
+  buttonLabelDanger: {
+    color: theme.colors.danger,
   },
 });
