@@ -5,6 +5,8 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import HearthOrb from './src/components/HearthOrb';
+import { AuthProvider } from './src/context/AuthContext';
+import { VendorProvider } from './src/context/VendorContext';
 import useAuth from './src/hooks/useAuth';
 import useVendor from './src/hooks/useVendor';
 import AuthScreen from './src/screens/AuthScreen';
@@ -47,7 +49,12 @@ export default function App() {
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
         <StatusBar style="light" />
-        <Root />
+        {/* VendorProvider reads useAuth() — keep nested inside AuthProvider. */}
+        <AuthProvider>
+          <VendorProvider>
+            <Root />
+          </VendorProvider>
+        </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
