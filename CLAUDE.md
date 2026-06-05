@@ -212,3 +212,9 @@ In multi-step vendor flows (onboarding, transaction entry, profile edit, payout 
 ### B.3 TTS visibility (awareness only)
 
 If/when voice or TTS is added to hearth-pos, text rendering treats voice as additive (subtitles), not exclusive. Don't add `!isSpeaking`-style visibility conditions to text the vendor might want to read along with the audio (deaf-friendly, noisy-environment-friendly, fast-readers-impatient-with-TTS friendly). *(Awareness rule — no TTS surface ships in hearth-pos today; documented here so it lands correctly the first time one does.)*
+
+## Known interim shortcuts
+
+Deliberate, scoped gaps that are wired to be completed later. Each must carry a `TODO(<tag>)` at the seam in code so the follow-up is greppable.
+
+- **TODO(SMS) — phone verification deferred.** Entity creation (`EntitySetupScreen` → `EntityContext.createEntity`) collects and stores `entities.phone` as TEXT but does **not** verify it; phone is stored unverified and phone-confirmation is **not** required for the entity to be created or for signup to complete. No SMS provider is configured (prod auth SMS lives in the Supabase dashboard; `supabase/config.toml` Twilio block is local-only and disabled). When SMS is enabled, wire **Supabase phone OTP** at the `TODO(SMS)` seam (send code → `verifyOtp`) and treat **`auth.users.phone_confirmed_at` as the source of truth** (Decision 1A) — do **not** add a phone-verified column to `entities` (the network reads that table; its shape is frozen). Grep: `grep -rn "TODO(SMS)" src`.
