@@ -14,6 +14,7 @@ import ConversationBubble, {
   type ConversationAction,
 } from '../components/ConversationBubble';
 import HearthOrb from '../components/HearthOrb';
+import { APP_NAME } from '../constants/app';
 import {
   classifyBusiness,
   type ClassificationResult,
@@ -67,7 +68,7 @@ interface ChatMessage {
 const CONFIDENCE_THRESHOLD = 0.7;
 const GENERIC_SERVICE_ID = 'generic_service';
 
-const GREETING_TEXT = 'Hey. Welcome to Hearth. What kind of work do you do?';
+const GREETING_TEXT = `Hey. Welcome to ${APP_NAME}. What kind of work do you do?`;
 const SAVE_ERROR_TEXT =
   'Something went sideways saving your account. Try again?';
 const NETWORK_ERROR_TEXT =
