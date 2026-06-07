@@ -14,6 +14,7 @@ import ConversationBubble, {
   type ConversationAction,
 } from '../components/ConversationBubble';
 import HearthOrb from '../components/HearthOrb';
+import SignOutButton from '../components/SignOutButton';
 import { APP_NAME } from '../constants/app';
 import {
   classifyBusiness,
@@ -578,6 +579,7 @@ export default function OnboardingScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <SignOutButton />
       <View style={styles.orbContainer}>
         <HearthOrb size={140} listening={phase === 'classifying'} />
       </View>

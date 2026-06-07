@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import HearthOrb from '../components/HearthOrb';
+import SignOutButton from '../components/SignOutButton';
 import useAuth from '../hooks/useAuth';
 import useEntity from '../hooks/useEntity';
 import { theme } from '../styles/theme';
@@ -91,6 +92,7 @@ export default function EntitySetupScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <SignOutButton />
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
