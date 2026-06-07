@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import useAuth from '../hooks/useAuth';
 import { theme } from '../styles/theme';
 
@@ -10,6 +11,10 @@ import { theme } from '../styles/theme';
 // drops the user back to AuthScreen automatically — no navigation here.
 export default function SignOutButton() {
   const { signOut } = useAuth();
+  // SafeAreaView applies the top inset as padding, but this button is
+  // absolutely positioned against its border box — so offset by the inset
+  // ourselves, otherwise it renders under the notch and isn't tappable.
+  const insets = useSafeAreaInsets();
   const [submitting, setSubmitting] = useState(false);
   // Synchronous gate against a double-tap before `submitting` re-renders.
   const inFlight = useRef(false);
@@ -33,7 +38,7 @@ export default function SignOutButton() {
 
   return (
     <Pressable
-      style={styles.button}
+      style={[styles.button, { top: insets.top + theme.spacing.sm }]}
       onPress={handlePress}
       disabled={submitting}
       hitSlop={8}
@@ -46,7 +51,6 @@ export default function SignOutButton() {
 const styles = StyleSheet.create({
   button: {
     position: 'absolute',
-    top: theme.spacing.sm,
     right: theme.spacing.xl,
     paddingVertical: theme.spacing.xs,
     paddingHorizontal: theme.spacing.sm,
