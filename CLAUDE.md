@@ -19,6 +19,8 @@ The vendor-facing mobile app. Vendors download from App Store, fill conversation
 - Launch templates: generic_service, plumber, coffee_shop, task_runner
 
 ## Design system
+**Canonical design reference: `docs/deus-prototype.html`** — the interactive Claude Design prototype (dark #050505, amber orb, four tabs: Profile / Incoming / Contacts / Identity, the card model with SEE/ACT permission pills, trust-tier identity screen). READ IT before building ANY screen, and match it for all app UI work.
+
 Background #050505 (deepest), Surface #111111, Text primary #F5F0E8, Text secondary #A5A99A, Text muted #7D8471, Accent #D4A574 (hearth amber), Success #5DCAA5, Danger #E24B4A, Warning #EF9F27
 HearthOrb: 4-layer radial gradient, 4s breathing cycle, canonical RGBA values: outer rgba(125,140,113,0.22), mid rgba(150,160,120,0.35), inner rgba(200,175,120,0.65), core rgba(255,250,235,0.90)
 Border radius: 12px cards, 24px inputs
@@ -31,6 +33,7 @@ Font: system sans-serif
 - ALWAYS track completed_transaction_count for paywall trigger
 - ALWAYS use Opus (claude-opus-4-7), never Haiku
 - One app, one codebase, infinite business types via templates
+- The user-facing app name comes from a SINGLE `APP_NAME` constant — NEVER hardcode the brand string per screen. Currently "Deus"; a brand pass to "Flow" is planned pending name research, so centralization keeps the rename a one-line change. (As of 2026-06-06 no `APP_NAME` constant exists yet; `src/screens/AuthScreen.tsx` and `src/screens/OnboardingScreen.tsx` still hardcode the stale "Hearth" brand and must route through it when the constant lands.)
 
 ## Revenue logic
 - Free until vendor completes 10 transactions
