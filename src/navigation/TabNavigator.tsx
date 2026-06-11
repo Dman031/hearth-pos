@@ -5,15 +5,20 @@ import HomeScreen from '../screens/HomeScreen';
 import InboxScreen from '../screens/InboxScreen';
 import JobsScreen from '../screens/JobsScreen';
 import MoneyScreen from '../screens/MoneyScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 import { theme } from '../styles/theme';
 
 const Tab = createBottomTabNavigator();
 
+// NOTE: this 4→5 tab addition is deliberately minimal. At Day 9 / Step 4.1 the
+// whole bar is replaced with Profile/Incoming/Contacts/Identity (the prototype
+// model), so resist restyling the bar here — only the Profile entry is added.
 const TAB_ICONS: Record<string, string> = {
   Home: 'H',
   Inbox: 'I',
   Jobs: 'J',
   Money: 'M',
+  Profile: 'P',
 };
 
 export default function TabNavigator() {
@@ -44,6 +49,7 @@ export default function TabNavigator() {
       <Tab.Screen name="Inbox" component={InboxScreen} />
       <Tab.Screen name="Jobs" component={JobsScreen} />
       <Tab.Screen name="Money" component={MoneyScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
 }

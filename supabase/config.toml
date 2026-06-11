@@ -366,6 +366,18 @@ authorization_url_path = "/oauth/consent"
 # Allow dynamic client registration
 allow_dynamic_registration = false
 
+# Stripe Identity webhook: Stripe cannot present a Supabase JWT, so JWT
+# verification is disabled here. The function instead authenticates every
+# request by verifying the Stripe webhook SIGNATURE against
+# STRIPE_IDENTITY_WEBHOOK_SECRET — an unsigned request writes nothing.
+[functions.stripe-identity-webhook]
+verify_jwt = false
+
+# create-identity-session keeps the default verify_jwt = true: only a signed-in
+# vendor (valid Supabase JWT) may start verification for their own entity.
+[functions.create-identity-session]
+verify_jwt = true
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.
