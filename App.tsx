@@ -27,10 +27,15 @@ function SplashScreen() {
 
 function Root() {
   const { user, isLoading: authLoading } = useAuth();
-  const { entity, isLoading: entityLoading, revealEntity } = useEntity();
+  // Gate on isInitializing (first load only), NOT isLoading. isLoading is true
+  // during every background refresh too — keying the splash off it would unmount
+  // the whole navigator whenever an in-tab screen calls refresh() (this was the
+  // ProfileScreen-blank bug). isInitializing stays false through refreshes.
+  const { entity, isInitializing: entityInitializing, revealEntity } =
+    useEntity();
   const { vendor, isLoading: vendorLoading } = useVendor();
 
-  if (authLoading || entityLoading || vendorLoading) {
+  if (authLoading || entityInitializing || vendorLoading) {
     return <SplashScreen />;
   }
   if (!user) {

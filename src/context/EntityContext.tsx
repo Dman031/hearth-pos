@@ -15,7 +15,16 @@ import type { CreateEntityInput, Entity } from '../types/entity';
 
 interface EntityContextValue {
   entity: Entity | null;
+  // True during ANY entity load, including background refreshes. Do NOT gate a
+  // full-screen splash on this — a refresh() from an in-tab screen flips it and
+  // would tear the navigator down (see BUG: ProfileScreen blank). For the
+  // app-level first-load gate use `isInitializing` instead.
   isLoading: boolean;
+  // True ONLY until the FIRST load for the current user resolves. Background
+  // refreshes (e.g. ProfileScreen's focus refresh) leave this false, so Root
+  // can gate its splash on this without the navigator unmounting on every
+  // refresh. Resets to true on a genuine (re)login, not on token refresh.
+  isInitializing: boolean;
   error: Error | null;
   // Set by createEntity, held until acknowledgeReveal(). Drives the one-time
   // "this is you — <deus_id>" reveal without persisting routing state, and is
@@ -134,9 +143,14 @@ export function EntityProvider({ children }: EntityProviderProps) {
   const [entity, setEntity] = useState<Entity | null>(null);
   const [revealEntity, setRevealEntity] = useState<Entity | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInitializing, setIsInitializing] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
   const activeController = useRef<AbortController | null>(null);
+  // The user id whose first load has resolved. Lets the mount effect tell a
+  // genuine (re)login (id we haven't initialized) apart from a token refresh
+  // (same id) — only the former re-shows the splash via setIsInitializing(true).
+  const initializedUserId = useRef<string | null>(null);
 
   const loadEntity = useCallback(async (userId: string): Promise<void> => {
     activeController.current?.abort();
@@ -178,6 +192,11 @@ export function EntityProvider({ children }: EntityProviderProps) {
     } finally {
       if (!controller.signal.aborted) {
         setIsLoading(false);
+        // First load for this user has now resolved — drop the app-level gate
+        // and remember the id so the mount effect won't re-splash on a token
+        // refresh. Harmless on a background refresh (already false / same id).
+        setIsInitializing(false);
+        initializedUserId.current = userId;
       }
     }
   }, []);
@@ -192,7 +211,16 @@ export function EntityProvider({ children }: EntityProviderProps) {
       setRevealEntity(null);
       setError(null);
       setIsLoading(false);
+      setIsInitializing(false);
+      initializedUserId.current = null;
       return;
+    }
+
+    // Re-show the splash gate ONLY for a user whose first load hasn't resolved
+    // (cold start / sign-in / account switch). A token refresh re-runs this
+    // effect with the same id, where this stays false — so no splash flicker.
+    if (initializedUserId.current !== user.id) {
+      setIsInitializing(true);
     }
 
     void loadEntity(user.id);
@@ -209,6 +237,8 @@ export function EntityProvider({ children }: EntityProviderProps) {
       setRevealEntity(null);
       setError(null);
       setIsLoading(false);
+      setIsInitializing(false);
+      initializedUserId.current = null;
       return;
     }
     await loadEntity(user.id);
@@ -294,6 +324,7 @@ export function EntityProvider({ children }: EntityProviderProps) {
     () => ({
       entity,
       isLoading,
+      isInitializing,
       error,
       revealEntity,
       createEntity,
@@ -304,6 +335,7 @@ export function EntityProvider({ children }: EntityProviderProps) {
     [
       entity,
       isLoading,
+      isInitializing,
       error,
       revealEntity,
       createEntity,

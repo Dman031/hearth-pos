@@ -234,3 +234,61 @@ If any new bubble uses `actions` without `kind`, TS will fail.
 
 The Day 2 build prompt did not specify the no-WIMP principle for the POS onboarding flow — the spec mirrored Hearth@Home in voice but not in architecture, which is how the yes/no buttons and the immediate-write `createVendor` ended up in the same screen. Future onboarding-adjacent prompts should state the principle explicitly: "decisions are made by typing, not by tapping; mutator calls run at the end of a flow, not at intermediate confirms." The same principle applies to any future surface where Hearth classifies, extracts, or assumes something about the vendor or their work.
 
+
+---
+
+## BUG-004: Profile tab renders blank — in-tab refresh() unmounts the whole navigator
+
+**Status:** FIXED
+**Date:** 2026-06-12
+**Severity:** High
+**Category:** expo-rn
+**Introduced-by:** claude-fix
+**Related bugs:** BUG-002 (shared-vs-per-instance context state — inverse lesson)
+
+### Symptoms
+
+- Tapping the new Profile tab shows nothing — no name, no Deus ID, no "Verify your identity" button. Completely blank.
+- The logged-in account (`testjune@gmail.com`) had a full entity row (`deus_id 225606`, `display_name "Derrick"`, `id_verified false`), so it was NOT a missing-entity issue.
+- Other tabs (Home/Inbox/Jobs/Money) rendered fine. No error logged, no redbox.
+
+### Root Cause
+
+`ProfileScreen` ran `useFocusEffect(() => void refresh())` (`ProfileScreen.tsx:52-54`). `refresh()` → `loadEntity()` calls `setIsLoading(true)` on the **shared** `EntityProvider` state (`EntityContext.tsx:146`). `Root` keyed its full-screen splash gate on that same value — `if (authLoading || entityLoading || vendorLoading) return <SplashScreen/>` (`App.tsx:33`, reading entity `isLoading` as `entityLoading`). So every time Profile gained focus, `entityLoading` flipped true → Root unmounted the entire `NavigationContainer`/`TabNavigator` → on resolve it remounted a fresh `NavigationContainer` at its initial route (Home). Profile's content never stayed on screen.
+
+`isLoading` conflated two different things: a first-load (legit full-screen splash) and a background refresh (should be invisible). Profile was the only screen calling `refresh()` on focus, which is why it was the only broken tab.
+
+### Solution
+
+Split the flag in `EntityContext`. Added `isInitializing` — true only until the FIRST load for the current user resolves; background `refresh()` calls leave it false. A per-user ref (`initializedUserId`) lets the mount effect re-show the splash on a genuine (re)login while staying false on a token refresh (same id), avoiding splash flicker. Pointed `Root` at `isInitializing` instead of `isLoading`.
+
+### Files Changed
+
+- `src/context/EntityContext.tsx` — added `isInitializing` state + `initializedUserId` ref; `loadEntity` finally resolves `isInitializing=false`; mount effect re-shows it only for an un-initialized user id; exposed in the context value + interface.
+- `App.tsx` — `Root` gates the splash on `entityInitializing` (was entity `isLoading`).
+
+### Commits
+
+- `<pending>` — fix: gate Root splash on entity isInitializing, not isLoading (Profile tab blank)
+
+### Verification
+
+- `npx tsc --noEmit` → exit 0.
+- Logic trace: focus refresh now toggles only `isLoading` (Root ignores) → navigator stays mounted → ProfileScreen renders the entity. Cold start / sign-in still splash on first load (`isInitializing` true → false on resolve). Token refresh (same id) does not re-splash. New-user-no-entity path still resolves to `EntitySetupScreen` without flashing.
+- NOTE: not yet verified on-device (requires running the Expo build); confirmed by type-check + control-flow trace. DB state was never the issue — the entity row was confirmed present in the report.
+
+### Cross-check Performed
+
+- **Other screens calling refresh() on focus:** `grep -rn "useFocusEffect\|refresh()" src/screens` → only `ProfileScreen`. No other tab triggers the teardown today.
+- **Same latent pattern in sibling contexts (out-of-scope-but-flagged):** `VendorContext` and `AuthContext` also expose an `isLoading` that `Root` gates on (`vendorLoading`, `authLoading`). If a future in-tab screen ever calls vendor `refresh()` (or an auth reload), it would reproduce this exact teardown. No current caller exists, so not fixed here — flagged for the same `isInitializing` split if/when an in-tab vendor/auth refresh is added.
+- **iOS/Android parity:** the fix is pure JS state/control-flow (no native API); behaves identically on both platforms.
+
+### Prevention
+
+A context's "is loading" flag that is also true during background refreshes must NOT be used as an app-level full-screen gate. Gate first-mount splashes on an init-only flag; let refreshes toggle a separate flag that no unmount-gate reads.
+
+Grep for at-risk gates: `grep -n "isLoading" App.tsx` and confirm any provider `isLoading` used in a Root-level early return is an init-only flag.
+
+### Prompt/Subagent Notes
+
+Introduced by `claude-fix`: the Step 3.2 ProfileScreen code added `useFocusEffect(refresh)` for the verified-badge auto-refresh without checking how `Root` consumed the shared entity `isLoading`. The investigation-first report for that build traced the entity write path but not the Root render gate. Build prompts that add a `refresh()` call from a screen should require tracing every consumer of the loading flag the refresh toggles — especially app-level early returns.
