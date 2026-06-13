@@ -1,28 +1,24 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../styles/theme';
 
-export default function JobsScreen() {
+// ContactsScreen — the "Contacts" tab: the vendor's connected entities. Thin
+// placeholder for the shell step; the real connections list lands later.
+export default function ContactsScreen() {
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.content}>
-        <Text style={styles.title}>Jobs</Text>
-        <Text style={styles.subtitle}>Coming soon</Text>
-      </View>
-    </SafeAreaView>
+    <View style={styles.content}>
+      <Text style={styles.title}>Contacts</Text>
+      <Text style={styles.subtitle}>No connections yet.</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
   content: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: theme.colors.background,
   },
   title: {
     ...theme.typography.h2,

@@ -77,7 +77,8 @@ export default function ProfileScreen() {
   const deusId = entity?.deus_id ?? null;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    // No top edge: the shell's wordmark header owns the top safe-area inset.
+    <SafeAreaView style={styles.safe} edges={[]}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}

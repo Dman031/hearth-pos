@@ -1,28 +1,25 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../styles/theme';
 
-export default function InboxScreen() {
+// IncomingScreen — the "Incoming" tab: requests/threads reaching the vendor
+// through the network. Thin placeholder for the shell step; the real incoming
+// card/thread list lands in a later sprint.
+export default function IncomingScreen() {
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.content}>
-        <Text style={styles.title}>Inbox</Text>
-        <Text style={styles.subtitle}>Coming soon</Text>
-      </View>
-    </SafeAreaView>
+    <View style={styles.content}>
+      <Text style={styles.title}>Incoming</Text>
+      <Text style={styles.subtitle}>Nothing waiting yet.</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
   content: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: theme.colors.background,
   },
   title: {
     ...theme.typography.h2,
