@@ -33,6 +33,9 @@ import { supabase } from './supabase';
 /** Edge Function that creates the VerificationSession (holds the secret key). */
 const CREATE_SESSION_FUNCTION = 'create-identity-session';
 
+/** Edge Function that creates/reuses the Connect account + onboarding link. */
+const CREATE_CONNECT_FUNCTION = 'create-connect-account';
+
 /**
  * Result of attempting to start hosted Identity verification. Discriminated so
  * the caller can branch without try/catch — this path is vendor-initiated, so
@@ -132,4 +135,93 @@ export async function startIdentityVerification(): Promise<IdentityVerificationS
     sessionId: payload.id,
   });
   return { ok: true, sessionId: payload.id };
+}
+
+// ── Business verification (Stripe Connect / KYB) ─────────────────────────────
+//
+// Same shape as Identity: a server hop creates (or reuses) the Connect Express
+// account and returns the Stripe-hosted onboarding URL; the verdict
+// (entities.business_verified) is set later by the stripe-connect-webhook on
+// account.updated. The hosted-flow failure set is shared with Identity.
+
+export type BusinessVerificationStart =
+  | { ok: true; accountId: string }
+  | { ok: false; reason: IdentityStartFailure };
+
+interface CreateConnectPayload {
+  url: string;
+  accountId: string;
+}
+
+/** Validates the create-connect-account JSON before we trust it. */
+function parseConnectPayload(data: unknown): CreateConnectPayload | null {
+  if (typeof data !== 'object' || data === null) {
+    return null;
+  }
+  const { url, account_id } = data as Record<string, unknown>;
+  if (typeof url !== 'string' || url.length === 0) {
+    return null;
+  }
+  if (typeof account_id !== 'string' || account_id.length === 0) {
+    return null;
+  }
+  return { url, accountId: account_id };
+}
+
+/**
+ * Starts Stripe Connect business verification (KYB) for the signed-in vendor's
+ * entity. Invoke just-in-time when a card needs the 'business' tier (Phase 4),
+ * or from a "Verify your business" affordance. Never throws.
+ */
+export async function startBusinessVerification(): Promise<BusinessVerificationStart> {
+  const { data: sessionData, error: sessionError } =
+    await supabase.auth.getSession();
+  if (sessionError) {
+    console.warn('[stripe] getSession failed:', sessionError);
+    return { ok: false, reason: 'unauthenticated' };
+  }
+  if (!sessionData.session) {
+    console.warn('[stripe] startBusinessVerification called with no session');
+    return { ok: false, reason: 'unauthenticated' };
+  }
+
+  let payload: CreateConnectPayload | null;
+  try {
+    const { data, error } = await supabase.functions.invoke(
+      CREATE_CONNECT_FUNCTION,
+      { body: {} },
+    );
+    if (error) {
+      console.warn('[stripe] create-connect-account failed:', error);
+      return { ok: false, reason: 'session_create_failed' };
+    }
+    payload = parseConnectPayload(data);
+    if (payload === null) {
+      console.warn(
+        '[stripe] create-connect-account returned malformed payload:',
+        data,
+      );
+      return { ok: false, reason: 'session_create_failed' };
+    }
+  } catch (err) {
+    console.warn('[stripe] create-connect-account invoke threw:', err);
+    return { ok: false, reason: 'session_create_failed' };
+  }
+
+  try {
+    const canOpen = await Linking.canOpenURL(payload.url);
+    if (!canOpen) {
+      console.warn('[stripe] device cannot open Connect URL:', payload.url);
+      return { ok: false, reason: 'cannot_open_browser' };
+    }
+    await Linking.openURL(payload.url);
+  } catch (err) {
+    console.warn('[stripe] failed to open Connect onboarding URL:', err);
+    return { ok: false, reason: 'cannot_open_browser' };
+  }
+
+  console.log('[stripe] opened Connect onboarding', {
+    accountId: payload.accountId,
+  });
+  return { ok: true, accountId: payload.accountId };
 }

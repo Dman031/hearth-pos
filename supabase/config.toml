@@ -378,6 +378,17 @@ verify_jwt = false
 [functions.create-identity-session]
 verify_jwt = true
 
+# Stripe Connect webhook: same as the Identity webhook — Stripe can't present a
+# Supabase JWT, so it's authenticated by the Connect webhook signature against
+# STRIPE_CONNECT_WEBHOOK_SECRET instead.
+[functions.stripe-connect-webhook]
+verify_jwt = false
+
+# create-connect-account: signed-in vendor only (valid JWT) may start business
+# verification for their own entity.
+[functions.create-connect-account]
+verify_jwt = true
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.
