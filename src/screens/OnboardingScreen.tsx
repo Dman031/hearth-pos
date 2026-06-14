@@ -16,6 +16,7 @@ import ConversationBubble, {
 import HearthOrb from '../components/HearthOrb';
 import SignOutButton from '../components/SignOutButton';
 import useCards from '../hooks/useCards';
+import { generateFollowup } from '../services/followup';
 import type { ActPerm, CardDraft, SeePerm } from '../types/card';
 import { theme } from '../styles/theme';
 
@@ -41,6 +42,9 @@ import { theme } from '../styles/theme';
 // Phase semantics:
 //   mission             — opening mission lines, auto-paced, then the first ask
 //   awaiting_card_title — vendor types the thing they want to be found for
+//   generating_followup — Opus crafts ONE tailored follow-up (single turn);
+//                         falls back to a static prompt if the API fails/times
+//                         out, so onboarding never blocks
 //   awaiting_card_detail— optional one-line detail in their words (skippable)
 //   awaiting_see        — privacy: who can SEE this card (input chips)
 //   awaiting_act        — privacy: who can ACT on it (input chips)
@@ -51,6 +55,7 @@ import { theme } from '../styles/theme';
 type OnboardingPhase =
   | 'mission'
   | 'awaiting_card_title'
+  | 'generating_followup'
   | 'awaiting_card_detail'
   | 'awaiting_see'
   | 'awaiting_act'
@@ -215,10 +220,7 @@ export default function OnboardingScreen() {
       setPendingTitle(text);
       addMessage('vendor', text);
       setDraftText('');
-      void (async () => {
-        await sayHearth(DETAIL_QUESTION);
-        setPhase('awaiting_card_detail');
-      })();
+      void askTailoredDetail(text);
       return;
     }
 
@@ -234,6 +236,34 @@ export default function OnboardingScreen() {
     }
 
     // No other phase accepts free-text; defensively no-op.
+  };
+
+  // Comprehension step: Opus reads their card title and crafts ONE warm,
+  // tailored follow-up that makes them feel understood (e.g. "i'm a consultant"
+  // → "got it — what do you consult on, and who usually hires you?"). This is
+  // enrichment, NOT classification — no templates, no pick-list.
+  //
+  // STRICT single-turn: exactly one follow-up per card, then permissions.
+  // BULLETPROOF fallback: generateFollowup never throws and returns
+  // { question: null } on any error/timeout; we fall back to the static
+  // DETAIL_QUESTION so onboarding never blocks on the API. The typing indicator
+  // shows (orb listening) for the duration of the call.
+  const askTailoredDetail = async (title: string): Promise<void> => {
+    setPhase('generating_followup');
+    const streamId = addMessage('hearth', '', true);
+    let question = DETAIL_QUESTION;
+    try {
+      const { question: tailored } = await generateFollowup(title);
+      if (tailored) {
+        question = tailored;
+      }
+    } catch (err) {
+      // generateFollowup is built not to throw; defensive net so a failed API
+      // call can never break onboarding.
+      console.warn('[OnboardingScreen] generateFollowup threw:', err);
+    }
+    updateMessage(streamId, { text: question, isStreaming: false });
+    setPhase('awaiting_card_detail');
   };
 
   const handleSkipDetail = (): void => {
@@ -435,7 +465,12 @@ export default function OnboardingScreen() {
     <SafeAreaView style={styles.safe}>
       <SignOutButton />
       <View style={styles.orbContainer}>
-        <HearthOrb size={140} listening={phase === 'saving_card'} />
+        <HearthOrb
+          size={140}
+          listening={
+            phase === 'saving_card' || phase === 'generating_followup'
+          }
+        />
       </View>
 
       <KeyboardAvoidingView
