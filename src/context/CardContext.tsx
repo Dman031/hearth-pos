@@ -41,6 +41,32 @@ interface CardContextValue {
 
 const CardContext = createContext<CardContextValue | null>(null);
 
+// Explicit column list = the Card contract. NEVER select('*') on cards: the
+// table now carries an `embedding vector(768)` + `embedding_model` (semantic
+// search) that the app must not pull — 768 floats per card would bloat every
+// load to the mobile client. These columns mirror src/types/card.ts exactly.
+const CARD_COLUMNS =
+  'id, entity_id, title, kind, fields, see_perm, act_perm, ' +
+  'verification_required, verification_status, commerce_enabled, ' +
+  'display_order, created_at, updated_at';
+
+// Fire-and-forget: embed a newly-created/edited card for semantic search via the
+// embed-card edge function (which holds the Cloudflare key server-side). NEVER
+// blocks or fails card creation — if embedding fails the card still exists and
+// is found via the network's substring fallback; the backfill re-embeds later.
+async function triggerEmbedCard(cardId: string): Promise<void> {
+  try {
+    const { error } = await supabase.functions.invoke('embed-card', {
+      body: { card_id: cardId },
+    });
+    if (error) {
+      console.warn('[CardProvider] embed-card invoke failed (non-fatal):', error);
+    }
+  } catch (err) {
+    console.warn('[CardProvider] embed-card invoke threw (non-fatal):', err);
+  }
+}
+
 function toError(value: unknown, context: string): Error {
   if (value instanceof Error) {
     return value;
@@ -92,7 +118,7 @@ export function CardProvider({ children }: CardProviderProps) {
     try {
       const { data, error: queryError } = await supabase
         .from('cards')
-        .select('*')
+        .select(CARD_COLUMNS)
         .eq('entity_id', id)
         .order('display_order', { ascending: true })
         .abortSignal(controller.signal);
@@ -108,7 +134,9 @@ export function CardProvider({ children }: CardProviderProps) {
         return;
       }
 
-      const loaded = (data as Card[] | null) ?? [];
+      // Cast through unknown: a dynamic select() column string makes supabase-js
+      // infer GenericStringError[] rather than the row type.
+      const loaded = (data as unknown as Card[] | null) ?? [];
       setCards(loaded);
       // Latch the onboarding decision exactly once per entity, at first-load
       // resolution. A returning user with cards skips the helper for good.
@@ -208,7 +236,7 @@ export function CardProvider({ children }: CardProviderProps) {
         const { data, error: insertError } = await supabase
           .from('cards')
           .insert(row)
-          .select()
+          .select(CARD_COLUMNS)
           .single();
 
         if (insertError) {
@@ -222,8 +250,10 @@ export function CardProvider({ children }: CardProviderProps) {
           );
         }
 
-        const created = data as Card;
+        const created = data as unknown as Card;
         setCards((prev) => [...prev, created]);
+        // Embed for semantic search out-of-band — never blocks the return.
+        void triggerEmbedCard(created.id);
         return created;
       } catch (err) {
         const wrapped = toError(err, 'failed to create card');
