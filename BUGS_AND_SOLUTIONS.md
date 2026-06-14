@@ -292,3 +292,56 @@ Grep for at-risk gates: `grep -n "isLoading" App.tsx` and confirm any provider `
 ### Prompt/Subagent Notes
 
 Introduced by `claude-fix`: the Step 3.2 ProfileScreen code added `useFocusEffect(refresh)` for the verified-badge auto-refresh without checking how `Root` consumed the shared entity `isLoading`. The investigation-first report for that build traced the entity write path but not the Root render gate. Build prompts that add a `refresh()` call from a screen should require tracing every consumer of the loading flag the refresh toggles — especially app-level early returns.
+
+---
+
+## BUG-005: Onboarding classifier could not classify "teacher" (and the whole low-confidence class)
+
+**Status:** RESOLVED BY DESIGN
+**Date:** 2026-06-13
+**Severity:** Medium (onboarding dead-end for unsupported business types)
+**Category:** ai-tool-calling → resolved by removal
+**Introduced-by:** human (product direction — template era); resolved-by `claude` (Phase 4 card model)
+**Related bugs:** BUG-003 (the no-WIMP pick-list exception this removes), BUG-002 (the createVendor-on-finalize path this retires)
+
+### Symptom
+
+- A vendor describing themselves as a "teacher" (and other inputs outside the four launch templates: generic_service, plumber, coffee_shop, task_runner) returned low or zero confidence from `classify-business`. The flow fell through to the documented pick-list exception (BUG-003's Pattern C), where none of the four templates fit — a dead-end framed as a choice.
+
+### Root Cause
+
+Onboarding was modeled as "classify the vendor into one of N templates." Any input outside the seeded template set is inherently unclassifiable; no amount of prompt tuning fixes a closed-set classifier facing an open-set world. The teacher case is one instance of an unbounded class.
+
+### Fix (by design — classification removed entirely)
+
+Phase 4 replaces the template/classify model with the Deus **card model**. The new `OnboardingScreen` is a SCRIPTED helper (no LLM, no `classify-business`, no Anthropic call): it asks plain questions, seeds 1–3 cards (`title` + `fields` in the vendor's own words), sets per-card see/act permissions (framed as privacy/control), and hands off via a static closing beat. There is no classification left to fail, so the entire low-confidence class — teacher included — is moot. The card-write path goes through `assertCardCanGoLive` (PROMPT-CODE CONTRACT) in `CardContext.createCard`.
+
+### Files Changed
+
+- `src/screens/OnboardingScreen.tsx` — rewritten internals: scripted card phase machine; removed `classifyBusiness`/`fetchAllTemplates`/`useVendor`/`createVendor`; reuses the existing bubble/orb/input shell and the no-WIMP action model.
+- `src/context/CardContext.tsx` — new. Loads the entity's cards; gated `createCard`; `needsOnboarding` load-time latch + `completeOnboarding()`; `isInitializing` split (mirrors EntityContext, per BUG-004's prevention rule).
+- `src/hooks/useCards.ts` — new thin context reader.
+- `App.tsx` — mount `CardProvider` inside `EntityProvider`; route onboarding off `needsOnboarding` (was `vendor.template_id`); splash no longer gates on `vendorLoading` (closes the latent gate BUG-004 flagged); card splash checked AFTER the deus_id reveal so the reveal isn't hidden.
+- `src/services/classifier.ts` + `supabase/functions/classify-business` — left cleanly orphaned (no callers); retire/delete in a later cleanup (tracked in DEFERRED.md).
+
+### Commits
+
+- `<pending>` — feat: scripted card-seeding onboarding (replaces classify-business)
+
+### Verification
+
+- `npx tsc --noEmit` → exit 0.
+- `grep` confirms no remaining real references to `classifyBusiness`/`fetchAllTemplates`/`createVendor` in `App.tsx`/`OnboardingScreen.tsx` (only comments + the `'vendor'` bubble-speaker literal remain).
+- `grep -ni "schema"` over the new files → only the comment forbidding the word.
+- NOT yet verified on-device (requires the Expo build) — confirmed by type-check + control-flow trace. cards-table RLS policies are not in-repo; if a card write silently returns zero rows that is the cause and `createCard` surfaces it as failure (SUPABASE WRITE RULE) with a retry affordance (tracked in DEFERRED.md).
+
+### Cross-check Performed
+
+- **Other AI invocation surfaces (ai-tool-calling cross-check rule):** `classify-business` was the only Anthropic call wired into the app; no other tool-calling/extraction surface ships in hearth-pos today, so none carries the same closed-set-classifier failure mode.
+- **Other routing inputs:** `vendor` is still read by `stripe.ts`/`useVendor`; `VendorProvider` stays mounted, only its routing role is dropped. The four tab screens never read `vendor`, so the tabs are unaffected.
+- **isInitializing-vs-isLoading pattern (BUG-004):** `CardContext` was built with the init-only split from the start, so it does not reintroduce the ProfileScreen-blank teardown.
+- **Deus-ID reveal regression:** Root checks `revealEntity`/entity-setup BEFORE the card splash, so the Phase 3 reveal is not hidden while cards load for the just-created entity.
+
+### Prevention
+
+Do not model onboarding (or any vendor-facing categorization) as classification into a closed set when the input space is open. Prefer letting the vendor name the thing in their own words (a card) over forcing it into a predefined bucket. If a future surface must classify, it must have an explicit, non-dead-end path for "none of the buckets fit" that is not framed as a choice the vendor failed to make.

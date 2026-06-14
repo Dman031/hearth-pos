@@ -15,137 +15,129 @@ import ConversationBubble, {
 } from '../components/ConversationBubble';
 import HearthOrb from '../components/HearthOrb';
 import SignOutButton from '../components/SignOutButton';
-import { APP_NAME } from '../constants/app';
-import {
-  classifyBusiness,
-  type ClassificationResult,
-} from '../services/classifier';
-import { fetchAllTemplates, type Template } from '../services/template-loader';
-import useVendor from '../hooks/useVendor';
+import useCards from '../hooks/useCards';
+import type { ActPerm, CardDraft, SeePerm } from '../types/card';
 import { theme } from '../styles/theme';
 
-// Phase semantics:
-//   greeting / awaiting_description — opening line + free-text input
-//   classifying                     — LLM call in flight
-//   narrating                       — high-confidence assumption presented;
-//                                     held in pendingTemplateId. The vendor's
-//                                     next message is run through the cheap
-//                                     correction-router (once) before being
-//                                     treated as a question-loop answer.
-//   reclarifying                    — low-confidence first pass; ask one
-//                                     prose follow-up before any pick-list
-//   awaiting_clarification          — input visible during reclarify
-//   question_loop                   — Day 3 per-template questions (placeholder)
-//   manual_selection_exception      — DOCUMENTED EXCEPTION (see comment at
-//                                     line ~290): the pick-list is shown ONLY
-//                                     after two failed conversational passes
-//                                     or a confidence===0 read.
-//   finalizing                      — Pattern B: createVendor() runs here, at
-//                                     the END of the loop, not at narration
-//   confirmed                       — vendor row written; navigation continue
-type OnboardingPhase =
-  | 'greeting'
-  | 'awaiting_description'
-  | 'classifying'
-  | 'narrating'
-  | 'reclarifying'
-  | 'awaiting_clarification'
-  | 'question_loop'
-  | 'manual_selection_exception'
-  | 'finalizing'
-  | 'confirmed';
+// ============================================================================
+// OnboardingScreen — the card-seeding helper (Phase 4 / Day 10).
+//
+// This is a SCRIPTED helper, not an agent. It asks a fixed sequence of plain
+// questions, seeds 1–3 cards into the cards table, then hands off and never runs
+// again (CardContext.needsOnboarding latch). It REPLACES the old LLM
+// classify-business onboarding — there is no classification, no template, no
+// Anthropic call here anymore. The "teacher wouldn't classify" bug is resolved
+// by removing classification entirely (see DEFERRED.md).
+//
+// It reuses the existing conversational shell: ConversationBubble (typing dots +
+// streaming), HearthOrb, the input bar, and the no-WIMP action model
+// (kind: 'input' | 'navigation' only — never a binary decision pair).
+//
+// Editorial voice: spare, lowercase, human-first. Never the word "schema", never
+// protocol/MCP terminology. Each step carries one plain-language "why this
+// matters" line — especially permissions, framed as control, not configuration.
+// ============================================================================
 
-type SaveStatus = 'idle' | 'saving' | 'saved' | 'failed';
+// Phase semantics:
+//   mission             — opening mission lines, auto-paced, then the first ask
+//   awaiting_card_title — vendor types the thing they want to be found for
+//   awaiting_card_detail— optional one-line detail in their words (skippable)
+//   awaiting_see        — privacy: who can SEE this card (input chips)
+//   awaiting_act        — privacy: who can ACT on it (input chips)
+//   saving_card         — createCard() in flight (the canonical gated write)
+//   save_failed         — write failed; a retry navigation action is surfaced
+//   offer_more          — offer another card (cap at MAX_CARDS) or finish
+//   closing             — STATIC closing beat screen ("you're live")
+type OnboardingPhase =
+  | 'mission'
+  | 'awaiting_card_title'
+  | 'awaiting_card_detail'
+  | 'awaiting_see'
+  | 'awaiting_act'
+  | 'saving_card'
+  | 'save_failed'
+  | 'offer_more'
+  | 'closing';
 
 interface ChatMessage {
   id: string;
   speaker: 'hearth' | 'vendor';
   text: string;
   isStreaming?: boolean;
-  // Bubble-level tone, used by the save-failure path to mark the error bubble.
   tone?: 'default' | 'danger';
 }
 
-const CONFIDENCE_THRESHOLD = 0.7;
-const GENERIC_SERVICE_ID = 'generic_service';
+// At most three cards in onboarding — keep it to ~3 minutes; the rest are added
+// later from the Profile tab (Day 11–12).
+const MAX_CARDS = 3;
+// How long the typing indicator shows before a hearth line lands. Enough to feel
+// paced and human without dragging.
+const TYPING_MS = 650;
 
-const GREETING_TEXT = `Hey. Welcome to ${APP_NAME}. What kind of work do you do?`;
-const SAVE_ERROR_TEXT =
-  'Something went sideways saving your account. Try again?';
-const NETWORK_ERROR_TEXT =
-  'Hold on — the network is hiccuping. Try again in a moment.';
-const RECLARIFY_TEXT =
-  "I want to get this right — tell me a bit more. What's a typical job " +
-  'or customer look like for you?';
-
-// Lightweight cues that the vendor's next message is correcting the
-// just-narrated business type. The correction-router runs ONLY on the message
-// immediately after narration; later messages are answers to the question
-// loop. Cheap version per the approved spec — no classifier-on-every-turn.
-const CORRECTION_CUES: readonly string[] = [
-  'no',
-  'nope',
-  'not quite',
-  "that's not",
-  'thats not',
-  "i'm not",
-  'im not',
-  "i don't",
-  'i dont',
-  'actually',
-  'wrong',
-  "you're off",
-  'youre off',
-  "you've got",
-  'youve got',
+// --- copy -------------------------------------------------------------------
+const MISSION_LINES: readonly string[] = [
+  'we built this to connect people — not replace them.',
+  "let's make you findable. takes about a minute.",
 ];
 
-function looksLikeCorrection(text: string): boolean {
-  const lowered = text.trim().toLowerCase();
-  if (lowered.length === 0) {
-    return false;
-  }
-  // Match a cue only at the start of the message, or as a leading clause.
-  return CORRECTION_CUES.some((cue) => {
-    if (lowered === cue) {
-      return true;
-    }
-    return lowered.startsWith(`${cue} `) || lowered.startsWith(`${cue},`);
-  });
-}
+const CARD_QUESTION =
+  "what's one thing you'd want someone — or someone's assistant — to be able " +
+  'to find you for?' +
+  '\n\nwhatever you say becomes a card — a small, findable thing about you.';
+
+const DETAIL_QUESTION =
+  'say a little more, in your own words.' +
+  "\n\nit's what an agent reads when it's deciding whether to reach you. or " +
+  'skip it.';
+
+const SEE_QUESTION =
+  'who can see this?' +
+  '\n\nthis is how you stay in control — an agent can only do what you allow.';
+
+const ACT_QUESTION =
+  'and who can act on it?' +
+  '\n\nacting means booking, buying, or starting something — not just looking.';
+
+const OFFER_MORE_TEXT = 'added. want to add another thing people can find you for?';
+
+const SAVE_ERROR_TEXT = "that didn't save. want to try again?";
+
+// --- permission options (human label → enum) --------------------------------
+// 'off' is intentionally omitted from SEE — you're declaring a card to be found,
+// so the floor is "people I know". ACT starts at "no one" because most things
+// people want to be reachable, not actionable, by default.
+const SEE_OPTIONS: { label: string; value: SeePerm }[] = [
+  { label: 'people I know', value: 'contacts' },
+  { label: 'verified people', value: 'verified' },
+  { label: 'anyone', value: 'anyone' },
+];
+
+const ACT_OPTIONS: { label: string; value: ActPerm }[] = [
+  { label: 'no one — just reach out', value: 'off' },
+  { label: 'people I know', value: 'contacts' },
+  { label: 'verified people', value: 'verified' },
+];
 
 export default function OnboardingScreen() {
-  const { createVendor } = useVendor();
+  const { createCard, completeOnboarding } = useCards();
 
-  const [phase, setPhase] = useState<OnboardingPhase>('greeting');
+  const [phase, setPhase] = useState<OnboardingPhase>('mission');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draftText, setDraftText] = useState('');
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(
-    null,
-  );
-  const [pendingTemplateName, setPendingTemplateName] = useState<string | null>(
-    null,
-  );
-  // Carries the latest classifier output; used only for diagnostics and for
-  // the pick-list exception lead-in copy.
-  const [lastClassification, setLastClassification] =
-    useState<ClassificationResult | null>(null);
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
-  const [templatesUnavailable, setTemplatesUnavailable] = useState(false);
-  // Tracks whether the next vendor message should be checked for a correction.
-  // True only for the single turn immediately following a narration; flips
-  // back to false once that message lands (whether it was a correction or an
-  // answer). This is the "cheap correction-router" — exactly one classifier
-  // re-run per onboarding, at most, in response to vendor text.
-  const correctionWindowOpen = useRef(false);
-  // Tracks whether the vendor has already gone through one low-confidence
-  // reclarify pass. Pattern C says the pick-list appears only on the SECOND
-  // failure (or on a hard-zero confidence read from the start).
-  const reclarifyAttempted = useRef(false);
+
+  // The card currently being built. Reset between cards when "add another".
+  const [pendingTitle, setPendingTitle] = useState('');
+  const [pendingDetail, setPendingDetail] = useState<string | null>(null);
+  const [pendingSee, setPendingSee] = useState<SeePerm>('contacts');
+
+  const [cardsCreated, setCardsCreated] = useState(0);
+  // The first card's title — the representative line in the closing beat.
+  const [firstCardTitle, setFirstCardTitle] = useState<string | null>(null);
 
   const messageIdCounter = useRef(0);
   const scrollRef = useRef<ScrollView>(null);
+  // Outstanding paced-bubble timers, cleared on unmount.
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const nextMessageId = (): string => {
     messageIdCounter.current += 1;
@@ -169,419 +161,281 @@ export default function OnboardingScreen() {
     );
   };
 
-  // Opening line, shown once on mount, then the input opens.
+  // Shows the typing indicator for TYPING_MS, then lands a hearth line. Returns
+  // a promise so scripted sequences read top-to-bottom.
+  const sayHearth = (text: string): Promise<void> =>
+    new Promise((resolve) => {
+      const id = addMessage('hearth', '', true);
+      const t = setTimeout(() => {
+        updateMessage(id, { text, isStreaming: false });
+        resolve();
+      }, TYPING_MS);
+      timers.current.push(t);
+    });
+
+  // Mission intro on mount → first card question. The entity + deus_id already
+  // exist (EntitySetupScreen, Phase 3) by the time we get here, so we open
+  // straight into the mission framing.
   useEffect(() => {
-    setMessages([
-      { id: nextMessageId(), speaker: 'hearth', text: GREETING_TEXT },
-    ]);
-    setPhase('awaiting_description');
+    let cancelled = false;
+    const run = async () => {
+      for (const line of MISSION_LINES) {
+        if (cancelled) {
+          return;
+        }
+        await sayHearth(line);
+      }
+      if (cancelled) {
+        return;
+      }
+      await sayHearth(CARD_QUESTION);
+      if (!cancelled) {
+        setPhase('awaiting_card_title');
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+      timers.current.forEach(clearTimeout);
+      timers.current = [];
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadTemplates = async (): Promise<Template[]> => {
-    try {
-      const loaded = await fetchAllTemplates();
-      setTemplates(loaded);
-      return loaded;
-    } catch (err) {
-      console.warn('[OnboardingScreen] could not load business types:', err);
-      setTemplates([]);
-      return [];
-    }
-  };
-
-  const displayNameFor = (
-    categoryId: string,
-    loaded: Template[],
-  ): string => {
-    return (
-      loaded.find((t) => t.id === categoryId)?.display_name ?? categoryId
-    );
-  };
-
-  // Renders the narration as a two-line message: a prominent name line, then
-  // the soft correction invitation. The leading "▸ {Name}\n\n…" structure
-  // makes the chosen business type the most visually salient element of the
-  // bubble, mitigating silent ratification.
-  const narrationText = (displayName: string): string => {
-    return (
-      `▸ ${displayName.toUpperCase()}\n\n` +
-      `Setting you up for that now. If I read that wrong, just tell me ` +
-      `what you actually do and I'll switch.`
-    );
-  };
-
-  const reclarifyPromptText = (): string => RECLARIFY_TEXT;
-
-  const pickListLeadIn = (result: ClassificationResult | null): string => {
-    if (result === null || result.confidence === 0) {
-      return 'Let me ask you directly: which of these fits best?';
-    }
-    return "I'm still not catching it — which of these fits best?";
-  };
-
   // ---------------------------------------------------------------------------
-  // Phase transitions driven by classification outcomes
+  // Free-text input handler — only the title and detail steps take typed input.
   // ---------------------------------------------------------------------------
-
-  // High-confidence outcome: narrate the assumption, hold the template id in
-  // local state, and open the correction window for the vendor's next message.
-  // Pattern B: NO createVendor call here.
-  const enterNarrating = async (
-    result: ClassificationResult,
-    streamId: string,
-  ): Promise<void> => {
-    const loaded = await loadTemplates();
-    const name = displayNameFor(result.category, loaded);
-    setPendingTemplateId(result.category);
-    setPendingTemplateName(name);
-    updateMessage(streamId, {
-      text: narrationText(name),
-      isStreaming: false,
-    });
-    correctionWindowOpen.current = true;
-    setPhase('narrating');
-  };
-
-  // Low-confidence first pass: ask one prose follow-up before any pick-list.
-  // Pattern C, attempt 1.
-  const enterReclarifying = (streamId: string): void => {
-    reclarifyAttempted.current = true;
-    updateMessage(streamId, {
-      text: reclarifyPromptText(),
-      isStreaming: false,
-    });
-    setPhase('awaiting_clarification');
-  };
-
-  // DOCUMENTED EXCEPTION — Pattern C fallback. The conversational principle
-  // is that decisions are made by typing, not by tapping. The pick-list below
-  // is the one place that rule bends, and only when:
-  //   (a) the classifier returned confidence === 0 (a failed read — timeout,
-  //       unreadable response), OR
-  //   (b) the vendor has already been asked one prose follow-up and the
-  //       classifier still can't land above CONFIDENCE_THRESHOLD.
-  // Treating the pick-list as the default low-confidence path would be the
-  // anti-pattern — by gating it behind a second strike we keep it as a
-  // last-resort safety net, not a habit. Do not widen the conditions in
-  // enterManualSelectionException without updating the BUGS_AND_SOLUTIONS
-  // entry that records this rule.
-  const enterManualSelectionException = async (
-    result: ClassificationResult,
-    streamId: string,
-  ): Promise<void> => {
-    const loaded = templates.length > 0 ? templates : await loadTemplates();
-    if (loaded.length === 0) {
-      updateMessage(streamId, {
-        text: NETWORK_ERROR_TEXT,
-        isStreaming: false,
-      });
-      setTemplatesUnavailable(true);
-    } else {
-      updateMessage(streamId, {
-        text: pickListLeadIn(result),
-        isStreaming: false,
-      });
-      setTemplatesUnavailable(false);
-    }
-    setPhase('manual_selection_exception');
-  };
-
-  const runClassification = async (
-    text: string,
-    streamId: string,
-  ): Promise<void> => {
-    setPhase('classifying');
-
-    let result: ClassificationResult;
-    try {
-      result = await classifyBusiness(text);
-    } catch (err) {
-      // classifyBusiness is built not to throw; defensive net.
-      console.warn('[OnboardingScreen] classification threw:', err);
-      result = {
-        category: GENERIC_SERVICE_ID,
-        confidence: 0,
-        reasoning: 'unexpected_error',
-        isFallback: true,
-      };
-    }
-
-    setLastClassification(result);
-
-    const confident =
-      result.confidence >= CONFIDENCE_THRESHOLD && !result.isFallback;
-    if (confident) {
-      await enterNarrating(result, streamId);
-      return;
-    }
-
-    // Pattern C fallback decision:
-    //   - confidence === 0 is a failed read — go straight to the pick-list
-    //   - otherwise low-but-nonzero: one prose reclarify, then pick-list on
-    //     the SECOND failure (when reclarifyAttempted.current is already true)
-    if (result.confidence === 0 || reclarifyAttempted.current) {
-      await enterManualSelectionException(result, streamId);
-      return;
-    }
-    enterReclarifying(streamId);
-  };
-
-  // ---------------------------------------------------------------------------
-  // Input handler — branches on phase
-  // ---------------------------------------------------------------------------
-
   const handleSend = (): void => {
     const text = draftText.trim();
     if (text.length === 0) {
       return;
     }
 
-    // Correction-router runs ONLY on the message immediately after narration.
-    // If the vendor types a correction here, re-run the classifier on their
-    // new text and re-narrate (or fall through to Pattern C if it's now
-    // low-confidence). Otherwise treat the message as a question-loop answer.
-    if (phase === 'narrating' && correctionWindowOpen.current) {
-      correctionWindowOpen.current = false;
-      if (looksLikeCorrection(text)) {
-        addMessage('vendor', text);
-        const streamId = addMessage('hearth', '', true);
-        setDraftText('');
-        setPendingTemplateId(null);
-        setPendingTemplateName(null);
-        void runClassification(text, streamId);
-        return;
-      }
-      // First non-correction reply after narration — the vendor has implicitly
-      // ratified the template. Transition into the question loop and treat
-      // this text as the first answer.
+    if (phase === 'awaiting_card_title') {
+      setPendingTitle(text);
       addMessage('vendor', text);
       setDraftText('');
-      setPhase('question_loop');
-      // Day 3 will route this to the per-template question handler. For now,
-      // the question loop has a single placeholder turn that immediately
-      // surfaces the finalize affordance.
-      enterPlaceholderQuestionLoop();
+      void (async () => {
+        await sayHearth(DETAIL_QUESTION);
+        setPhase('awaiting_card_detail');
+      })();
       return;
     }
 
-    if (phase === 'awaiting_clarification') {
+    if (phase === 'awaiting_card_detail') {
+      setPendingDetail(text);
       addMessage('vendor', text);
-      const streamId = addMessage('hearth', '', true);
       setDraftText('');
-      void runClassification(text, streamId);
+      void (async () => {
+        await sayHearth(SEE_QUESTION);
+        setPhase('awaiting_see');
+      })();
       return;
     }
 
-    if (
-      phase === 'greeting' ||
-      phase === 'awaiting_description'
-    ) {
-      addMessage('vendor', text);
-      const streamId = addMessage('hearth', '', true);
-      setDraftText('');
-      void runClassification(text, streamId);
-      return;
-    }
-
-    // No other phase accepts free-text input; defensively no-op.
+    // No other phase accepts free-text; defensively no-op.
   };
 
-  // Day 3 placeholder. The real per-template question loop lands separately;
-  // for the no-WIMP onboarding ship this just acknowledges and surfaces the
-  // navigation "Continue" affordance that triggers the deferred write.
-  const enterPlaceholderQuestionLoop = (): void => {
-    addMessage(
-      'hearth',
-      'Great. Day 3 wires up a few quick questions here — for now, ' +
-        "I'll save your setup when you're ready.",
-    );
+  const handleSkipDetail = (): void => {
+    setPendingDetail(null);
+    addMessage('vendor', 'skip');
+    void (async () => {
+      await sayHearth(SEE_QUESTION);
+      setPhase('awaiting_see');
+    })();
+  };
+
+  const handleSelectSee = (option: { label: string; value: SeePerm }): void => {
+    setPendingSee(option.value);
+    addMessage('vendor', option.label);
+    void (async () => {
+      await sayHearth(ACT_QUESTION);
+      setPhase('awaiting_act');
+    })();
+  };
+
+  // Act is the last choice before the write — pass the value straight through
+  // rather than reading freshly-set state.
+  const handleSelectAct = (option: {
+    label: string;
+    value: ActPerm;
+  }): void => {
+    addMessage('vendor', option.label);
+    void runSaveCard(option.value);
   };
 
   // ---------------------------------------------------------------------------
-  // Pattern B: deferred write — runs at the END of the loop, never at
-  // classification time. Reads pendingTemplateId from state.
+  // The canonical card write. createCard() runs the card-gating guard
+  // (assertCardCanGoLive) and derives verification_status — see CardContext.
+  // Onboarding cards declare verification_required: 'none', so the gate never
+  // throws for a fresh unverified user, but the write still goes THROUGH it
+  // (PROMPT-CODE CONTRACT).
   // ---------------------------------------------------------------------------
-  const runFinalize = async (): Promise<void> => {
-    if (pendingTemplateId === null) {
-      console.warn(
-        '[OnboardingScreen] runFinalize called without a pendingTemplateId; ' +
-          'phase=',
-        phase,
-      );
-      return;
-    }
-    setPhase('finalizing');
-    setSaveStatus('saving');
+  const buildDraft = (act: ActPerm): CardDraft => ({
+    title: pendingTitle,
+    kind: 'capability',
+    fields: pendingDetail ? { note: pendingDetail } : null,
+    see_perm: pendingSee,
+    act_perm: act,
+    verification_required: 'none',
+  });
+
+  const runSaveCard = async (act: ActPerm): Promise<void> => {
+    setPhase('saving_card');
     const savingId = addMessage('hearth', '', true);
     try {
-      await createVendor({ template_id: pendingTemplateId });
-      updateMessage(savingId, {
-        text: "You're all set. Welcome aboard.",
-        isStreaming: false,
-      });
-      setSaveStatus('saved');
-      setPhase('confirmed');
+      const created = await createCard(buildDraft(act));
+      const count = cardsCreated + 1;
+      setCardsCreated(count);
+      if (firstCardTitle === null) {
+        setFirstCardTitle(created.title);
+      }
+
+      // Reset the pending card for a possible next one.
+      setPendingTitle('');
+      setPendingDetail(null);
+      setPendingSee('contacts');
+      setDraftText('');
+
+      if (count >= MAX_CARDS) {
+        updateMessage(savingId, { text: 'added.', isStreaming: false });
+        setPhase('closing');
+        return;
+      }
+      updateMessage(savingId, { text: OFFER_MORE_TEXT, isStreaming: false });
+      setPhase('offer_more');
     } catch (err) {
-      console.warn('[OnboardingScreen] createVendor failed:', err);
+      console.warn('[OnboardingScreen] createCard failed:', err);
       updateMessage(savingId, {
         text: SAVE_ERROR_TEXT,
         isStreaming: false,
         tone: 'danger',
       });
-      setSaveStatus('failed');
-      // Stay in 'finalizing' so the retry navigation action surfaces.
-    }
-  };
-
-  const handleFinalize = (): void => {
-    void runFinalize();
-  };
-
-  // ---------------------------------------------------------------------------
-  // Pick-list exception handler (DOCUMENTED EXCEPTION — see
-  // enterManualSelectionException comment). Sets the held template id and
-  // transitions straight into the placeholder question loop, so the deferred
-  // write rule still holds: createVendor runs in runFinalize, not here.
-  // ---------------------------------------------------------------------------
-  const handleManualSelect = (
-    templateId: string,
-    name: string,
-  ): void => {
-    setPendingTemplateId(templateId);
-    setPendingTemplateName(name);
-    addMessage(
-      'hearth',
-      `Got it — setting you up for a ${name}.`,
-    );
-    setPhase('question_loop');
-    enterPlaceholderQuestionLoop();
-  };
-
-  const handleRetryTemplates = async (): Promise<void> => {
-    const loaded = await loadTemplates();
-    if (loaded.length === 0) {
-      return; // still down — leave the network-hiccup message in place
-    }
-    setTemplatesUnavailable(false);
-    const lastMessage = messages[messages.length - 1];
-    if (lastMessage) {
-      updateMessage(lastMessage.id, {
-        text: pickListLeadIn(lastClassification),
-        isStreaming: false,
-      });
+      setPhase('save_failed');
     }
   };
 
   const handleRetrySave = (): void => {
-    if (pendingTemplateId === null) {
-      return;
-    }
-    void runFinalize();
+    // The act value lived only in the failed call; rebuild from the last
+    // act-question answer is overkill — re-run the see/act mini-flow instead by
+    // re-asking act. Simplest correct path: bounce back to the act question.
+    void (async () => {
+      await sayHearth(ACT_QUESTION);
+      setPhase('awaiting_act');
+    })();
   };
 
-  const handleContinue = (): void => {
-    // Day 3 wires the real route into the tab navigator here. With the
-    // Context lift in place, Root will pick up the new vendor row automatically
-    // once createVendor resolves; no extra hop is required from here.
-    console.log('TODO: Day 3 — route to TabNavigator after finalize');
+  const handleAddAnother = (): void => {
+    void (async () => {
+      await sayHearth(CARD_QUESTION);
+      setPhase('awaiting_card_title');
+    })();
+  };
+
+  const handleDone = (): void => {
+    setPhase('closing');
+  };
+
+  // Hand-off. completeOnboarding() clears the latch so Root advances to the
+  // tabs and this helper never runs again.
+  const handleEnterApp = (): void => {
+    completeOnboarding();
   };
 
   // ---------------------------------------------------------------------------
-  // Active actions per phase. The shape of every entry is constrained by
-  // ConversationAction.kind — input or navigation. No 'decision' kind exists.
+  // Actions per phase. Permission chips are kind:'input' (carry a value);
+  // offer/closing/retry are kind:'navigation'. No binary decision pairs.
   // ---------------------------------------------------------------------------
   const activeActions = (): ConversationAction[] | undefined => {
     switch (phase) {
-      case 'question_loop':
-        // Day 3 placeholder: surface the navigation that triggers Pattern B's
-        // deferred write. Tagged 'navigation' because tapping it does not
-        // encode a choice — it ends the (currently empty) question loop.
-        if (pendingTemplateId !== null) {
-          return [
-            {
-              label: 'Save and continue',
-              onPress: handleFinalize,
-              kind: 'navigation',
-            },
-          ];
-        }
-        return undefined;
-      case 'manual_selection_exception':
-        if (templatesUnavailable) {
-          return [
-            {
-              label: 'Try again',
-              onPress: () => void handleRetryTemplates(),
-              kind: 'navigation',
-            },
-          ];
-        }
+      case 'awaiting_card_detail':
         return [
-          ...templates.map<ConversationAction>((t) => ({
-            label: t.display_name,
-            onPress: () => handleManualSelect(t.id, t.display_name),
-            kind: 'input',
-          })),
           {
-            label: 'None of these fit',
-            onPress: () =>
-              handleManualSelect(GENERIC_SERVICE_ID, 'general service'),
-            kind: 'input',
+            label: 'skip for now',
+            onPress: handleSkipDetail,
+            kind: 'navigation',
           },
         ];
-      case 'finalizing':
-        if (saveStatus === 'failed') {
-          return [
-            {
-              label: 'Try again',
-              onPress: handleRetrySave,
-              kind: 'navigation',
-              tone: 'danger',
-            },
-          ];
-        }
-        return undefined;
-      case 'confirmed':
-        if (saveStatus === 'saved') {
-          return [
-            {
-              label: 'Continue',
-              onPress: handleContinue,
-              kind: 'navigation',
-            },
-          ];
-        }
-        return undefined;
+      case 'awaiting_see':
+        return SEE_OPTIONS.map<ConversationAction>((o) => ({
+          label: o.label,
+          onPress: () => handleSelectSee(o),
+          kind: 'input',
+        }));
+      case 'awaiting_act':
+        return ACT_OPTIONS.map<ConversationAction>((o) => ({
+          label: o.label,
+          onPress: () => handleSelectAct(o),
+          kind: 'input',
+        }));
+      case 'save_failed':
+        return [
+          {
+            label: 'try again',
+            onPress: handleRetrySave,
+            kind: 'navigation',
+            tone: 'danger',
+          },
+        ];
+      case 'offer_more':
+        return [
+          {
+            label: 'add another',
+            onPress: handleAddAnother,
+            kind: 'navigation',
+          },
+          {
+            label: "i'm done",
+            onPress: handleDone,
+            kind: 'navigation',
+          },
+        ];
       default:
         return undefined;
     }
   };
 
-  // Input is visible whenever the next move is the vendor typing — that is
-  // every phase where Hearth is waiting on the vendor's free-text reply,
-  // including the narration window (vendor's correction OR question-loop
-  // answer both arrive as typed text).
+  // Input is visible only when the next move is the vendor typing.
   const inputVisible =
-    phase === 'greeting' ||
-    phase === 'awaiting_description' ||
-    phase === 'narrating' ||
-    phase === 'awaiting_clarification';
+    phase === 'awaiting_card_title' || phase === 'awaiting_card_detail';
   const canSend = draftText.trim().length > 0;
   const actions = activeActions();
 
-  // The narration placeholder swaps in a softer correction prompt; everywhere
-  // else, the original prompt is fine.
   const inputPlaceholder =
-    phase === 'narrating' && pendingTemplateName !== null
-      ? `Reply, or correct me if "${pendingTemplateName}" is off…`
-      : 'Tell me about your work…';
+    phase === 'awaiting_card_detail'
+      ? 'add a detail, or tap skip…'
+      : 'in your own words…';
+
+  // STATIC closing beat — one screen, using data we already have (the first
+  // card's title). NO query_cards, NO live reach — that's Day 29 (DEFERRED.md).
+  if (phase === 'closing') {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.closingWrap}>
+          <View style={styles.orbContainer}>
+            <HearthOrb size={140} />
+          </View>
+          <Text style={styles.closingTitle}>you&apos;re now findable.</Text>
+          {firstCardTitle ? (
+            <Text style={styles.closingBody}>
+              an AI can reach you for{' '}
+              <Text style={styles.closingEmphasis}>{firstCardTitle}</Text>.
+            </Text>
+          ) : null}
+          <Text style={styles.closingLive}>you&apos;re live.</Text>
+          <Pressable style={styles.primaryButton} onPress={handleEnterApp}>
+            <Text style={styles.primaryButtonLabel}>continue</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
       <SignOutButton />
       <View style={styles.orbContainer}>
-        <HearthOrb size={140} listening={phase === 'classifying'} />
+        <HearthOrb size={140} listening={phase === 'saving_card'} />
       </View>
 
       <KeyboardAvoidingView
@@ -626,10 +480,7 @@ export default function OnboardingScreen() {
               onSubmitEditing={handleSend}
             />
             <Pressable
-              style={[
-                styles.sendButton,
-                !canSend && styles.sendButtonDisabled,
-              ]}
+              style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
               onPress={handleSend}
               disabled={!canSend}
             >
@@ -692,5 +543,49 @@ const styles = StyleSheet.create({
   sendIcon: {
     ...theme.typography.h2,
     color: theme.colors.background,
+  },
+  // --- closing beat ---------------------------------------------------------
+  closingWrap: {
+    flex: 1,
+    paddingHorizontal: theme.spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closingTitle: {
+    ...theme.typography.h1,
+    color: theme.colors.textPrimary,
+    textAlign: 'center',
+    marginTop: theme.spacing.xl,
+  },
+  closingBody: {
+    ...theme.typography.body,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    paddingHorizontal: theme.spacing.lg,
+    marginTop: theme.spacing.lg,
+  },
+  closingEmphasis: {
+    color: theme.colors.accent,
+  },
+  closingLive: {
+    ...theme.typography.h2,
+    color: theme.colors.accent,
+    textAlign: 'center',
+    marginTop: theme.spacing.lg,
+    marginBottom: theme.spacing.xxl,
+  },
+  primaryButton: {
+    backgroundColor: theme.colors.accent,
+    borderRadius: theme.borderRadius.input,
+    paddingVertical: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.xxl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
+  },
+  primaryButtonLabel: {
+    ...theme.typography.body,
+    color: theme.colors.background,
+    fontWeight: '600',
   },
 });
