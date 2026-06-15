@@ -64,13 +64,17 @@ time; it's a nice-to-have, not a blocker.
 ## Enforcement seams (revisit — not blocking)
 
 - **Verified-tier lock is UI-only at the editor / add-card surfaces** — Day 12 enforces the
-  "'verified' see/act tier requires the owner to be verified (`entities.id_verified`)" rule in
+  "'verified' see/act tier requires the owner to be verified" rule in
   `CardEditorSheet` (PermissionPicker disables the tier + `handleSave` double-guards), NOT in the
   shared `createCard`/`updateCard` write path. This was deliberate: gating the shared path would
   regress onboarding (which writes cards for an unverified fresh user). To fully honor the
   PROMPT-CODE CONTRACT, later move the lock into the write boundary so onboarding and any future
   writer are covered too — while keeping onboarding's own writes legal. Seam: `src/context/
   CardContext.tsx` (createCard/updateCard) ↔ `src/components/CardEditorSheet.tsx`.
+  "Owner is verified" = `entityIsVerified` (ANY of `id_verified` / `business_verified` /
+  `credential_verified`), matching the network's verified-tier derivation
+  (hearth-network `src/middleware/auth.ts:78`) — NOT `id_verified` alone, so a
+  business-verified-only vendor isn't wrongly blocked.
 - **`isHigherSee` (clamp predicate) still treats 'anyone' as gated** — `src/services/
   card-gating.ts` `isHigherSee` returns true for BOTH `'verified'` and `'anyone'`, so the gate's
   clamp logic would clamp an `'anyone'` see tier when verification is unsatisfied. Day 12's
