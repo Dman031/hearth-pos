@@ -42,6 +42,59 @@ time; it's a nice-to-have, not a blocker.
 
 ---
 
+## Pre-launch architecture decisions (locked)
+
+Locked design calls that aren't built yet but constrain how the unbuilt piece gets built.
+Distinct from polish — these are architecture, decided, not up for re-litigation.
+
+### Caller-side verification — "Model B" (anonymous-search → verify-at-action → app node) → PRE-LAUNCH
+DECISION (Derrick, locked). How a CALLER (demand side — e.g. an office admin connecting Deus to
+their ChatGPT/Claude to search + act) is verified. **Distinct from card-OWNER verification** (the
+Day-12 editor lock / `entityIsVerified`). Designed when real connector auth replaces the current
+**trust-on-type** placeholder (type a `deus_id`, no real auth — the entity-binding step of the
+network `/oauth` flow). Build that replacement AS this flow.
+
+The flow:
+1. **Connect + SEARCH = zero friction, anonymous.** A connected caller queries all
+   `see_perm='anyone'` cards with NO signup/verification. Discovery is the hook; it must cost
+   nothing. (Maps to the network's existing `anonymous` caller tier — `auth.ts`, no `entity_id`
+   bound.)
+2. **ACT (reach / order / book) = requires verification.** At the moment of FIRST action, the
+   caller is prompted to **download the app** and verify (~3 min). The app is REQUIRED to act, by
+   design. (Acting needs a bound, verified entity → network `verified` tier.)
+3. **Rationale for app-required (not web-verify):** every actor becomes a NODE. Acting pulls the
+   caller into the network as a full participant (app installed, verified, can post their own
+   cards). The act-to-verify moment doubles as supply-side acquisition. "Accelerate together."
+
+Why verify-to-act is a FEATURE, not friction:
+- **"The safest network — everyone who can act on you is a verified human."** A quality guarantee
+  SOLD to the supply side, not a tax. Verified actors = vetted, high-intent. A vendor prefers 10
+  verified requests over 1,000 anonymous tire-kickers.
+- **Never ask for verification before the caller has gotten value.** 3 min is nothing AT THE
+  MOMENT OF ACTION (peak motivation — they've already found what they want). Upfront gates kill
+  adoption; just-in-time-at-action converts.
+
+Two independent safety mechanisms (complementary, different coverage — need BOTH):
+- **VERIFICATION = accountability** (we know who the actor is). The UNIVERSAL floor for ALL
+  actions. The ONLY thing protecting non-payment actions (reach / message / book) from spam.
+- **PAYMENT-UPFRONT = skin in the game.** Additional gate for TRANSACTIONAL actions (orders). A
+  bot placing paid fake orders is paying real money — that's revenue, not spam; payment
+  self-solves order-spam. But payment does NOT cover reach/messaging.
+- ⚠️ Do NOT drop the verification floor on the payment argument alone — reach (the core
+  primitive) has no payment to gate it.
+
+**HARD TARGET (acceptance criterion, not aspiration):** full caller onboarding — download →
+verified → can act — must complete in **UNDER 3 MINUTES**, benchmarked to ChatGPT/Claude Pro
+setup. This number is load-bearing: the app-required choice ONLY holds if onboarding is genuinely
+this fast. **MEASURE IT** — stopwatch test on a real device, cold (fresh install, new user). Over
+3 min = a bug to fix, not "good enough."
+
+Cross-repo: spans hearth-pos (app download, caller verify, caller-as-new-owner) AND hearth-network
+(connector OAuth replacing trust-on-type, anonymous-search gating, act-tier enforcement). Status:
+**NOT built.**
+
+---
+
 ## Polish pass — DAY 30 (Pre-flight for the App Store)
 
 - **Verified-human badge design** — match docs/deus-prototype.html. Current = plain amber
