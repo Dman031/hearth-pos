@@ -26,6 +26,7 @@ import {
 } from '../utils/card-fields';
 import {
   actTierRequiresOwnerVerification,
+  entityIsVerified,
   seeTierRequiresOwnerVerification,
 } from '../services/card-gating';
 import PermissionPicker from './PermissionPicker';
@@ -57,14 +58,14 @@ interface CardEditorSheetProps {
   onClose: () => void;
 }
 
-/** The card flavors, with vendor-facing labels (never the raw enum). */
+// The four flavors user-pickable in this editor (Day 12), with vendor-facing
+// labels (never the raw enum). 'presence' / 'reachability' remain real CardKinds
+// but aren't offered here yet — no designed render. See DEFERRED.md.
 const FLAVORS: ReadonlyArray<{ kind: CardKind; label: string }> = [
   { kind: 'capability', label: 'Capability' },
-  { kind: 'content', label: 'Content' },
   { kind: 'state', label: 'Status' },
+  { kind: 'content', label: 'Content' },
   { kind: 'event', label: 'Event' },
-  { kind: 'presence', label: 'Presence' },
-  { kind: 'reachability', label: 'Reachability' },
 ];
 
 // Sensible defaults for a brand-new card. see='contacts' / act='off' mirrors the
@@ -80,7 +81,9 @@ export default function CardEditorSheet({
 }: CardEditorSheetProps) {
   const { createCard, updateCard } = useCards();
   const { entity } = useEntity();
-  const ownerVerified = entity?.id_verified ?? false;
+  // Verified-tier lock matches the network's derivation: ANY badge counts (see
+  // entityIsVerified / hearth-network auth.ts), not id_verified alone.
+  const ownerVerified = entity ? entityIsVerified(entity) : false;
 
   const [title, setTitle] = useState('');
   const [kind, setKind] = useState<CardKind>(DEFAULT_KIND);

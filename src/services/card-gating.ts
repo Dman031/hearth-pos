@@ -49,6 +49,23 @@ export const REQUIRED_FLAG: Record<VerificationRequired, VerifiedFlag | null> = 
   business: 'business_verified',
 };
 
+/**
+ * Whether the owning entity counts as "verified" for verified-tier purposes:
+ * ANY of its verification badges is set. This folds over REQUIRED_FLAG's
+ * non-null values (id_verified / credential_verified / business_verified) so it
+ * stays in lockstep with the gate's flag map — and, critically, MATCHES the
+ * network's verified-tier derivation (hearth-network src/middleware/auth.ts:
+ * `tier = id_verified || business_verified || credential_verified ? 'verified'
+ * : 'basic'`). The editor uses this to lock the 'verified' tier; if it gated on
+ * id_verified alone, a business_verified vendor the network treats as verified
+ * would be wrongly blocked from setting their own cards to 'verified'.
+ */
+export function entityIsVerified(entity: EntityVerificationFlags): boolean {
+  return Object.values(REQUIRED_FLAG).some(
+    (flag) => flag !== null && entity[flag] === true,
+  );
+}
+
 /** A see tier that requires the owner to be verified before it can go live. */
 function isHigherSee(see: SeePerm): boolean {
   return see === 'verified' || see === 'anyone';
