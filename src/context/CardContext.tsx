@@ -35,13 +35,23 @@ interface CardContextValue {
   // so the helper never runs again once cards exist.
   needsOnboarding: boolean;
   createCard: (draft: CardDraft) => Promise<Card>;
-  // Canonical edit write (Profile editor). Patches title and/or fields on an
-  // existing card, then re-embeds fire-and-forget via the same embed-card path
-  // createCard uses — so edits stay in semantic-search sync. Permissions and the
-  // verification gate are NOT touched here (Day 12).
+  // Canonical edit write (Profile editor). Patches title, fields, see/act
+  // permissions, and/or kind on an existing card, then re-embeds fire-and-forget
+  // via the same embed-card path createCard uses — so edits stay in
+  // semantic-search sync. `verification_required` / `verification_status` are
+  // NOT touched here: the editor never exposes the verification gate, and the
+  // 'verified'-tier owner-verification lock is enforced UI-side at the editor /
+  // add-card surfaces (see DEFERRED.md — onboarding-vs-editor enforcement seam),
+  // not in this shared write path.
   updateCard: (
     id: string,
-    patch: { title?: string; fields?: Card['fields'] },
+    patch: {
+      title?: string;
+      fields?: Card['fields'];
+      see_perm?: Card['see_perm'];
+      act_perm?: Card['act_perm'];
+      kind?: Card['kind'];
+    },
   ) => Promise<Card>;
   completeOnboarding: () => void;
   refresh: () => Promise<void>;
@@ -276,15 +286,26 @@ export function CardProvider({ children }: CardProviderProps) {
   const updateCard = useCallback(
     async (
       id: string,
-      patch: { title?: string; fields?: Card['fields'] },
+      patch: {
+        title?: string;
+        fields?: Card['fields'];
+        see_perm?: Card['see_perm'];
+        act_perm?: Card['act_perm'];
+        kind?: Card['kind'];
+      },
     ): Promise<Card> => {
       setError(null);
 
-      // Only the fields the editor actually changes are sent. Permissions /
-      // verification_status / kind are untouched (Day 12 owns those).
+      // Only the fields the editor actually changes are sent.
+      // verification_required / verification_status stay untouched — the editor
+      // never edits the gate, and the 'verified'-tier owner-verification lock is
+      // enforced at the editor surface, not here.
       const row: Record<string, unknown> = {};
       if (patch.title !== undefined) row.title = patch.title;
       if (patch.fields !== undefined) row.fields = patch.fields;
+      if (patch.see_perm !== undefined) row.see_perm = patch.see_perm;
+      if (patch.act_perm !== undefined) row.act_perm = patch.act_perm;
+      if (patch.kind !== undefined) row.kind = patch.kind;
 
       try {
         const { data, error: updateError } = await supabase

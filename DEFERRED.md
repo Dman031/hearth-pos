@@ -10,6 +10,17 @@ Convention: when an item is built, move it to "Done" with the commit hash. Don't
 
 ## Scheduled — mapped to a roadmap day
 
+### Day 12.5 — Real media upload for content cards  → NEXT STEP after Day 12
+Day 12 ships content-card media as a **URL only** (pasted image link, stored in the card's
+`fields` jsonb under the reserved `media_url` entry — see `src/utils/card-fields.ts`). Day 12.5
+replaces the paste-a-URL input with a real upload, at the `TODO(Day 12.5)` seam in
+`src/components/CardEditorSheet.tsx`. Scope:
+- Image picker (expo-image-picker) on the editor's "add media" affordance.
+- Supabase **Storage bucket + RLS** (owner-writes-own, public-read for content media).
+- Client-side validation (type/size) and upload **progress + error states**.
+- The resulting Storage URL flows into the content card's **existing `media_url` field** —
+  nothing downstream assumes the URL was user-typed, so the URL path keeps working too.
+
 ### Live "watch an AI find you" reach demo  → DAY 29 (Record the demo / fundable artifact)
 The onboarding payoff in its full form: a user's freshly-created card actually surfaced
 via query_cards on the live network and reached by an agent — ideally cross-LLM.
@@ -49,6 +60,24 @@ time; it's a nice-to-have, not a blocker.
   Identity and Connect flows.
 
 ---
+
+## Enforcement seams (revisit — not blocking)
+
+- **Verified-tier lock is UI-only at the editor / add-card surfaces** — Day 12 enforces the
+  "'verified' see/act tier requires the owner to be verified (`entities.id_verified`)" rule in
+  `CardEditorSheet` (PermissionPicker disables the tier + `handleSave` double-guards), NOT in the
+  shared `createCard`/`updateCard` write path. This was deliberate: gating the shared path would
+  regress onboarding (which writes cards for an unverified fresh user). To fully honor the
+  PROMPT-CODE CONTRACT, later move the lock into the write boundary so onboarding and any future
+  writer are covered too — while keeping onboarding's own writes legal. Seam: `src/context/
+  CardContext.tsx` (createCard/updateCard) ↔ `src/components/CardEditorSheet.tsx`.
+- **`isHigherSee` (clamp predicate) still treats 'anyone' as gated** — `src/services/
+  card-gating.ts` `isHigherSee` returns true for BOTH `'verified'` and `'anyone'`, so the gate's
+  clamp logic would clamp an `'anyone'` see tier when verification is unsatisfied. Day 12's
+  editor lock uses the NARROW `seeTierRequiresOwnerVerification` (=== `'verified'`) instead,
+  because findable-by-anyone is the network's baseline reach. Revisit whether the clamp predicate
+  is too broad and reconcile the two predicate families (it touches the createCard write path, so
+  it was left alone tonight).
 
 ## Logged bugs / cleanups (not blocking)
 

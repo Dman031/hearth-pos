@@ -50,8 +50,22 @@ export default function ProfileScreen() {
   const { entity, refresh } = useEntity();
   const { cards } = useCards();
   const [starting, setStarting] = useState(false);
-  // The card open in the editor sheet (null = closed). Part 1: rename + fields.
+  // The card open in the editor sheet (null = not editing). Day 12: rename,
+  // fields, flavor, permissions + verification lock, and content media.
   const [editingCard, setEditingCard] = useState<Card | null>(null);
+  // True while the editor is open in create ("add a card") mode.
+  const [creating, setCreating] = useState(false);
+
+  // The sheet's mode, derived from the two pieces of open-state above.
+  const editorMode: 'create' | 'edit' | null = creating
+    ? 'create'
+    : editingCard
+      ? 'edit'
+      : null;
+  const closeEditor = useCallback(() => {
+    setEditingCard(null);
+    setCreating(false);
+  }, []);
 
   // Returning from the hosted browser, the webhook may have already flipped
   // id_verified — re-read the entity each time the tab regains focus so the
@@ -146,25 +160,47 @@ export default function ProfileScreen() {
         </View>
 
         {/* Card list — the user's cards with their fields + SEE/ACT display
-            pills. Tap a card to rename / edit its fields (part 1). */}
-        {cards.length > 0 ? (
-          <View style={styles.cardList}>
+            pills. Tap a card to edit it; ⊕ adds a new one. */}
+        <View style={styles.cardList}>
+          <View style={styles.cardListHeader}>
             <Text style={styles.cardListLabel}>Your cards</Text>
-            {cards.map((card) => (
+            <Pressable
+              onPress={() => setCreating(true)}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Add a card"
+              style={({ pressed }) => [
+                styles.addCard,
+                pressed && styles.addCardPressed,
+              ]}
+            >
+              <Text style={styles.addCardLabel}>＋ Add</Text>
+            </Pressable>
+          </View>
+
+          {cards.length > 0 ? (
+            cards.map((card) => (
               <ProfileCard
                 key={card.id}
                 card={card}
                 onPress={() => setEditingCard(card)}
               />
-            ))}
-          </View>
-        ) : null}
+            ))
+          ) : (
+            <Text style={styles.cardsEmpty}>
+              No cards yet. Add the first thing people can find you for.
+            </Text>
+          )}
+        </View>
 
-        {/* TODO(Day 12): ⊕ add-card, editable permission control + verification
-            lock, card flavors, and swipe-to-delete land here. */}
+        {/* TODO(Day 12+): swipe-to-delete lands here. */}
       </ScrollView>
 
-      <CardEditorSheet card={editingCard} onClose={() => setEditingCard(null)} />
+      <CardEditorSheet
+        mode={editorMode}
+        card={editingCard}
+        onClose={closeEditor}
+      />
     </SafeAreaView>
   );
 }
@@ -189,10 +225,33 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.xl,
     gap: theme.spacing.md,
   },
+  cardListHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   cardListLabel: {
     ...theme.typography.bodyMuted,
     color: theme.colors.textMuted,
-    marginBottom: theme.spacing.xs,
+  },
+  addCard: {
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.borderRadius.pill,
+    borderWidth: 1,
+    borderColor: theme.colors.accent,
+  },
+  addCardPressed: {
+    opacity: 0.6,
+  },
+  addCardLabel: {
+    ...theme.typography.bodyMuted,
+    color: theme.colors.accent,
+    fontWeight: '600',
+  },
+  cardsEmpty: {
+    ...theme.typography.bodyMuted,
+    color: theme.colors.textMuted,
   },
   name: {
     ...theme.typography.h1,

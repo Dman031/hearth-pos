@@ -56,6 +56,40 @@ export function normalizeFields(fields: unknown): FieldEntry[] {
 }
 
 /**
+ * Reserved field label that carries a content card's media inside the canonical
+ * fields[] array. Day 12 stores a user-pasted image URL here; Day 12.5's upload
+ * flow writes the resulting Supabase Storage URL into this SAME field — nothing
+ * downstream assumes the URL was user-typed (see TODO(Day 12.5) seam in
+ * CardEditorSheet). Media lives in the existing `fields` jsonb, NOT a new
+ * column, so the frozen hearth-network card contract is untouched.
+ */
+export const MEDIA_FIELD_LABEL = 'media_url';
+
+/** The media URL stored on a card's fields, or '' when none. */
+export function getMediaUrl(fields: unknown): string {
+  const entry = normalizeFields(fields).find(
+    (f) => f.label === MEDIA_FIELD_LABEL,
+  );
+  return entry?.value ?? '';
+}
+
+/**
+ * Upserts the reserved media-URL entry into a FieldEntry[]. An empty/whitespace
+ * url REMOVES the entry — so clearing the URL, or switching a card away from the
+ * content flavor, leaves no orphan media field. The reserved entry is kept last.
+ */
+export function setMediaUrl(entries: FieldEntry[], url: string): FieldEntry[] {
+  const rest = entries.filter((f) => f.label !== MEDIA_FIELD_LABEL);
+  const trimmed = url.trim();
+  return trimmed ? [...rest, { label: MEDIA_FIELD_LABEL, value: trimmed }] : rest;
+}
+
+/** A card's user-facing fields with the reserved media entry removed. */
+export function withoutMediaField(entries: FieldEntry[]): FieldEntry[] {
+  return entries.filter((f) => f.label !== MEDIA_FIELD_LABEL);
+}
+
+/**
  * The value to persist back to `fields`: the canonical array, or null when the
  * card has no fields (matches the column default and how createCard stores "no
  * detail"). Trims and drops fully-empty entries.

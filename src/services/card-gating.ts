@@ -60,6 +60,26 @@ function isHigherAct(act: ActPerm): boolean {
 }
 
 /**
+ * Editor-lock predicates — the NARROW "owner must be verified" check applied at
+ * the card editor / add-card surfaces (CardEditorSheet / PermissionPicker).
+ *
+ * Distinct from the gate's internal isHigherSee/isHigherAct CLAMP predicates
+ * above: only the 'verified' tier — "restrict visibility to verified CALLERS" —
+ * requires the owner to be verified. 'anyone' is the network's baseline reach
+ * (an unverified user MUST stay discoverable — the reach thesis) and is never
+ * locked. The two predicate families intentionally diverge for now; see
+ * DEFERRED.md — isHigherSee (clamp) still treats 'anyone' as gated, to be
+ * reconciled later.
+ */
+export function seeTierRequiresOwnerVerification(see: SeePerm): boolean {
+  return see === 'verified';
+}
+
+export function actTierRequiresOwnerVerification(act: ActPerm): boolean {
+  return act === 'verified';
+}
+
+/**
  * The safe tier a locked permission is clamped to while verification is
  * unsatisfied. 'contacts' keeps the card usable among known contacts without
  * exposing the gated (verified/anyone/verified-act) tier.
