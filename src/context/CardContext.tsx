@@ -35,6 +35,14 @@ interface CardContextValue {
   // so the helper never runs again once cards exist.
   needsOnboarding: boolean;
   createCard: (draft: CardDraft) => Promise<Card>;
+  // Canonical edit write (Profile editor). Patches title and/or fields on an
+  // existing card, then re-embeds fire-and-forget via the same embed-card path
+  // createCard uses — so edits stay in semantic-search sync. Permissions and the
+  // verification gate are NOT touched here (Day 12).
+  updateCard: (
+    id: string,
+    patch: { title?: string; fields?: Card['fields'] },
+  ) => Promise<Card>;
   completeOnboarding: () => void;
   refresh: () => Promise<void>;
 }
@@ -265,6 +273,53 @@ export function CardProvider({ children }: CardProviderProps) {
     [entity, cards.length],
   );
 
+  const updateCard = useCallback(
+    async (
+      id: string,
+      patch: { title?: string; fields?: Card['fields'] },
+    ): Promise<Card> => {
+      setError(null);
+
+      // Only the fields the editor actually changes are sent. Permissions /
+      // verification_status / kind are untouched (Day 12 owns those).
+      const row: Record<string, unknown> = {};
+      if (patch.title !== undefined) row.title = patch.title;
+      if (patch.fields !== undefined) row.fields = patch.fields;
+
+      try {
+        const { data, error: updateError } = await supabase
+          .from('cards')
+          .update(row)
+          .eq('id', id)
+          .select(CARD_COLUMNS)
+          .single();
+
+        if (updateError) {
+          throw toError(updateError, 'update card failed');
+        }
+        if (!data) {
+          // Zero rows on a PK match is the RLS/constraint silent-block signature.
+          throw new Error(
+            '[CardProvider] update returned no row (possible RLS block)',
+          );
+        }
+
+        const updated = data as unknown as Card;
+        setCards((prev) => prev.map((c) => (c.id === id ? updated : c)));
+        // Re-embed out-of-band so the edited card gets a fresh vector — never
+        // blocks the save (mirrors createCard).
+        void triggerEmbedCard(id);
+        return updated;
+      } catch (err) {
+        const wrapped = toError(err, 'failed to update card');
+        console.error('[CardProvider] updateCard failed:', wrapped);
+        setError(wrapped);
+        throw wrapped;
+      }
+    },
+    [],
+  );
+
   const completeOnboarding = useCallback(() => {
     setNeedsOnboarding(false);
   }, []);
@@ -277,6 +332,7 @@ export function CardProvider({ children }: CardProviderProps) {
       error,
       needsOnboarding,
       createCard,
+      updateCard,
       completeOnboarding,
       refresh,
     }),
@@ -287,6 +343,7 @@ export function CardProvider({ children }: CardProviderProps) {
       error,
       needsOnboarding,
       createCard,
+      updateCard,
       completeOnboarding,
       refresh,
     ],

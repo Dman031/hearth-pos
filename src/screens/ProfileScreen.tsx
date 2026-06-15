@@ -11,8 +11,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import useEntity from '../hooks/useEntity';
+import useCards from '../hooks/useCards';
 import VerifiedHumanBadge from '../components/VerifiedHumanBadge';
+import ProfileCard from '../components/ProfileCard';
+import CardEditorSheet from '../components/CardEditorSheet';
 import { startIdentityVerification } from '../services/stripe';
+import type { Card } from '../types/card';
 import { theme } from '../styles/theme';
 
 // ProfileScreen — the vendor's identity surface and the PERMANENT home of the
@@ -44,7 +48,10 @@ const VERIFY_ERROR_COPY: Record<string, string> = {
 
 export default function ProfileScreen() {
   const { entity, refresh } = useEntity();
+  const { cards } = useCards();
   const [starting, setStarting] = useState(false);
+  // The card open in the editor sheet (null = closed). Part 1: rename + fields.
+  const [editingCard, setEditingCard] = useState<Card | null>(null);
 
   // Returning from the hosted browser, the webhook may have already flipped
   // id_verified — re-read the entity each time the tab regains focus so the
@@ -138,10 +145,26 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* TODO(Day 11-12): card list renders here (the entity's cards with
-            SEE/ACT permission pills, per the prototype Profile tab). */}
-        {/* TODO(Day 11-12): "Declare a card" sheet trigger lands below the list. */}
+        {/* Card list — the user's cards with their fields + SEE/ACT display
+            pills. Tap a card to rename / edit its fields (part 1). */}
+        {cards.length > 0 ? (
+          <View style={styles.cardList}>
+            <Text style={styles.cardListLabel}>Your cards</Text>
+            {cards.map((card) => (
+              <ProfileCard
+                key={card.id}
+                card={card}
+                onPress={() => setEditingCard(card)}
+              />
+            ))}
+          </View>
+        ) : null}
+
+        {/* TODO(Day 12): ⊕ add-card, editable permission control + verification
+            lock, card flavors, and swipe-to-delete land here. */}
       </ScrollView>
+
+      <CardEditorSheet card={editingCard} onClose={() => setEditingCard(null)} />
     </SafeAreaView>
   );
 }
@@ -161,6 +184,15 @@ const styles = StyleSheet.create({
   },
   header: {
     gap: theme.spacing.md,
+  },
+  cardList: {
+    marginTop: theme.spacing.xl,
+    gap: theme.spacing.md,
+  },
+  cardListLabel: {
+    ...theme.typography.bodyMuted,
+    color: theme.colors.textMuted,
+    marginBottom: theme.spacing.xs,
   },
   name: {
     ...theme.typography.h1,
