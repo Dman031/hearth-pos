@@ -10,17 +10,6 @@ Convention: when an item is built, move it to "Done" with the commit hash. Don't
 
 ## Scheduled — mapped to a roadmap day
 
-### Day 12.5 — Real media upload for content cards  → NEXT STEP after Day 12
-Day 12 ships content-card media as a **URL only** (pasted image link, stored in the card's
-`fields` jsonb under the reserved `media_url` entry — see `src/utils/card-fields.ts`). Day 12.5
-replaces the paste-a-URL input with a real upload, at the `TODO(Day 12.5)` seam in
-`src/components/CardEditorSheet.tsx`. Scope:
-- Image picker (expo-image-picker) on the editor's "add media" affordance.
-- Supabase **Storage bucket + RLS** (owner-writes-own, public-read for content media).
-- Client-side validation (type/size) and upload **progress + error states**.
-- The resulting Storage URL flows into the content card's **existing `media_url` field** —
-  nothing downstream assumes the URL was user-typed, so the URL path keeps working too.
-
 ### Live "watch an AI find you" reach demo  → DAY 29 (Record the demo / fundable artifact)
 The onboarding payoff in its full form: a user's freshly-created card actually surfaced
 via query_cards on the live network and reached by an agent — ideally cross-LLM.
@@ -157,4 +146,10 @@ Cross-repo: spans hearth-pos (app download, caller verify, caller-as-new-owner) 
 
 ## Done (move items here with commit hash when built)
 
-- _(empty — first entries land here as deferred items get built)_
+- **Day 12.5 — Real media upload for content cards** — built in `78e48e6`. Picker
+  (expo-image-picker) → `card-media` Storage bucket (owner-writes-own RLS keyed by
+  `{entity_id}/` path, public-read) → public URL written into the existing `fields.media_url`
+  entry; render side unchanged. URL paste kept as a secondary fallback. Upload logic is reusable
+  (`src/services/storage.ts` + `src/hooks/useMediaUpload.ts`) for Day 14. Indeterminate
+  "Uploading…" spinner (no % — supabase-js upload has no progress callback). Ops: apply
+  `supabase/migrations/0002_card_media_storage.sql` (`supabase db push`).
