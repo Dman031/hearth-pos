@@ -100,6 +100,11 @@ Cross-repo: spans hearth-pos (app download, caller verify, caller-as-new-owner) 
 - **Stripe return deep-link** — add app.json custom scheme (e.g. deus://) so Identity +
   Connect verification auto-return to the app instead of manual switch-back. Affects both the
   Identity and Connect flows.
+- **Card editor — field-entry UX (Option 2)** — "+ Add a field" currently gives a blank
+  self-named row (flexible but blank-slate friction). Better: suggested/placeholder fields per
+  card type (capability → "what you do / where / rate"; event → "when / where") tappable to add
+  pre-named, custom fields still allowed. Serves "vendor shouldn't think like a developer." Part
+  of the card-editor-feel pass (alongside content-card distinct render).
 
 ---
 
