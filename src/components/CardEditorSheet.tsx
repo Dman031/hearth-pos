@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -30,6 +30,7 @@ import {
   seeTierRequiresOwnerVerification,
 } from '../services/card-gating';
 import PermissionPicker from './PermissionPicker';
+import useMediaUpload from '../hooks/useMediaUpload';
 import { theme } from '../styles/theme';
 
 // CardEditorSheet — the multi-mode Profile card editor (Day 12). One sheet,
@@ -124,7 +125,6 @@ export default function CardEditorSheet({
   }, [mode, card]);
 
   const visible = mode !== null;
-  const canSave = title.trim().length > 0 && !saving;
 
   const setField = (index: number, patch: Partial<FieldEntry>): void => {
     setFields((prev) =>
@@ -138,10 +138,24 @@ export default function CardEditorSheet({
     setFields((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const onMediaChange = (url: string): void => {
+  // Stable so useMediaUpload's callbacks don't re-create each render. Used by
+  // BOTH the upload flow (writes the returned Storage URL) and the secondary
+  // paste-a-link input — both land in the same media_url field.
+  const onMediaChange = useCallback((url: string): void => {
     setMediaUrlState(url);
     setImageBroken(false);
-  };
+  }, []);
+
+  // Upload machinery (Day 12.5). Owns permissions/picker/upload state; on
+  // success it writes the public Storage URL via onMediaChange. Reused by Day 14.
+  const {
+    uploading,
+    error: uploadError,
+    pickFromLibrary,
+    takePhoto,
+  } = useMediaUpload(entity?.id ?? null, onMediaChange);
+
+  const canSave = title.trim().length > 0 && !saving && !uploading;
 
   const handleSave = async (): Promise<void> => {
     if (!canSave) {
@@ -293,13 +307,66 @@ export default function CardEditorSheet({
               ) : null}
               {trimmedMedia && imageBroken ? (
                 <Text style={styles.mediaError}>
-                  Couldn't load that image — check the URL.
+                  Couldn't load that image — try uploading it again.
                 </Text>
               ) : null}
-              {/* TODO(Day 12.5): replace this URL input with a real upload
-                  button (image picker → Supabase Storage). The resulting
-                  Storage URL flows into this SAME media field via
-                  onMediaChange, so nothing here assumes a user-typed URL. */}
+
+              {/* PRIMARY path (Day 12.5): take / choose a photo → Supabase
+                  Storage. The returned URL flows into the SAME media_url field
+                  via onMediaChange, so the render side needs no change. */}
+              <View style={styles.mediaButtonRow}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.mediaButton,
+                    pressed && styles.mediaButtonPressed,
+                    uploading && styles.mediaButtonDisabled,
+                  ]}
+                  onPress={() => void takePhoto()}
+                  disabled={uploading}
+                  accessibilityRole="button"
+                  accessibilityLabel="Take a photo"
+                >
+                  <Text style={styles.mediaButtonLabel}>Take photo</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.mediaButton,
+                    pressed && styles.mediaButtonPressed,
+                    uploading && styles.mediaButtonDisabled,
+                  ]}
+                  onPress={() => void pickFromLibrary()}
+                  disabled={uploading}
+                  accessibilityRole="button"
+                  accessibilityLabel="Choose a photo from your library"
+                >
+                  <Text style={styles.mediaButtonLabel}>Choose photo</Text>
+                </Pressable>
+              </View>
+
+              {uploading ? (
+                <View style={styles.uploadingRow}>
+                  <ActivityIndicator size="small" color={theme.colors.accent} />
+                  <Text style={styles.uploadingLabel}>Uploading…</Text>
+                </View>
+              ) : null}
+
+              {uploadError ? (
+                <Text style={styles.mediaError}>{uploadError}</Text>
+              ) : null}
+
+              {trimmedMedia && !uploading ? (
+                <Pressable
+                  onPress={() => onMediaChange('')}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Remove photo"
+                >
+                  <Text style={styles.removePhoto}>Remove photo</Text>
+                </Pressable>
+              ) : null}
+
+              {/* SECONDARY fallback: paste a link. Lands in the same field. */}
+              <Text style={styles.mediaHint}>or paste a link</Text>
               <TextInput
                 style={styles.mediaInput}
                 value={mediaUrl}
@@ -309,11 +376,8 @@ export default function CardEditorSheet({
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="url"
+                editable={!uploading}
               />
-              <Text style={styles.mediaHint}>
-                Paste a link to an image for now. Uploading from your photos is
-                coming soon.
-              </Text>
             </View>
 
             {/* Permissions ------------------------------------------------- */}
@@ -484,6 +548,45 @@ const styles = StyleSheet.create({
   mediaError: {
     ...theme.typography.caption,
     color: theme.colors.danger,
+  },
+  mediaButtonRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  mediaButton: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.borderRadius.card,
+    borderWidth: 1,
+    borderColor: theme.colors.accent,
+    backgroundColor: 'rgba(212,165,116,0.12)',
+  },
+  mediaButtonPressed: {
+    opacity: 0.6,
+  },
+  mediaButtonDisabled: {
+    opacity: 0.4,
+  },
+  mediaButtonLabel: {
+    ...theme.typography.bodyMuted,
+    color: theme.colors.accent,
+    fontWeight: '600',
+  },
+  uploadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  uploadingLabel: {
+    ...theme.typography.bodyMuted,
+    color: theme.colors.textSecondary,
+  },
+  removePhoto: {
+    ...theme.typography.caption,
+    color: theme.colors.danger,
+    fontWeight: '600',
+    alignSelf: 'flex-start',
   },
   mediaInput: {
     backgroundColor: theme.colors.surface,

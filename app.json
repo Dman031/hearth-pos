@@ -30,6 +30,14 @@
       "expo-router",
       "expo-secure-store",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Deus uses your photos so you can add an image to a card people can find you by.",
+          "cameraPermission": "Deus uses your camera so you can take a photo for a card people can find you by.",
+          "microphonePermission": false
+        }
+      ],
+      [
         "@stripe/stripe-react-native",
         {
           "merchantIdentifier": "merchant.com.hearth.pos",

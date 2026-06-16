@@ -146,6 +146,12 @@ Cross-repo: spans hearth-pos (app download, caller verify, caller-as-new-owner) 
   in-tab screen calls their refresh), but apply the same split if/when one does.
 - **cards table RLS policies not in repo** — confirm the owner insert/select policy exists;
   if a card write silently zero-rows, that's the cause. Add an explicit migration if needed.
+- **Card media is public-read (unguessable path) regardless of the card's see_perm** — a card
+  gated to contacts/verified still has its IMAGE publicly accessible to anyone with the URL
+  (`card-media` bucket is `public = true`; see `supabase/migrations/0002_card_media_storage.sql`).
+  Acceptable now (content media is meant to be seen; no enumeration via unguessable paths). If
+  private-card media becomes a requirement, move to a private bucket + signed URLs (time-limited,
+  generated on authorized card view) — touches the render side. Logged, not built.
 
 ---
 
