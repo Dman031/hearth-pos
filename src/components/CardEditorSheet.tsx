@@ -38,11 +38,13 @@ import { theme } from '../styles/theme';
 //   'edit'   → an existing card, saved via CardContext.updateCard
 //   null     → closed
 //
-// It edits: title, the card FLAVOR (kind), the user-named fields, and the two
-// SEE/ACT permission tiers. For the 'content' flavor it also edits a media URL
-// (stored in the existing fields jsonb under the reserved `media_url` entry —
-// see card-fields.ts). Day 12.5 replaces the URL input with a real upload at the
-// TODO(Day 12.5) seam below; the Storage URL flows into the SAME field.
+// It edits: title, the card type (kind), the user-named fields, and the two
+// SEE/ACT permission tiers. It also edits a media URL, available on ANY card
+// type (an event flyer, capability work photos, or a 'content' card that is
+// primarily media) — stored in the existing fields jsonb under the reserved
+// `media_url` entry (see card-fields.ts). Day 12.5 replaces the URL input with a
+// real upload at the TODO(Day 12.5) seam below; the Storage URL flows into the
+// SAME field.
 //
 // VERIFICATION LOCK: the 'verified' see/act tier ("restrict to verified
 // callers") requires the owner to be verified (entities.id_verified). The lock
@@ -122,7 +124,6 @@ export default function CardEditorSheet({
   }, [mode, card]);
 
   const visible = mode !== null;
-  const isContent = kind === 'content';
   const canSave = title.trim().length > 0 && !saving;
 
   const setField = (index: number, patch: Partial<FieldEntry>): void => {
@@ -162,9 +163,9 @@ export default function CardEditorSheet({
     setSaving(true);
     setError(null);
     try {
-      // Recombine: media lives in the fields jsonb only for content cards;
-      // setMediaUrl('') strips any stale entry for other flavors.
-      const merged = setMediaUrl(fields, isContent ? mediaUrl : '');
+      // Recombine: media can ride on any card type. setMediaUrl upserts the
+      // reserved media_url entry, or strips it when the URL is blank.
+      const merged = setMediaUrl(fields, mediaUrl);
       const persistedFields = fieldsToPersist(merged);
 
       if (mode === 'edit' && card) {
@@ -249,8 +250,8 @@ export default function CardEditorSheet({
               placeholderTextColor={theme.colors.textMuted}
             />
 
-            {/* Flavor (kind) ----------------------------------------------- */}
-            <Text style={[styles.sectionLabel, styles.spaced]}>Flavor</Text>
+            {/* Card type (kind) -------------------------------------------- */}
+            <Text style={[styles.sectionLabel, styles.spaced]}>Card type</Text>
             <View style={styles.flavorRow}>
               {FLAVORS.map((f) => {
                 const selected = f.kind === kind;
@@ -278,44 +279,42 @@ export default function CardEditorSheet({
               })}
             </View>
 
-            {/* Media (content flavor only) --------------------------------- */}
-            {isContent ? (
-              <View style={styles.mediaSection}>
-                <Text style={[styles.sectionLabel, styles.spaced]}>Media</Text>
-                {trimmedMedia && !imageBroken ? (
-                  <Image
-                    source={{ uri: trimmedMedia }}
-                    style={styles.mediaPreview}
-                    resizeMode="cover"
-                    onError={() => setImageBroken(true)}
-                    accessibilityIgnoresInvertColors
-                  />
-                ) : null}
-                {trimmedMedia && imageBroken ? (
-                  <Text style={styles.mediaError}>
-                    Couldn't load that image — check the URL.
-                  </Text>
-                ) : null}
-                {/* TODO(Day 12.5): replace this URL input with a real upload
-                    button (image picker → Supabase Storage). The resulting
-                    Storage URL flows into this SAME media field via
-                    onMediaChange, so nothing here assumes a user-typed URL. */}
-                <TextInput
-                  style={styles.mediaInput}
-                  value={mediaUrl}
-                  onChangeText={onMediaChange}
-                  placeholder="paste an image URL"
-                  placeholderTextColor={theme.colors.textMuted}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="url"
+            {/* Media — available on ANY card type -------------------------- */}
+            <View style={styles.mediaSection}>
+              <Text style={[styles.sectionLabel, styles.spaced]}>Media</Text>
+              {trimmedMedia && !imageBroken ? (
+                <Image
+                  source={{ uri: trimmedMedia }}
+                  style={styles.mediaPreview}
+                  resizeMode="cover"
+                  onError={() => setImageBroken(true)}
+                  accessibilityIgnoresInvertColors
                 />
-                <Text style={styles.mediaHint}>
-                  Paste a link to an image for now. Uploading from your photos is
-                  coming soon.
+              ) : null}
+              {trimmedMedia && imageBroken ? (
+                <Text style={styles.mediaError}>
+                  Couldn't load that image — check the URL.
                 </Text>
-              </View>
-            ) : null}
+              ) : null}
+              {/* TODO(Day 12.5): replace this URL input with a real upload
+                  button (image picker → Supabase Storage). The resulting
+                  Storage URL flows into this SAME media field via
+                  onMediaChange, so nothing here assumes a user-typed URL. */}
+              <TextInput
+                style={styles.mediaInput}
+                value={mediaUrl}
+                onChangeText={onMediaChange}
+                placeholder="paste an image URL (optional)"
+                placeholderTextColor={theme.colors.textMuted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+              />
+              <Text style={styles.mediaHint}>
+                Paste a link to an image for now. Uploading from your photos is
+                coming soon.
+              </Text>
+            </View>
 
             {/* Permissions ------------------------------------------------- */}
             <Text style={[styles.sectionLabel, styles.spaced]}>Permissions</Text>
