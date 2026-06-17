@@ -3,29 +3,47 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Card } from '../types/card';
 import {
   getMediaUrl,
+  isItemField,
+  MEDIA_FIELD_LABEL,
   normalizeFields,
-  withoutMediaField,
 } from '../utils/card-fields';
 import { theme } from '../styles/theme';
 import PermissionPill from './PermissionPill';
 
 // ProfileCard — one of the user's cards in the Profile list: title, an optional
 // media image, its user-named fields, and the two DISPLAY permission pills
-// (see / act). Tapping opens the editor sheet. Media (the reserved media_url
-// field) can ride on ANY card kind — not just 'content' — so the image renders
-// and the media_url entry is kept OUT of the text-field rows for every card.
+// (see / act). Tapping the card opens the editor sheet. Media (the reserved
+// media_url field) can ride on ANY card kind — not just 'content' — so the
+// image renders and the media_url entry is kept OUT of the text-field rows.
+//
+// Day 13 — fulfillable fields (those carrying a boolean `available`) render as
+// one-tap "86" toggles: tap flips available true↔false WITHOUT opening the
+// editor (a nested Pressable wins the touch). 86'd items grey out with an "out"
+// tag. Describing fields (no `available`) render as plain rows, untappable.
 
 interface ProfileCardProps {
   card: Card;
   onPress: () => void;
+  // Flip one item field's availability (the 86 toggle). `fieldIndex` is the
+  // canonical index into normalizeFields(card.fields) — passed straight to
+  // CardContext.setFieldAvailability. Absent → item rows render but don't toggle.
+  onToggleAvailability?: (fieldIndex: number, next: boolean) => void;
 }
 
-export default function ProfileCard({ card, onPress }: ProfileCardProps) {
-  // Text fields exclude the reserved media_url entry; media renders as an image.
-  const fields = useMemo(
-    () => withoutMediaField(normalizeFields(card.fields)),
-    [card.fields],
-  );
+export default function ProfileCard({
+  card,
+  onPress,
+  onToggleAvailability,
+}: ProfileCardProps) {
+  // Canonical field list (media entry included so indices match the write
+  // path); the media row is filtered out of the text rows below and rendered as
+  // an image instead. Each kept row carries its canonical index for the toggle.
+  const fields = useMemo(() => {
+    const all = normalizeFields(card.fields);
+    return all
+      .map((entry, index) => ({ entry, index }))
+      .filter(({ entry }) => entry.label !== MEDIA_FIELD_LABEL);
+  }, [card.fields]);
   const mediaUrl = useMemo(() => getMediaUrl(card.fields), [card.fields]);
   const [imageBroken, setImageBroken] = useState(false);
   // Re-arm the image when the URL changes (e.g. after an edit fixes a bad link).
@@ -54,12 +72,60 @@ export default function ProfileCard({ card, onPress }: ProfileCardProps) {
 
       {fields.length > 0 ? (
         <View style={styles.fields}>
-          {fields.map((f, i) => (
-            <View key={`${f.label}-${i}`} style={styles.fieldRow}>
-              {f.label ? <Text style={styles.fieldLabel}>{f.label}</Text> : null}
-              <Text style={styles.fieldValue}>{f.value || '—'}</Text>
-            </View>
-          ))}
+          {fields.map(({ entry, index }) => {
+            const item = isItemField(entry);
+            const out = item && entry.available === false;
+
+            // Describing field — plain, untappable row.
+            if (!item) {
+              return (
+                <View key={`${entry.label}-${index}`} style={styles.fieldRow}>
+                  {entry.label ? (
+                    <Text style={styles.fieldLabel}>{entry.label}</Text>
+                  ) : null}
+                  <Text style={styles.fieldValue}>{entry.value || '—'}</Text>
+                </View>
+              );
+            }
+
+            // Item field — one-tap 86 toggle. Nested Pressable so the touch
+            // does NOT bubble to the card's outer Pressable (no editor open).
+            return (
+              <Pressable
+                key={`${entry.label}-${index}`}
+                style={({ pressed }) => [
+                  styles.itemRow,
+                  pressed && styles.itemRowPressed,
+                ]}
+                onPress={() => onToggleAvailability?.(index, !entry.available)}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: out }}
+                accessibilityLabel={
+                  out
+                    ? `${entry.label || 'Item'} is sold out. Tap to restore.`
+                    : `${entry.label || 'Item'} is available. Tap to mark sold out.`
+                }
+              >
+                <View style={styles.itemTextRow}>
+                  {entry.label ? (
+                    <Text
+                      style={[styles.fieldLabel, out && styles.outText]}
+                    >
+                      {entry.label}
+                    </Text>
+                  ) : null}
+                  <Text style={[styles.fieldValue, out && styles.outText]}>
+                    {entry.value || '—'}
+                  </Text>
+                </View>
+                {out ? (
+                  <View style={styles.outTag}>
+                    <Text style={styles.outTagText}>out</Text>
+                  </View>
+                ) : null}
+              </Pressable>
+            );
+          })}
         </View>
       ) : (
         <Text style={styles.noFields}>No details yet — tap to add some.</Text>
@@ -100,6 +166,42 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: theme.spacing.sm,
+  },
+  itemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+  },
+  itemRowPressed: {
+    opacity: 0.6,
+  },
+  itemTextRow: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+  },
+  // 86'd item: text dims toward muted and strikes through so "unavailable"
+  // reads at a glance, alongside the explicit "out" tag.
+  outText: {
+    color: theme.colors.textMuted,
+    textDecorationLine: 'line-through',
+  },
+  outTag: {
+    paddingVertical: 2,
+    paddingHorizontal: theme.spacing.sm,
+    borderRadius: theme.borderRadius.pill,
+    borderWidth: 1,
+    borderColor: theme.colors.danger,
+  },
+  outTagText: {
+    ...theme.typography.caption,
+    color: theme.colors.danger,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   fieldLabel: {
     ...theme.typography.bodyMuted,

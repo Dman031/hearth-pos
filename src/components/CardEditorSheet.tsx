@@ -137,6 +137,24 @@ export default function CardEditorSheet({
   const removeField = (index: number): void => {
     setFields((prev) => prev.filter((_, i) => i !== index));
   };
+  // Day 13 — mark a field as an orderable item (gives it a boolean `available`,
+  // defaulting to in-stock) or back to a plain describing field (strips the
+  // flag entirely, so no fake `available` rides along — matches the network
+  // contract). The one-tap 86 toggle on the Profile card flips it after save.
+  const toggleOrderable = (index: number): void => {
+    setFields((prev) =>
+      prev.map((f, i) => {
+        if (i !== index) {
+          return f;
+        }
+        if (typeof f.available === 'boolean') {
+          const { available: _omit, ...rest } = f;
+          return rest;
+        }
+        return { ...f, available: true };
+      }),
+    );
+  };
 
   // Stable so useMediaUpload's callbacks don't re-create each render. Used by
   // BOTH the upload flow (writes the returned Storage URL) and the secondary
@@ -434,6 +452,31 @@ export default function CardEditorSheet({
                   placeholderTextColor={theme.colors.textMuted}
                   multiline
                 />
+                {/* Orderable-item switch: makes this field a fulfillable item
+                    (a menu item, service, slot) you can 86 from your profile. */}
+                <Pressable
+                  style={styles.orderableRow}
+                  onPress={() => toggleOrderable(i)}
+                  accessibilityRole="switch"
+                  accessibilityState={{
+                    checked: typeof f.available === 'boolean',
+                  }}
+                  accessibilityLabel={`Mark "${f.label || 'this field'}" an orderable item`}
+                >
+                  <View
+                    style={[
+                      styles.checkbox,
+                      typeof f.available === 'boolean' && styles.checkboxOn,
+                    ]}
+                  >
+                    {typeof f.available === 'boolean' ? (
+                      <Text style={styles.checkboxMark}>✓</Text>
+                    ) : null}
+                  </View>
+                  <Text style={styles.orderableLabel}>
+                    Orderable item (can be marked sold out)
+                  </Text>
+                </Pressable>
               </View>
             ))}
 
@@ -638,6 +681,36 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.bodyMuted.fontSize,
     paddingVertical: theme.spacing.xs,
     minHeight: 24,
+  },
+  orderableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.xs,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: theme.colors.textMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxOn: {
+    borderColor: theme.colors.accent,
+    backgroundColor: 'rgba(212,165,116,0.12)',
+  },
+  checkboxMark: {
+    color: theme.colors.accent,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 16,
+  },
+  orderableLabel: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    flexShrink: 1,
   },
   addField: {
     alignSelf: 'flex-start',

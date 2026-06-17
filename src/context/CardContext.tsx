@@ -14,6 +14,11 @@ import {
   assertCardCanGoLive,
   evaluateCardGate,
 } from '../services/card-gating';
+import {
+  fieldsToPersist,
+  normalizeFields,
+  setAvailabilityAt,
+} from '../utils/card-fields';
 import type { Card, CardDraft } from '../types/card';
 
 interface CardContextValue {
@@ -53,6 +58,16 @@ interface CardContextValue {
       kind?: Card['kind'];
     },
   ) => Promise<Card>;
+  // Day 13 — flip ONE item field's `available` flag (the 86 toggle). `fieldIndex`
+  // is the position in normalizeFields(card.fields) (canonical order, media entry
+  // included), matching what ProfileCard renders from. Writes only the `fields`
+  // jsonb and DELIBERATELY does NOT re-embed: availability is not searchable text
+  // (see embed note below + DEFERRED). Optimistic; reverts on write failure.
+  setFieldAvailability: (
+    cardId: string,
+    fieldIndex: number,
+    available: boolean,
+  ) => Promise<void>;
   completeOnboarding: () => void;
   refresh: () => Promise<void>;
 }
@@ -341,6 +356,81 @@ export function CardProvider({ children }: CardProviderProps) {
     [],
   );
 
+  const setFieldAvailability = useCallback(
+    async (
+      cardId: string,
+      fieldIndex: number,
+      available: boolean,
+    ): Promise<void> => {
+      setError(null);
+
+      const card = cards.find((c) => c.id === cardId);
+      if (!card) {
+        console.warn('[CardProvider] setFieldAvailability: card not found', cardId);
+        return;
+      }
+
+      // Recompute the canonical fields array and flip the one item field.
+      // setAvailabilityAt is a no-op unless the target is already an item
+      // (carries a boolean `available`), so a describing field can't be 86'd.
+      const current = normalizeFields(card.fields);
+      const target = current[fieldIndex];
+      if (!target || typeof target.available !== 'boolean') {
+        console.warn(
+          '[CardProvider] setFieldAvailability: index is not an item field',
+          { cardId, fieldIndex },
+        );
+        return;
+      }
+      if (target.available === available) {
+        return; // already in the requested state
+      }
+
+      const nextFields = fieldsToPersist(
+        setAvailabilityAt(current, fieldIndex, available),
+      );
+
+      // Optimistic: flip locally now (one-tap feel), revert if the write fails.
+      const prevCards = cards;
+      setCards((prev) =>
+        prev.map((c) => (c.id === cardId ? { ...c, fields: nextFields } : c)),
+      );
+
+      try {
+        // Writes ONLY the fields jsonb. NO triggerEmbedCard — availability is a
+        // reported status, not embedding text (the explicit Day 13 guardrail).
+        // Explicit CARD_COLUMNS (no select('*')); .select() so a silent RLS
+        // zero-row block surfaces as failure per the SUPABASE WRITE RULE.
+        const { data, error: updateError } = await supabase
+          .from('cards')
+          .update({ fields: nextFields })
+          .eq('id', cardId)
+          .select(CARD_COLUMNS)
+          .single();
+
+        if (updateError) {
+          throw toError(updateError, 'update field availability failed');
+        }
+        if (!data) {
+          throw new Error(
+            '[CardProvider] availability update returned no row (possible RLS block)',
+          );
+        }
+
+        // Reconcile with the authoritative row (e.g. updated_at).
+        const updated = data as unknown as Card;
+        setCards((prev) => prev.map((c) => (c.id === cardId ? updated : c)));
+      } catch (err) {
+        // Revert the optimistic flip and surface the error.
+        setCards(prevCards);
+        const wrapped = toError(err, 'failed to set field availability');
+        console.error('[CardProvider] setFieldAvailability failed:', wrapped);
+        setError(wrapped);
+      }
+    },
+    [cards],
+  );
+
   const completeOnboarding = useCallback(() => {
     setNeedsOnboarding(false);
   }, []);
@@ -354,6 +444,7 @@ export function CardProvider({ children }: CardProviderProps) {
       needsOnboarding,
       createCard,
       updateCard,
+      setFieldAvailability,
       completeOnboarding,
       refresh,
     }),
@@ -365,6 +456,7 @@ export function CardProvider({ children }: CardProviderProps) {
       needsOnboarding,
       createCard,
       updateCard,
+      setFieldAvailability,
       completeOnboarding,
       refresh,
     ],

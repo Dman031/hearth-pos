@@ -12,10 +12,27 @@
  * card stays searchable before and after this blob→structured migration.
  */
 
-/** One user-named field: a label and its value, in the user's own words. */
+/**
+ * One user-named field: a label and its value, in the user's own words.
+ *
+ * `available` is the Day 13 fulfillment flag and is OPTIONAL by design: a field
+ * carries it ONLY when it is an orderable item (a menu item, a service, a slot).
+ * A plain describing field (where / hours) must NOT carry it. Presence of a
+ * boolean `available` is therefore what makes a field "fulfillable" (and shows
+ * the 86 toggle); absence means it's just an info row. This mirrors the frozen
+ * network contract exactly (hearth-network src/tools/shared.ts CardField:
+ * "a describing field must not gain a fake available:true"). `false` = 86'd /
+ * sold out (reported, never an access gate).
+ */
 export interface FieldEntry {
   label: string;
   value: string;
+  available?: boolean;
+}
+
+/** A field is a fulfillable item iff it carries a boolean `available` flag. */
+export function isItemField(entry: FieldEntry): boolean {
+  return typeof entry.available === 'boolean';
 }
 
 function toStr(v: unknown): string {
@@ -41,7 +58,16 @@ export function normalizeFields(fields: unknown): FieldEntry[] {
         const r = f as Record<string, unknown>;
         const label = toStr(r.label).trim();
         const value = toStr(r.value).trim();
-        if (label || value) out.push({ label, value });
+        if (label || value) {
+          const entry: FieldEntry = { label, value };
+          // Preserve availability ONLY when the field actually carries a
+          // boolean — a describing field must not gain a fake `available`
+          // (mirrors hearth-network normalizeFields).
+          if (typeof r.available === 'boolean') {
+            entry.available = r.available;
+          }
+          out.push(entry);
+        }
       }
     }
   } else if (fields && typeof fields === 'object') {
@@ -96,7 +122,31 @@ export function withoutMediaField(entries: FieldEntry[]): FieldEntry[] {
  */
 export function fieldsToPersist(entries: FieldEntry[]): FieldEntry[] | null {
   const cleaned = entries
-    .map((e) => ({ label: e.label.trim(), value: e.value.trim() }))
+    .map((e) => {
+      const next: FieldEntry = { label: e.label.trim(), value: e.value.trim() };
+      // Carry the fulfillment flag through ONLY when it's a real boolean, so an
+      // orderable item keeps its 86 state but a describing field never gains one.
+      if (typeof e.available === 'boolean') {
+        next.available = e.available;
+      }
+      return next;
+    })
     .filter((e) => e.label || e.value);
   return cleaned.length > 0 ? cleaned : null;
+}
+
+/**
+ * Returns a new array with the entry at `index` flipped to `available`. The
+ * target MUST already be an item field (carry a boolean `available`) — a no-op
+ * otherwise, so a describing field can never be accidentally 86'd. Used by the
+ * one-tap toggle's non-embedding write path (CardContext.setFieldAvailability).
+ */
+export function setAvailabilityAt(
+  entries: FieldEntry[],
+  index: number,
+  available: boolean,
+): FieldEntry[] {
+  return entries.map((e, i) =>
+    i === index && typeof e.available === 'boolean' ? { ...e, available } : e,
+  );
 }

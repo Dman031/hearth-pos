@@ -48,7 +48,7 @@ const VERIFY_ERROR_COPY: Record<string, string> = {
 
 export default function ProfileScreen() {
   const { entity, refresh } = useEntity();
-  const { cards } = useCards();
+  const { cards, setFieldAvailability } = useCards();
   const [starting, setStarting] = useState(false);
   // The card open in the editor sheet (null = not editing). Day 12: rename,
   // fields, flavor, permissions + verification lock, and content media.
@@ -184,6 +184,9 @@ export default function ProfileScreen() {
                 key={card.id}
                 card={card}
                 onPress={() => setEditingCard(card)}
+                onToggleAvailability={(fieldIndex, next) =>
+                  void setFieldAvailability(card.id, fieldIndex, next)
+                }
               />
             ))
           ) : (
