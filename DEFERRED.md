@@ -207,6 +207,16 @@ Cross-repo: spans hearth-pos (app download, caller verify, caller-as-new-owner) 
   Acceptable now (content media is meant to be seen; no enumeration via unguessable paths). If
   private-card media becomes a requirement, move to a private bucket + signed URLs (time-limited,
   generated on authorized card view) — touches the render side. Logged, not built.
+- **Fulfillable item price — UX + data shape (card-editor polish + Phase 5 prep)** — Day 13 ticks
+  a field "Orderable item," but the value input still reads "value (in your words)" (describing-
+  field language) and the price stores as FREE TEXT. A vendor building a menu isn't guided to
+  enter a price, and "$16.15" persists as an unparseable string. Two linked pieces:
+  (1) **UX** — when Orderable is on, relabel value → "Price" with a currency/number input +
+  validation (numeric, sensible bounds). (2) **Phase 5 dependency** — payments need a STRUCTURED
+  numeric price (minor units / decimal + currency) so Stripe can charge it; you cannot charge the
+  string "$16.15". Design the structured price shape ONCE, properly, when wiring payments — don't
+  bolt a parser onto free text later. Until then the 86 toggle works fine (availability is
+  independent of price format). Part of the card-editor-feel pass; gates the Phase 5 order path.
 
 ---
 
