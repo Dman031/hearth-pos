@@ -140,6 +140,19 @@ Cross-repo: spans hearth-pos (app download, caller verify, caller-as-new-owner) 
   in-tab screen calls their refresh), but apply the same split if/when one does.
 - **cards table RLS policies not in repo** — confirm the owner insert/select policy exists;
   if a card write silently zero-rows, that's the cause. Add an explicit migration if needed.
+- **Swipe-to-delete is an UNBUILT Day 12 deliverable** — `ProfileScreen.tsx` still carries the
+  `{/* TODO(Day 12+): swipe-to-delete lands here. */}` seam and there is NO `deleteCard` in
+  `CardContext` (confirmed `git log -S deleteCard` across all branches: nothing). The deliberate
+  delete gesture (swipe + confirm) was never shipped. When it's built: it must COEXIST with the
+  Day 13 one-tap 86 toggle on the SAME item row — **tap = 86 (light, no confirm); swipe = delete
+  (deliberate, confirm)**. Don't let the swipe handler swallow the tap, and don't let the 86 tap
+  trigger delete. Both gestures live on the fulfillable item row.
+- **`updateCard` re-embeds unconditionally** — `CardContext.tsx` calls `triggerEmbedCard` on EVERY
+  edit, including non-text edits (permission tiers, and the kind label) that don't change
+  embedding text. Day 13's availability flip already routes around this via the dedicated
+  non-embedding `setFieldAvailability`. Efficiency cleanup (separate scope): gate
+  `updateCard`'s re-embed on whether title/field-content/kind actually changed, so a
+  permission-only edit skips the wasted Cloudflare embed call. Low risk, pure optimization.
 - **Card media is public-read (unguessable path) regardless of the card's see_perm** — a card
   gated to contacts/verified still has its IMAGE publicly accessible to anyone with the URL
   (`card-media` bucket is `public = true`; see `supabase/migrations/0002_card_media_storage.sql`).
