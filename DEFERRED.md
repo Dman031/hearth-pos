@@ -84,7 +84,36 @@ Cross-repo: spans hearth-pos (app download, caller verify, caller-as-new-owner) 
 
 ---
 
+## Brand — Teleoplexy (name DECIDED/locked; visual system → DAY 30 polish)
+
+- **Name: Deus → Teleoplexy (LOCKED).** Resolves the class 9/42 trademark conflicts that
+  killed "Deus." Etymology carries the thesis: *tele-* (the line drawn between two not-yet-
+  connected people) + *-plexy* (a weaving that thickens the more it's woven into) = "reach that
+  compounds," encoded in the name. `APP_NAME` is centralized → the rename is a one-line change.
+  ⚠️ **PENDING — trademark check on "Teleoplexy" in classes 9 + 42 BEFORE flipping `APP_NAME`.**
+  Don't repeat the Deus mistake; renaming twice is the disaster. (Note: `APP_NAME` constant does
+  not exist yet — see CLAUDE.md; the rename lands when the constant does, gated on the TM check.)
+- **Visual system → implement at the DAY 30 polish pass.** The full **Teleoplexy Brand Field
+  Guide v1.0** is the canonical reference (supersedes docs/deus-prototype.html for the cosmetic
+  layer). Implement as ONE coherent sweep (~2–3 focused days), NOT piecemeal mid-build. Static
+  orb is sufficient (motion orb stays in the deferred WebGL chunk). **Every cosmetic complaint
+  logged to date — oversized photo buttons, fonts, badge match, etc. — resolves to "implement
+  per field guide"** (the Polish pass items below all roll up into this single sweep). Scope:
+  three color worlds (Stone / Soil&Ember / Field), Teleo typeface (a geometric-sans stand-in is
+  acceptable until the real Teleo file exists), node/line iconography, wordmark lockups,
+  sentence-case + tight-tracking type rules.
+- **Strategic note — two registers, one company.** The field guide's co-op/populist frame
+  ("the large cooperation not the large corporation," "nobody in Silicon Valley takes a cut") is
+  the **USER/VENDOR-facing** register; the "agent broadband / supply-side infra" story stays the
+  **INVESTOR-facing** register. Same company, two faces — the guide's Stone / Soil&Ember / Field
+  worlds already encode this split. Be deliberate about which face shows to whom.
+
+---
+
 ## Polish pass — DAY 30 (Pre-flight for the App Store)
+
+> All cosmetic items below roll up into the single Teleoplexy field-guide sweep (see Brand
+> section above) — they are not independent fixes. Don't patch them piecemeal mid-build.
 
 - **Verified-human badge design** — match docs/deus-prototype.html. Current = plain amber
   text pill (functional placeholder). Real home is the Identity tab.
