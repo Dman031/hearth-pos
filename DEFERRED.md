@@ -107,6 +107,25 @@ Cross-repo: spans hearth-pos (app download, caller verify, caller-as-new-owner) 
   the **USER/VENDOR-facing** register; the "agent broadband / supply-side infra" story stays the
   **INVESTOR-facing** register. Same company, two faces — the guide's Stone / Soil&Ember / Field
   worlds already encode this split. Be deliberate about which face shows to whom.
+- **App color mapping (Stone world = the PRODUCT-SURFACE register).** Of the three worlds, the
+  app surface uses **Stone**; Soil&Ember = marketing, Field = community/local. Reconcile the
+  guide's light-drawn Stone with the app's dark-first reality (this is the "darker and warmer"
+  direction):
+  - **Background:** `#050505` (cold) → **Ink `#23201A`** (warm near-black). This IS "darker and warmer."
+  - **Surface / cards:** a warm step above Ink (Slate `#4A4438` low-opacity, or `#111111` warmed).
+  - **Primary text:** Paper `#ECE4D3` / Clay `#E3D8C2` (≈ current `#F5F0E8`, warmer).
+  - **Muted text:** Stone `#857B6A` (≈ current sage `#A5A99A`).
+  - **ONE brand accent:** Stone accent **`#A86B43`** (≈ current amber `#D4A574`, more clay/terracotta).
+  - **Guide rule — ONE accent, never two.** The app currently has 4 (amber + teal + red +
+    amber-warning). Resolve: clay `#A86B43` = the single brand accent; **teal/red stay as
+    FUNCTIONAL semantic signals** (success / danger / sold-out), used sparingly, NOT brand-level.
+  - **Ember `#BC4A24`** = high-energy accent for **ACT / convert moments** (publish, accept job,
+    convert-to-paid CTA) — louder than the clay base accent.
+  - **Field moss `#5C6B36` / Sage `#73785C`** = community/local register (ENV.Food.Local
+    vertical, "keep it local" surfaces) — specific contexts, NOT app-wide.
+  - **Single highest-impact change:** cold `#050505` → warm Ink `#23201A` + one-accent discipline
+    = ~80% of the field-guide feel. (Both are `theme.ts` token changes — the Day 30 sweep, not
+    piecemeal; `theme.ts` is on the DO-NOT-TOUCH list mid-build.)
 
 ---
 
