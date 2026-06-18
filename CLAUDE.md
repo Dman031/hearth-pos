@@ -9,7 +9,7 @@ The vendor-facing mobile app. Vendors download from App Store, fill conversation
 - Expo / React Native, iOS + Android
 - Supabase backend (auth, database, storage)
 - Stripe Connect Express for vendor payments
-- Anthropic API (Opus, model: claude-opus-4-7) for onboarding and classification
+- Anthropic API (Opus, model: claude-opus-4-8) for onboarding and classification
 - Hearth Network (mcp.hearth.network) is a separate service this app does NOT call directly. POS writes vendor data to Supabase. The Network reads from Supabase.
 
 ## Template system
@@ -31,7 +31,7 @@ Font: system sans-serif
 - NEVER show features the template has disabled
 - ALWAYS use Stripe Connect Express
 - ALWAYS track completed_transaction_count for paywall trigger
-- ALWAYS use Opus (claude-opus-4-7), never Haiku
+- ALWAYS use Opus (claude-opus-4-8), never Haiku
 - One app, one codebase, infinite business types via templates
 - The user-facing app name comes from a SINGLE `APP_NAME` constant — NEVER hardcode the brand string per screen. Currently "Deus"; a brand pass to "Flow" is planned pending name research, so centralization keeps the rename a one-line change. (As of 2026-06-06 no `APP_NAME` constant exists yet; `src/screens/AuthScreen.tsx` and `src/screens/OnboardingScreen.tsx` still hardcode the stale "Hearth" brand and must route through it when the constant lands.)
 

@@ -10,6 +10,33 @@ Convention: when an item is built, move it to "Done" with the commit hash. Don't
 
 ## Scheduled — mapped to a roadmap day
 
+### PDF menu upload  → DAY 14.x (deferred from Day 14 — Step 4.5 menu→cards)
+Day 14 ships PHOTO-only menu parse. PDF is a deliberate follow-on. Of the three seams, two are
+nearly free and ALREADY designed for both file types:
+- **Seam 2 (parse-menu function):** branch on file type — PDF → `{type:"document", source:{type:"url", url}}`,
+  image → `{type:"image", source:{type:"url", url}}`. The public `card-media` URL works as the
+  source for BOTH. Same parse prompt, same output shape, same server-side validation downstream.
+  A few lines; does not fork the function.
+- **Seam 3 (confirm screen):** ZERO change — PDF items land as the same `{label, value, available}`
+  FieldEntry[] in the same seeded `CardEditorSheet`, same `createCard` write path.
+- **Seam 1 (upload) is the real cost and the reason it's deferred:** `expo-image-picker` can't pick
+  PDFs (images/videos only) → needs **`expo-document-picker`** (new native dep → Expo
+  prebuild/rebuild; heed AGENTS.md's SDK 55 caution). And `src/services/storage.ts` is image-locked
+  AND shared (hardcoded `image/jpeg` + `.jpg`, 10 MB cap; used by onboarding / profile / card-media
+  via `CardEditorSheet`) → needs a SEPARATE `uploadDocumentAsset` path + a larger size ceiling, NOT
+  an in-place widen (widening regresses the image-only paths). Lands clean later: add
+  `expo-document-picker`, build the document-upload path, flip the one parse-menu branch. Do NOT
+  bolt onto Day 14 — it expands the demo-critical photo path's risk surface with a native dep + rebuild.
+
+### Link menu parse (paste a URL)  → DAY 14.x (after PDF)
+Server-side fetch of a menu page + HTML→text extraction, then the same parse → confirm → publish
+spine. A separate, bigger surface (fetch + parse + sanitize untrusted HTML); not demo-critical.
+Build after PDF. Seams 2/3 reuse identically (URL content block / same field shape).
+
+### Voice menu entry ("or speak it")  → LATER (no roadmap day yet)
+Speak a menu instead of photographing it. NO voice/TTS surface exists in the app today (CLAUDE.md
+B.3 is awareness-only). A later step once a voice surface is introduced; out of Day 14 entirely.
+
 ### Live "watch an AI find you" reach demo  → DAY 29 (Record the demo / fundable artifact)
 The onboarding payoff in its full form: a user's freshly-created card actually surfaced
 via query_cards on the live network and reached by an agent — ideally cross-LLM.
