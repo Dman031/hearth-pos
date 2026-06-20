@@ -55,10 +55,24 @@ import { theme } from '../styles/theme';
 
 type EditorMode = 'create' | 'edit' | null;
 
+// Day 14 — a parse-proposed draft used to seed CREATE mode (menu photo → card).
+// USER fields only (items carry `available`, describing rows don't); the menu
+// photo rides in `mediaUrl`. Optional + only consulted in create mode, so the
+// empty-create path (onboarding, ＋ Add) is untouched when no seed is passed.
+export interface CardEditorSeed {
+  title?: string;
+  kind?: CardKind;
+  fields?: FieldEntry[];
+  mediaUrl?: string;
+}
+
 interface CardEditorSheetProps {
   mode: EditorMode;
   card: Card | null; // the card being edited; null in create mode / closed
   onClose: () => void;
+  // Pre-fills create mode (e.g. a parsed menu). Ignored in edit mode and when
+  // null/undefined — create then starts empty, exactly as before.
+  createSeed?: CardEditorSeed | null;
 }
 
 // The four flavors user-pickable in this editor (Day 12), with vendor-facing
@@ -81,6 +95,7 @@ export default function CardEditorSheet({
   mode,
   card,
   onClose,
+  createSeed,
 }: CardEditorSheetProps) {
   const { createCard, updateCard } = useCards();
   const { entity } = useEntity();
@@ -114,15 +129,18 @@ export default function CardEditorSheet({
       setSeePerm(card.see_perm);
       setActPerm(card.act_perm);
     } else {
-      // create
-      setTitle('');
-      setKind(DEFAULT_KIND);
-      setFields([]);
-      setMediaUrlState('');
+      // create — seeded from a parsed draft if one was passed, else empty
+      // (onboarding / ＋ Add). Items in seed.fields keep their `available` flag,
+      // so the orderable toggle shows checked; permissions stay at the safe
+      // defaults for the owner to set who-can-order on this confirm screen.
+      setTitle(createSeed?.title ?? '');
+      setKind(createSeed?.kind ?? DEFAULT_KIND);
+      setFields(createSeed?.fields ?? []);
+      setMediaUrlState(createSeed?.mediaUrl ?? '');
       setSeePerm(DEFAULT_SEE);
       setActPerm(DEFAULT_ACT);
     }
-  }, [mode, card]);
+  }, [mode, card, createSeed]);
 
   const visible = mode !== null;
 

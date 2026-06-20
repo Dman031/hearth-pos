@@ -14,7 +14,11 @@ import useEntity from '../hooks/useEntity';
 import useCards from '../hooks/useCards';
 import VerifiedHumanBadge from '../components/VerifiedHumanBadge';
 import ProfileCard from '../components/ProfileCard';
-import CardEditorSheet from '../components/CardEditorSheet';
+import CardEditorSheet, {
+  type CardEditorSeed,
+} from '../components/CardEditorSheet';
+import useMediaUpload from '../hooks/useMediaUpload';
+import { parseMenu } from '../services/menu-parse';
 import { startIdentityVerification } from '../services/stripe';
 import type { Card } from '../types/card';
 import { theme } from '../styles/theme';
@@ -55,6 +59,13 @@ export default function ProfileScreen() {
   const [editingCard, setEditingCard] = useState<Card | null>(null);
   // True while the editor is open in create ("add a card") mode.
   const [creating, setCreating] = useState(false);
+  // Day 14 — a parse-proposed draft to seed the editor with (menu photo → card).
+  // null = empty create (＋ Add / onboarding); set = open the confirm screen
+  // pre-filled. Held in state so the reference is stable while the sheet is open
+  // (the editor re-seeds only when this changes, not on every parent render).
+  const [menuSeed, setMenuSeed] = useState<CardEditorSeed | null>(null);
+  // True while the menu photo is being read into proposed fields.
+  const [parsing, setParsing] = useState(false);
 
   // The sheet's mode, derived from the two pieces of open-state above.
   const editorMode: 'create' | 'edit' | null = creating
@@ -65,7 +76,49 @@ export default function ProfileScreen() {
   const closeEditor = useCallback(() => {
     setEditingCard(null);
     setCreating(false);
+    setMenuSeed(null);
   }, []);
+
+  // After the menu photo uploads, parse it server-side and open the editor
+  // seeded with the proposed card. parseMenu never throws: on any failure it
+  // returns a fallback, and we still open the editor with just the photo
+  // attached — an editable card, never a dead end. Nothing publishes here; the
+  // owner reviews/edits and Save → createCard is the only commit.
+  const onMenuPhotoUploaded = useCallback(async (url: string) => {
+    setParsing(true);
+    try {
+      const result = await parseMenu(url);
+      setMenuSeed({
+        title: result.title,
+        fields: result.fields, // [] on fallback → blank-but-editable card
+        mediaUrl: url,
+      });
+      setCreating(true);
+    } finally {
+      setParsing(false);
+    }
+  }, []);
+
+  const {
+    uploading: menuUploading,
+    error: menuError,
+    pickFromLibrary: pickMenu,
+    takePhoto: photographMenu,
+  } = useMediaUpload(entity?.id ?? null, onMenuPhotoUploaded);
+
+  const menuBusy = menuUploading || parsing;
+
+  const startMenuUpload = useCallback(() => {
+    Alert.alert(
+      'Upload a menu',
+      "Add a photo of your menu and we'll turn it into orderable items you can review before publishing.",
+      [
+        { text: 'Take photo', onPress: () => void photographMenu() },
+        { text: 'Choose photo', onPress: () => void pickMenu() },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    );
+  }, [photographMenu, pickMenu]);
 
   // Returning from the hosted browser, the webhook may have already flipped
   // id_verified — re-read the entity each time the tab regains focus so the
@@ -164,19 +217,53 @@ export default function ProfileScreen() {
         <View style={styles.cardList}>
           <View style={styles.cardListHeader}>
             <Text style={styles.cardListLabel}>Your cards</Text>
-            <Pressable
-              onPress={() => setCreating(true)}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Add a card"
-              style={({ pressed }) => [
-                styles.addCard,
-                pressed && styles.addCardPressed,
-              ]}
-            >
-              <Text style={styles.addCardLabel}>＋ Add</Text>
-            </Pressable>
+            <View style={styles.cardListActions}>
+              <Pressable
+                onPress={startMenuUpload}
+                disabled={menuBusy}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Upload a menu to create a card"
+                style={({ pressed }) => [
+                  styles.addCard,
+                  pressed && styles.addCardPressed,
+                  menuBusy && styles.addCardDisabled,
+                ]}
+              >
+                <Text style={styles.addCardLabel}>Upload menu</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  setMenuSeed(null);
+                  setCreating(true);
+                }}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Add a card"
+                style={({ pressed }) => [
+                  styles.addCard,
+                  pressed && styles.addCardPressed,
+                ]}
+              >
+                <Text style={styles.addCardLabel}>＋ Add</Text>
+              </Pressable>
+            </View>
           </View>
+
+          {/* Menu-upload progress / error. parseMenu can't fail to a dead end —
+              a failed parse still opens an editable card — so this only covers
+              the upload+read in-flight state and upload errors (vendor-facing). */}
+          {menuBusy ? (
+            <View style={styles.menuBusyRow}>
+              <ActivityIndicator size="small" color={theme.colors.accent} />
+              <Text style={styles.menuBusyLabel}>
+                {parsing ? 'Reading your menu…' : 'Uploading…'}
+              </Text>
+            </View>
+          ) : null}
+          {menuError && !menuBusy ? (
+            <Text style={styles.menuError}>{menuError}</Text>
+          ) : null}
 
           {cards.length > 0 ? (
             cards.map((card) => (
@@ -203,6 +290,7 @@ export default function ProfileScreen() {
         mode={editorMode}
         card={editingCard}
         onClose={closeEditor}
+        createSeed={menuSeed}
       />
     </SafeAreaView>
   );
@@ -237,6 +325,11 @@ const styles = StyleSheet.create({
     ...theme.typography.bodyMuted,
     color: theme.colors.textMuted,
   },
+  cardListActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
   addCard: {
     paddingVertical: theme.spacing.xs,
     paddingHorizontal: theme.spacing.md,
@@ -246,6 +339,24 @@ const styles = StyleSheet.create({
   },
   addCardPressed: {
     opacity: 0.6,
+  },
+  addCardDisabled: {
+    opacity: 0.4,
+  },
+  menuBusyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.sm,
+  },
+  menuBusyLabel: {
+    ...theme.typography.bodyMuted,
+    color: theme.colors.textSecondary,
+  },
+  menuError: {
+    ...theme.typography.caption,
+    color: theme.colors.danger,
+    marginTop: theme.spacing.sm,
   },
   addCardLabel: {
     ...theme.typography.bodyMuted,
