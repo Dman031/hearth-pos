@@ -257,12 +257,26 @@ Cross-repo: spans hearth-pos (app download, caller verify, caller-as-new-owner) 
   non-embedding `setFieldAvailability`. Efficiency cleanup (separate scope): gate
   `updateCard`'s re-embed on whether title/field-content/kind actually changed, so a
   permission-only edit skips the wasted Cloudflare embed call. Low risk, pure optimization.
-- **Card media is public-read (unguessable path) regardless of the card's see_perm** — a card
-  gated to contacts/verified still has its IMAGE publicly accessible to anyone with the URL
+- **Card media + gallery are public-read (unguessable path) regardless of the card's see_perm** — a
+  card gated to contacts/verified still has its IMAGE(S) publicly accessible to anyone with the URL
   (`card-media` bucket is `public = true`; see `supabase/migrations/0002_card_media_storage.sql`).
-  Acceptable now (content media is meant to be seen; no enumeration via unguessable paths). If
-  private-card media becomes a requirement, move to a private bucket + signed URLs (time-limited,
-  generated on authorized card view) — touches the render side. Logged, not built.
+  Day 15 galleries reuse the SAME bucket and inherit the same tradeoff. Acceptable now (portfolio
+  content is meant to be seen; no enumeration via unguessable paths). **Follow-on — see_perm-gated
+  image access (cross-repo):** if private-card images become a requirement, move to a PRIVATE bucket
+  + signed URLs (time-limited, minted on authorized card view). This is NOT single-repo: the
+  hearth-network read path (`query_cards` / `get_card_details`) would have to MINT signed URLs at
+  query time for the `media_url` / `gallery_image` values it returns, since the raw object paths are
+  no longer publicly fetchable. Scope it as a deliberate cross-repo step, not a POS-only change.
+  Logged, not built.
+- **Gallery drag-to-reorder** — Day 15 supports add (appended in selection order) + remove; images
+  display in stored order. Reordering existing gallery photos (drag handles) is deferred — a UI-only
+  add (the data model is already an ordered `gallery_image[]`, so reorder is just rewriting the array
+  order on save). Low priority; the vendor can remove + re-add to reorder today.
+- **Gallery/media Storage orphan cleanup** — removing an image in the editor drops the
+  `gallery_image` / `media_url` entry from the card's `fields` but does NOT delete the underlying
+  Storage object (same as the Day 12.5 media-remove behavior). Orphaned objects accumulate under
+  `card-media/{entity_id}/`. Acceptable now (storage is cheap, paths unguessable). Later: a reap on
+  card save/delete (diff old vs new URL set → `storage.remove` the dropped ones) or a periodic sweep.
 - **Fulfillable item price — UX + data shape (card-editor polish + Phase 5 prep)** — Day 13 ticks
   a field "Orderable item," but the value input still reads "value (in your words)" (describing-
   field language) and the price stores as FREE TEXT. A vendor building a menu isn't guided to
@@ -278,6 +292,18 @@ Cross-repo: spans hearth-pos (app download, caller verify, caller-as-new-owner) 
 
 ## Done (move items here with commit hash when built)
 
+- **Day 15 / Step 4.6 — Stored-image gallery content cards** — built across `35836be` (search
+  hygiene: reserved-field embed exclusion + force-all backfill; [[BUG-006]]), `eea6d9e` (gallery
+  data model: `gallery_image` reserved-field helpers), `964859e` (multi-image pipeline:
+  `useGalleryUpload` + `expo-image-manipulator` compress + `uploadImageFromUri`), `b9b24a8` (UI:
+  `GalleryGrid` + `ImageViewer` + editor/card wiring). **Option A** — repeated
+  `{label:'gallery_image', value:<url>}` entries in the existing `fields` jsonb; ZERO
+  hearth-network change (the network returns `fields` wholesale; gallery reconstructed by label
+  filter). Count cap 12, on-device resize (longest edge 1600) + JPEG 0.7, take-what-fits at the cap.
+  **Ops (Derrick):** (1) `npx expo prebuild` + rebuild the dev client — `expo-image-manipulator` is
+  a NEW native module; (2) redeploy `embed-card` + `backfill-embeddings`; (3) run backfill
+  `{ force_all: true }`, paging `next_cursor` until null, to clean existing `media_url`-polluted
+  vectors. Deferred follow-ons logged above (see_perm-gated access, drag-reorder, orphan cleanup).
 - **Day 12.5 — Real media upload for content cards** — built in `78e48e6`. Picker
   (expo-image-picker) → `card-media` Storage bucket (owner-writes-own RLS keyed by
   `{entity_id}/` path, public-read) → public URL written into the existing `fields.media_url`
