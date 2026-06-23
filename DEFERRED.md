@@ -49,6 +49,23 @@ relocation of the entry point into the CardEditorSheet create flow ("or scan a p
 is a SEPARATE, still-pending step — it's a data-flow re-architecture (seed-from-parent → self-parse-and-
 mutate), not a clean copy move, so it was split out rather than risk the working parse path.
 
+### "Scan a photo" entry point — RELOCATE into the card-creation flow  → OWN FOCUSED STEP (deferred)
+The **"Scan a photo"** button is correctly NAMED but mis-PLACED: it sits on the Profile tab "Your
+cards" row, when conceptually it belongs in the card-CREATION flow (it builds a card, it's not a
+profile action). Moving it into `CardEditorSheet` create mode is **more than a move — it changes the
+data flow**:
+- **Today (seed-from-parent):** `ProfileScreen` parses, hands a finished `createSeed` to
+  `CardEditorSheet`, applied **once on open**.
+- **In-sheet:** the editor must **scan-and-mutate its own live state mid-session** — needs a **2nd
+  `useMediaUpload` wiring** (the existing one writes `media_url`, NOT fields), in-sheet parse/error
+  UI, a **MERGE-VS-OVERWRITE decision** when the editor already has content, and unwinding ~50 lines
+  of now-orphaned `ProfileScreen` state.
+- **Open design question to answer FIRST:** when the user hits "scan" mid-edit, does the parse
+  **REPLACE** the current fields or **MERGE** into them? Decide before building.
+Cleanly separable; do as its own focused step. Part of the **card-creation-flow polish cluster**
+(alongside suggested-fields-per-card-type, content-card render, and eventually the Plex Capture
+generalization above — they all touch how a card gets BUILT).
+
 ### Live "watch an AI find you" reach demo  → DAY 29 (Record the demo / fundable artifact)
 The onboarding payoff in its full form: a user's freshly-created card actually surfaced
 via query_cards on the live network and reached by an agent — ideally cross-LLM.
