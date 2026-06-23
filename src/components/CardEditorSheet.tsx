@@ -18,10 +18,13 @@ import useCards from '../hooks/useCards';
 import useEntity from '../hooks/useEntity';
 import {
   fieldsToPersist,
+  getGalleryUrls,
   getMediaUrl,
+  MAX_GALLERY_IMAGES,
   normalizeFields,
+  setGalleryUrls,
   setMediaUrl,
-  withoutMediaField,
+  withoutReservedFields,
   type FieldEntry,
 } from '../utils/card-fields';
 import {
@@ -31,6 +34,9 @@ import {
 } from '../services/card-gating';
 import PermissionPicker from './PermissionPicker';
 import useMediaUpload from '../hooks/useMediaUpload';
+import useGalleryUpload from '../hooks/useGalleryUpload';
+import GalleryGrid from './GalleryGrid';
+import ImageViewer from './ImageViewer';
 import { theme } from '../styles/theme';
 
 // CardEditorSheet — the multi-mode Profile card editor (Day 12). One sheet,
@@ -105,8 +111,12 @@ export default function CardEditorSheet({
 
   const [title, setTitle] = useState('');
   const [kind, setKind] = useState<CardKind>(DEFAULT_KIND);
-  const [fields, setFields] = useState<FieldEntry[]>([]); // user fields, no media
+  const [fields, setFields] = useState<FieldEntry[]>([]); // user fields, no reserved
   const [mediaUrl, setMediaUrlState] = useState('');
+  // Gallery image URLs (Day 15) — persisted as repeated gallery_image entries.
+  const [galleryUrls, setGalleryUrlsState] = useState<string[]>([]);
+  // The gallery image open in the full viewer (null = closed).
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [seePerm, setSeePerm] = useState<SeePerm>(DEFAULT_SEE);
   const [actPerm, setActPerm] = useState<ActPerm>(DEFAULT_ACT);
   const [saving, setSaving] = useState(false);
@@ -120,12 +130,14 @@ export default function CardEditorSheet({
     }
     setError(null);
     setImageBroken(false);
+    setViewerIndex(null);
     if (mode === 'edit' && card) {
       const all = normalizeFields(card.fields);
       setTitle(card.title);
       setKind(card.kind);
-      setFields(withoutMediaField(all));
+      setFields(withoutReservedFields(all));
       setMediaUrlState(getMediaUrl(card.fields));
+      setGalleryUrlsState(getGalleryUrls(card.fields));
       setSeePerm(card.see_perm);
       setActPerm(card.act_perm);
     } else {
@@ -135,8 +147,9 @@ export default function CardEditorSheet({
       // defaults for the owner to set who-can-order on this confirm screen.
       setTitle(createSeed?.title ?? '');
       setKind(createSeed?.kind ?? DEFAULT_KIND);
-      setFields(createSeed?.fields ?? []);
+      setFields(withoutReservedFields(createSeed?.fields ?? []));
       setMediaUrlState(createSeed?.mediaUrl ?? '');
+      setGalleryUrlsState(getGalleryUrls(createSeed?.fields ?? []));
       setSeePerm(DEFAULT_SEE);
       setActPerm(DEFAULT_ACT);
     }
@@ -191,7 +204,32 @@ export default function CardEditorSheet({
     takePhoto,
   } = useMediaUpload(entity?.id ?? null, onMediaChange);
 
-  const canSave = title.trim().length > 0 && !saving && !uploading;
+  // Gallery (Day 15) — multi-image upload. Each success appends its URL (cap-
+  // guarded here; the hook also slices the pick to the remaining slots). Held
+  // separately from the single media_url path so neither regresses the other.
+  const onGalleryUploaded = useCallback((url: string): void => {
+    setGalleryUrlsState((prev) =>
+      prev.length >= MAX_GALLERY_IMAGES ? prev : [...prev, url],
+    );
+  }, []);
+
+  const {
+    uploading: galleryUploading,
+    progress: galleryProgress,
+    error: galleryError,
+    hasFailures: galleryHasFailures,
+    pickAndUpload: pickGallery,
+    retryFailed: retryGallery,
+  } = useGalleryUpload(entity?.id ?? null, onGalleryUploaded);
+
+  const removeGalleryAt = useCallback((index: number): void => {
+    setGalleryUrlsState((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const remainingSlots = MAX_GALLERY_IMAGES - galleryUrls.length;
+
+  const canSave =
+    title.trim().length > 0 && !saving && !uploading && !galleryUploading;
 
   const handleSave = async (): Promise<void> => {
     if (!canSave) {
@@ -213,9 +251,11 @@ export default function CardEditorSheet({
     setSaving(true);
     setError(null);
     try {
-      // Recombine: media can ride on any card type. setMediaUrl upserts the
-      // reserved media_url entry, or strips it when the URL is blank.
-      const merged = setMediaUrl(fields, mediaUrl);
+      // Recombine: user fields + reserved media + reserved gallery. setMediaUrl
+      // upserts/strips the single media_url entry; setGalleryUrls replaces the
+      // repeated gallery_image entries (ordered, capped). Both ride on any card
+      // type, kept at the end so the user fields stay at the front.
+      const merged = setGalleryUrls(setMediaUrl(fields, mediaUrl), galleryUrls);
       const persistedFields = fieldsToPersist(merged);
 
       if (mode === 'edit' && card) {
@@ -415,6 +455,79 @@ export default function CardEditorSheet({
                 editable={!uploading}
               />
             </View>
+
+            {/* Gallery — multiple browsable photos (a content portfolio) ---- */}
+            <View style={styles.gallerySection}>
+              <View style={styles.galleryHeader}>
+                <Text style={[styles.sectionLabel, styles.spaced]}>Gallery</Text>
+                <Text style={[styles.galleryCount, styles.spaced]}>
+                  {galleryUrls.length} of {MAX_GALLERY_IMAGES}
+                </Text>
+              </View>
+
+              {galleryUrls.length > 0 ? (
+                <GalleryGrid
+                  urls={galleryUrls}
+                  onPressImage={setViewerIndex}
+                  onRemove={removeGalleryAt}
+                />
+              ) : (
+                <Text style={styles.galleryHint}>
+                  Add photos people can browse — work samples, a portfolio, your
+                  space.
+                </Text>
+              )}
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.mediaButton,
+                  styles.galleryAddButton,
+                  pressed && styles.mediaButtonPressed,
+                  (galleryUploading || remainingSlots <= 0) &&
+                    styles.mediaButtonDisabled,
+                ]}
+                onPress={() => void pickGallery(remainingSlots)}
+                disabled={galleryUploading || remainingSlots <= 0}
+                accessibilityRole="button"
+                accessibilityLabel="Add gallery photos"
+              >
+                <Text style={styles.mediaButtonLabel}>
+                  {remainingSlots <= 0 ? 'Gallery full' : 'Add photos'}
+                </Text>
+              </Pressable>
+
+              {galleryUploading && galleryProgress ? (
+                <View style={styles.uploadingRow}>
+                  <ActivityIndicator size="small" color={theme.colors.accent} />
+                  <Text style={styles.uploadingLabel}>
+                    Uploading {galleryProgress.completed + galleryProgress.failed}{' '}
+                    of {galleryProgress.total}…
+                  </Text>
+                </View>
+              ) : null}
+
+              {galleryError ? (
+                <View style={styles.galleryErrorRow}>
+                  <Text style={styles.mediaError}>{galleryError}</Text>
+                  {galleryHasFailures && !galleryUploading ? (
+                    <Pressable
+                      onPress={() => void retryGallery()}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel="Retry failed gallery uploads"
+                    >
+                      <Text style={styles.galleryRetry}>Retry</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ) : null}
+            </View>
+
+            <ImageViewer
+              urls={galleryUrls}
+              index={viewerIndex}
+              onClose={() => setViewerIndex(null)}
+            />
 
             {/* Permissions ------------------------------------------------- */}
             <Text style={[styles.sectionLabel, styles.spaced]}>Permissions</Text>
@@ -661,6 +774,38 @@ const styles = StyleSheet.create({
     ...theme.typography.caption,
     color: theme.colors.textMuted,
     lineHeight: 16,
+  },
+  gallerySection: {
+    gap: theme.spacing.sm,
+  },
+  galleryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  galleryCount: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+  },
+  galleryHint: {
+    ...theme.typography.bodyMuted,
+    color: theme.colors.textMuted,
+  },
+  galleryAddButton: {
+    flex: 0, // override mediaButton's flex:1 (that's for the side-by-side row)
+    alignSelf: 'flex-start',
+    paddingHorizontal: theme.spacing.lg,
+  },
+  galleryErrorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: theme.spacing.sm,
+  },
+  galleryRetry: {
+    ...theme.typography.bodyMuted,
+    color: theme.colors.accent,
+    fontWeight: '600',
   },
   permsBlock: {
     gap: theme.spacing.lg,

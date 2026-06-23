@@ -2,13 +2,16 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Card } from '../types/card';
 import {
+  getGalleryUrls,
   getMediaUrl,
   isItemField,
-  MEDIA_FIELD_LABEL,
+  isReservedFieldLabel,
   normalizeFields,
 } from '../utils/card-fields';
 import { theme } from '../styles/theme';
 import PermissionPill from './PermissionPill';
+import GalleryGrid from './GalleryGrid';
+import ImageViewer from './ImageViewer';
 
 // ProfileCard — one of the user's cards in the Profile list: title, an optional
 // media image, its user-named fields, and the two DISPLAY permission pills
@@ -42,10 +45,13 @@ export default function ProfileCard({
     const all = normalizeFields(card.fields);
     return all
       .map((entry, index) => ({ entry, index }))
-      .filter(({ entry }) => entry.label !== MEDIA_FIELD_LABEL);
+      .filter(({ entry }) => !isReservedFieldLabel(entry.label));
   }, [card.fields]);
   const mediaUrl = useMemo(() => getMediaUrl(card.fields), [card.fields]);
+  const galleryUrls = useMemo(() => getGalleryUrls(card.fields), [card.fields]);
   const [imageBroken, setImageBroken] = useState(false);
+  // The gallery image open in the full viewer (null = closed).
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   // Re-arm the image when the URL changes (e.g. after an edit fixes a bad link).
   useEffect(() => {
     setImageBroken(false);
@@ -69,6 +75,18 @@ export default function ProfileCard({
           accessibilityIgnoresInvertColors
         />
       ) : null}
+
+      {/* Gallery thumbnails — tap one to browse full-screen. The thumbnail
+          Pressables win the touch, so tapping a photo opens the viewer instead
+          of the card editor (same nested-Pressable pattern as the 86 toggle). */}
+      {galleryUrls.length > 0 ? (
+        <GalleryGrid urls={galleryUrls} onPressImage={setViewerIndex} />
+      ) : null}
+      <ImageViewer
+        urls={galleryUrls}
+        index={viewerIndex}
+        onClose={() => setViewerIndex(null)}
+      />
 
       {fields.length > 0 ? (
         <View style={styles.fields}>
