@@ -116,6 +116,65 @@ export function withoutMediaField(entries: FieldEntry[]): FieldEntry[] {
 }
 
 /**
+ * Reserved field label for ONE gallery image on a content card (Day 15). Unlike
+ * media_url (a single entry), gallery images are stored as REPEATED entries —
+ * one `{label:'gallery_image', value:<url>}` per photo, in display order — so a
+ * content card can hold a whole portfolio inside the existing `fields` jsonb with
+ * NO schema change and NO hearth-network change (the network's normalizeFields
+ * passes each {label,value} through untouched; the gallery is reconstructed
+ * caller-side by filtering on this label).
+ *
+ * CONTRACT MIRROR: this string is duplicated in
+ * supabase/functions/_shared/embed-core.ts (RESERVED_EMBED_SKIP_LABELS) so the
+ * URLs are excluded from the search embedding. Changing it here MUST change it
+ * there (and warrants a force-all backfill re-embed). See [[BUG-006]].
+ */
+export const GALLERY_FIELD_LABEL = 'gallery_image';
+
+/** Max gallery images per card — a UX/storage ceiling (see useGalleryUpload). */
+export const MAX_GALLERY_IMAGES = 12;
+
+/** Every reserved (machine-only) field label — hidden from the user field editor. */
+export const RESERVED_FIELD_LABELS: ReadonlySet<string> = new Set([
+  MEDIA_FIELD_LABEL,
+  GALLERY_FIELD_LABEL,
+]);
+
+/** True when a label names a reserved machine field (media/gallery URL carrier). */
+export function isReservedFieldLabel(label: string): boolean {
+  return RESERVED_FIELD_LABELS.has(label);
+}
+
+/** A card's user-facing fields with ALL reserved entries (media + gallery) removed. */
+export function withoutReservedFields(entries: FieldEntry[]): FieldEntry[] {
+  return entries.filter((f) => !RESERVED_FIELD_LABELS.has(f.label));
+}
+
+/** The gallery image URLs stored on a card's fields, in stored (display) order. */
+export function getGalleryUrls(fields: unknown): string[] {
+  return normalizeFields(fields)
+    .filter((f) => f.label === GALLERY_FIELD_LABEL)
+    .map((f) => f.value.trim())
+    .filter((v) => v.length > 0);
+}
+
+/**
+ * Replaces the gallery entries in a FieldEntry[] with one reserved entry per url
+ * (order preserved, blanks dropped, capped at MAX_GALLERY_IMAGES). Existing
+ * gallery entries are stripped first, so this is an idempotent upsert. Reserved
+ * entries are kept last so user fields stay at the front of the editor.
+ */
+export function setGalleryUrls(entries: FieldEntry[], urls: string[]): FieldEntry[] {
+  const rest = entries.filter((f) => f.label !== GALLERY_FIELD_LABEL);
+  const gallery = urls
+    .map((u) => u.trim())
+    .filter((u) => u.length > 0)
+    .slice(0, MAX_GALLERY_IMAGES)
+    .map((value) => ({ label: GALLERY_FIELD_LABEL, value }));
+  return [...rest, ...gallery];
+}
+
+/**
  * The value to persist back to `fields`: the canonical array, or null when the
  * card has no fields (matches the column default and how createCard stores "no
  * detail"). Trims and drops fully-empty entries.
