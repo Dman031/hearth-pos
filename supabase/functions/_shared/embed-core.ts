@@ -15,6 +15,18 @@ const CF_TIMEOUT_MS = 12_000;
 // surprises (rough ~4 chars/token).
 const MAX_EMBED_CHARS = 1800;
 
+// RESERVED field labels that carry MACHINE data (URLs), never describing text —
+// they MUST be excluded from the embedding so opaque Storage URLs don't pollute
+// semantic search (an LLM matches on what a card MEANS, not its image paths).
+//   • 'media_url'     — the single content-card image (Day 12.5 reserved field)
+//   • 'gallery_image' — one entry per gallery photo (Day 15 reserved field;
+//                       repeated, so a content card can hold N images)
+// CONTRACT MIRROR: these string literals are duplicated in src/utils/card-fields.ts
+// (MEDIA_FIELD_LABEL / GALLERY_FIELD_LABEL) — this edge module is Deno and cannot
+// import from the app bundle, exactly like embedding-config is mirrored cross-repo.
+// Changing a label here MUST change it there (and warrants a backfill re-embed).
+const RESERVED_EMBED_SKIP_LABELS = new Set(['media_url', 'gallery_image']);
+
 export interface EmbeddableCard {
   id: string;
   title: string;
@@ -34,7 +46,11 @@ export function composeEmbeddingText(title: string, fields: unknown): string {
     for (const f of fields) {
       if (f && typeof f === 'object') {
         const r = f as Record<string, unknown>;
-        if (typeof r.label === 'string' && r.label.trim()) parts.push(r.label.trim());
+        const label = typeof r.label === 'string' ? r.label.trim() : '';
+        // Skip reserved machine fields (image URLs) entirely — neither the label
+        // token nor the URL value belongs in the searchable text.
+        if (RESERVED_EMBED_SKIP_LABELS.has(label)) continue;
+        if (label) parts.push(label);
         if (typeof r.value === 'string' && r.value.trim()) parts.push(r.value.trim());
       }
     }

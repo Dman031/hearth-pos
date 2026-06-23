@@ -345,3 +345,54 @@ Phase 4 replaces the template/classify model with the Deus **card model**. The n
 ### Prevention
 
 Do not model onboarding (or any vendor-facing categorization) as classification into a closed set when the input space is open. Prefer letting the vendor name the thing in their own words (a card) over forcing it into a predefined bucket. If a future surface must classify, it must have an explicit, non-dead-end path for "none of the buckets fit" that is not framed as a choice the vendor failed to make.
+
+---
+
+## BUG-006: Reserved image-URL fields polluted the semantic-search embedding
+
+**Status:** FIXED
+**Date:** 2026-06-23
+**Severity:** Medium
+**Category:** ai-tool-calling (semantic search / embedding hygiene)
+**Introduced-by:** claude-prompt
+**Related bugs:** none
+
+### Symptoms
+
+- No user-visible error — a silent search-QUALITY degradation, found during Day 15 (gallery cards) investigation, not from a report.
+- Every content card with an image embedded the literal token `media_url` **plus its full Supabase Storage URL** (e.g. `https://<proj>.supabase.co/storage/v1/object/public/card-media/<uuid>/1699-ab12cd.jpg`) into its semantic-search vector — ~100+ chars of opaque, meaningless tokens diluting the describing text an LLM actually matches on.
+
+### Root Cause
+
+The reserved-field machinery (`MEDIA_FIELD_LABEL`, `withoutMediaField`, `getMediaUrl`) lived ONLY in the client `src/utils/card-fields.ts`, used for rendering/editing. The WRITE-side embedder `composeEmbeddingText` (`supabase/functions/_shared/embed-core.ts`) had no knowledge of it: it walked the entire `fields` array and pushed every `{label, value}`, including the reserved `media_url` entry. When embed-on-write was added (semantic search, commit `c11d78f`), the already-existing `media_url` reserved field was not excluded — the two systems were built independently and never reconciled.
+
+### Solution
+
+Added `RESERVED_EMBED_SKIP_LABELS = new Set(['media_url', 'gallery_image'])` to `embed-core.ts` and `continue` past any field whose label is reserved (skips BOTH the label token and the URL value). `gallery_image` (Day 15's repeated gallery reserved field) is included pre-emptively in the same set so the gallery feature never reintroduces the same pollution. Existing rows were re-embedded via the new backfill `force_all` cursor mode (already-embedded rows don't match the stale filter, so a forced pass is required to rewrite their vectors).
+
+### Files Changed
+
+- `supabase/functions/_shared/embed-core.ts` — `RESERVED_EMBED_SKIP_LABELS` set + skip in `composeEmbeddingText`.
+- `supabase/functions/backfill-embeddings/index.ts` — `force_all` + `after_id` cursor mode to re-embed already-embedded rows.
+
+### Commits
+
+- `<this commit>` — feat: Day 15 search hygiene (reserved-field embed exclusion + force-all backfill)
+
+### Verification
+
+- `npx tsc --noEmit` → exit 0.
+- Code trace: a `{label:'media_url', value:'https://…jpg'}` entry now hits the `RESERVED_EMBED_SKIP_LABELS.has(label)` guard and is skipped before either push.
+- Ops (Derrick): redeploy `embed-card` + `backfill-embeddings`; invoke backfill with `{ "force_all": true }`, re-invoking with the returned `next_cursor` until it is null, to rewrite the ~handful of existing content-card vectors.
+- NOT independently re-verifiable on-device (server-side embedding); the vector is never returned to the client. Confirmed by reading `composeEmbeddingText` and the network's `match_cards` (returns no vector).
+
+### Cross-check Performed
+
+- **Other reserved fields (same anti-pattern grep `grep -rn "MEDIA_FIELD_LABEL\|GALLERY_FIELD_LABEL" src`):** `media_url` was the only reserved field at discovery; `gallery_image` is added by this same Day 15 work and is covered by the same skip-set in the same commit — no reserved field is left embeddable.
+- **Other embed entry points:** both `embed-card` (write) and `backfill-embeddings` (ops) call the SHARED `composeEmbeddingText`, so the single fix covers every vector-producing path. The network read side embeds only the QUERY (never card fields), so it needs no change.
+- **Availability flag (`available`):** already correctly excluded — `composeEmbeddingText` only reads `label`/`value`, never `available` (Day 13 guardrail intact).
+- **Substring fallback (`query_cards`):** scans `label`/`value` literally; a reserved `media_url`/`gallery_image` label could in theory substring-match a query, but the values are opaque URLs and labels are machine tokens a human query won't contain — out-of-scope-but-flagged (no behavioural change made there).
+
+### Prevention
+
+When a reserved/machine field is added to a jsonb blob that is ALSO embedded for search, the exclusion must be applied at EVERY consumer of that blob, not just the render/edit path. The embed text builder and the renderer are independent consumers — a reserved-field convention defined in one does not propagate to the other. Grep both sides when adding a reserved label: `grep -rn "composeEmbeddingText\|RESERVED_EMBED_SKIP_LABELS" supabase` and `grep -rn "FIELD_LABEL" src`.
