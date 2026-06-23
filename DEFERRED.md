@@ -37,6 +37,18 @@ Build after PDF. Seams 2/3 reuse identically (URL content block / same field sha
 Speak a menu instead of photographing it. NO voice/TTS surface exists in the app today (CLAUDE.md
 B.3 is awareness-only). A later step once a voice surface is introduced; out of Day 14 entirely.
 
+### "Plex Capture" — brand for the GENERALIZED capture feature  → WHEN BREADTH IS REAL (not before)
+The vendor-facing entry point ships as **"Scan a photo"** (mechanism-honest, deliberately NOT a brand
+name) with loading copy **"Reading your photo…"**. Under the hood the parse PROMPT stays **menu-tuned**
+— it's a way station, not a card-type-aware extractor. **"Plex Capture" is the brand name reserved for
+the GENERALIZED (card-type-aware) feature.** It graduates from "Scan a photo" ONLY when the breadth is
+real — i.e. the prompt actually handles multiple card types, not just menus — NOT before. Applying the
+brand to a menu-tuned tool over-promises. As of Day 14.x the user-facing COPY is already generic; what
+remains for "Plex Capture" is the **prompt generalization** (the deferred work) plus the rename. The
+relocation of the entry point into the CardEditorSheet create flow ("or scan a photo to fill this card")
+is a SEPARATE, still-pending step — it's a data-flow re-architecture (seed-from-parent → self-parse-and-
+mutate), not a clean copy move, so it was split out rather than risk the working parse path.
+
 ### Live "watch an AI find you" reach demo  → DAY 29 (Record the demo / fundable artifact)
 The onboarding payoff in its full form: a user's freshly-created card actually surfaced
 via query_cards on the live network and reached by an agent — ideally cross-LLM.

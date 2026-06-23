@@ -110,8 +110,8 @@ export default function ProfileScreen() {
 
   const startMenuUpload = useCallback(() => {
     Alert.alert(
-      'Upload a menu',
-      "Add a photo of your menu and we'll turn it into orderable items you can review before publishing.",
+      'Scan a photo',
+      "Add a photo and we'll turn it into orderable items you can review before publishing.",
       [
         { text: 'Take photo', onPress: () => void photographMenu() },
         { text: 'Choose photo', onPress: () => void pickMenu() },
@@ -223,14 +223,14 @@ export default function ProfileScreen() {
                 disabled={menuBusy}
                 hitSlop={8}
                 accessibilityRole="button"
-                accessibilityLabel="Upload a menu to create a card"
+                accessibilityLabel="Scan a photo to create a card"
                 style={({ pressed }) => [
                   styles.addCard,
                   pressed && styles.addCardPressed,
                   menuBusy && styles.addCardDisabled,
                 ]}
               >
-                <Text style={styles.addCardLabel}>Upload menu</Text>
+                <Text style={styles.addCardLabel}>Scan a photo</Text>
               </Pressable>
               <Pressable
                 onPress={() => {
@@ -257,7 +257,7 @@ export default function ProfileScreen() {
             <View style={styles.menuBusyRow}>
               <ActivityIndicator size="small" color={theme.colors.accent} />
               <Text style={styles.menuBusyLabel}>
-                {parsing ? 'Reading your menu…' : 'Uploading…'}
+                {parsing ? 'Reading your photo…' : 'Uploading…'}
               </Text>
             </View>
           ) : null}
