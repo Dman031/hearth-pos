@@ -132,3 +132,57 @@ export async function uploadImageAsset(
   }
   return { url: data.publicUrl, path };
 }
+
+/**
+ * Upload an image from a local file URI (Day 15 gallery path). The gallery hook
+ * compresses each pick with expo-image-manipulator, which yields a file URI, not
+ * base64 — fetching the URI to bytes avoids holding a base64 string per image in
+ * memory (a real cost across a 12-photo batch on Hermes). Same bucket, same
+ * owner-scoped `{entityId}/...` path, same public URL contract as
+ * uploadImageAsset; only the input form differs.
+ */
+export async function uploadImageFromUri(
+  entityId: string,
+  uri: string,
+): Promise<UploadResult> {
+  if (!entityId) {
+    throw new MediaUploadError('Set up your profile before adding media.');
+  }
+
+  let bytes: Uint8Array;
+  try {
+    const res = await fetch(uri);
+    bytes = new Uint8Array(await res.arrayBuffer());
+  } catch (err) {
+    console.error('[storage] could not read image uri:', err);
+    throw new MediaUploadError("Couldn't read that image. Try another photo.");
+  }
+  if (bytes.byteLength === 0) {
+    throw new MediaUploadError("Couldn't read that image. Try another photo.");
+  }
+  // Defense in depth behind the manipulator compression — should rarely fire.
+  if (bytes.byteLength > MAX_MEDIA_BYTES) {
+    throw new MediaUploadError('That image is over 10 MB. Pick a smaller one.');
+  }
+
+  const path = `${entityId}/${makeFilename()}`;
+
+  // Destructure { error } per the SUPABASE WRITE RULE — a silent failure here
+  // would otherwise return a getPublicUrl for a file that was never written.
+  const { error: uploadError } = await supabase.storage
+    .from(MEDIA_BUCKET)
+    .upload(path, bytes, { contentType: 'image/jpeg', upsert: false });
+
+  if (uploadError) {
+    console.error('[storage] card-media uri upload failed:', uploadError);
+    throw new MediaUploadError(
+      "That didn't upload. Check your connection and try again.",
+    );
+  }
+
+  const { data } = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(path);
+  if (!data?.publicUrl) {
+    throw new MediaUploadError('Upload finished but no URL came back. Try again.');
+  }
+  return { url: data.publicUrl, path };
+}
