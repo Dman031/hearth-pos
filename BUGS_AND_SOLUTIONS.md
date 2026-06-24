@@ -416,14 +416,11 @@ This lets us observe whether the pollution actually degraded search in practice 
   - A specific important pre-fix card (e.g. the ezCater menu card — parsed WITH a photo, so it's in the polluted cohort) isn't getting found well in demos
   - Before the fundable demo / raise — clean everything so no card is handicapped when it matters
 
-**HOW to run when triggered:** `backfill-embeddings` function, body `{"force_all": true}`, re-invoke with returned `next_cursor` until null. Requires service_role auth (anon is rejected 401 — use the dashboard Test panel with an `Authorization: Bearer <service_role>` header, or equivalent). Idempotent and reversible (re-embeds derived data; source cards untouched). Same model (bge-base-en-v1.5), same dims — no index rebuild.
+**TO RUN THE BACKFILL (when triggered — see triggers above):**
+  1. **PREREQUISITE — make the function ops-invokable.** It currently gates on `auth.getUser(token)` (`supabase/functions/backfill-embeddings/index.ts:45-56`), so it needs a signed-in USER JWT. Both anon AND service_role keys 401 here (neither is a user token `auth.getUser` can resolve). Before running, change the gate to accept a `service_role` claim or a shared ops-secret Bearer. Scope this as its own small change.
+  2. Invoke `backfill-embeddings`, body `{"force_all": true}`, with the ops credential from step 1.
+  3. Re-invoke with each returned `next_cursor` until `next_cursor` is null.
+  4. Search-test 3 cards (menu / Blue Hour Coffee / pickleball) on the live network — all must still surface. If any regress, STOP and investigate.
+  Idempotent + reversible (re-embeds derived data; source cards untouched). Same model (bge-base-en-v1.5), same dims — no index rebuild.
 
-> **Verification note (Claude, 2026-06-23) — confirm the auth before relying on this at demo time.**
-> As written, `backfill-embeddings` does NOT accept the service_role key as its Bearer. Its
-> `verifyUser` calls `client.auth.getUser(token)` and requires a real `data.user`
-> (`supabase/functions/backfill-embeddings/index.ts:45-56`). The anon key → no user → 401 (correct
-> above), but the raw **service_role key is also not a user token**, so `auth.getUser` returns no
-> user and it 401s too. To run it as-is, pass a signed-in **user's access token** (a real vendor
-> session JWT), not the service_role key. If service_role invocation is wanted (the natural ops
-> ergonomic), the function needs a small change first — gate on a `service_role` claim / shared ops
-> secret instead of `auth.getUser`. Flagged, not changed (no code touched in this doc append).
+**INTERIM (run before the gate change):** pass a signed-in vendor's access token as the Bearer — that satisfies `auth.getUser` today, no code change needed.
