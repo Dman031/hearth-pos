@@ -396,3 +396,34 @@ Added `RESERVED_EMBED_SKIP_LABELS = new Set(['media_url', 'gallery_image'])` to 
 ### Prevention
 
 When a reserved/machine field is added to a jsonb blob that is ALSO embedded for search, the exclusion must be applied at EVERY consumer of that blob, not just the render/edit path. The embed text builder and the renderer are independent consumers — a reserved-field convention defined in one does not propagate to the other. Grep both sides when adding a reserved label: `grep -rn "composeEmbeddingText\|RESERVED_EMBED_SKIP_LABELS" supabase` and `grep -rn "FIELD_LABEL" src`.
+
+---
+
+### DECISION (Day 15): old cards left un-backfilled as an observational cohort
+
+The fix (`composeEmbeddingText` reserved-label exclusion) is deployed, so all cards created AFTER the Day 15 `embed-card` deploy are clean. Existing cards created BEFORE the deploy still carry the old polluted embeddings (image URL in the vector).
+
+We are deliberately NOT running the `force_all` backfill yet, treating the two cohorts as a natural observational split:
+  - **CLEAN cohort:** cards created post-fix (URL excluded from embedding)
+  - **POLLUTED cohort:** cards created pre-fix (URL still in embedding)
+
+This lets us observe whether the pollution actually degraded search in practice before spending the backfill effort.
+
+**IMPORTANT — the polluted cards do NOT break.** They remain findable. The only expected symptom is SLIGHTLY WORSE search ranking (the URL noise competes with describing text for embedding budget).
+
+**TRIGGER to run the backfill (any of):**
+  - Observed: pre-fix cards consistently surface worse than post-fix cards for comparable queries
+  - A specific important pre-fix card (e.g. the ezCater menu card — parsed WITH a photo, so it's in the polluted cohort) isn't getting found well in demos
+  - Before the fundable demo / raise — clean everything so no card is handicapped when it matters
+
+**HOW to run when triggered:** `backfill-embeddings` function, body `{"force_all": true}`, re-invoke with returned `next_cursor` until null. Requires service_role auth (anon is rejected 401 — use the dashboard Test panel with an `Authorization: Bearer <service_role>` header, or equivalent). Idempotent and reversible (re-embeds derived data; source cards untouched). Same model (bge-base-en-v1.5), same dims — no index rebuild.
+
+> **Verification note (Claude, 2026-06-23) — confirm the auth before relying on this at demo time.**
+> As written, `backfill-embeddings` does NOT accept the service_role key as its Bearer. Its
+> `verifyUser` calls `client.auth.getUser(token)` and requires a real `data.user`
+> (`supabase/functions/backfill-embeddings/index.ts:45-56`). The anon key → no user → 401 (correct
+> above), but the raw **service_role key is also not a user token**, so `auth.getUser` returns no
+> user and it 401s too. To run it as-is, pass a signed-in **user's access token** (a real vendor
+> session JWT), not the service_role key. If service_role invocation is wanted (the natural ops
+> ergonomic), the function needs a small change first — gate on a `service_role` claim / shared ops
+> secret instead of `auth.getUser`. Flagged, not changed (no code touched in this doc append).
