@@ -4,15 +4,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import ProfileScreen from '../screens/ProfileScreen';
 import IncomingScreen from '../screens/IncomingScreen';
+import PlexChatScreen from '../screens/PlexChatScreen';
 import ContactsScreen from '../screens/ContactsScreen';
-import IdentityScreen from '../screens/IdentityScreen';
 import Wordmark from '../components/Wordmark';
 import { theme } from '../styles/theme';
 
-// The four-tab card-model shell (replaces the legacy Home/Inbox/Jobs/Money +
-// temp Profile). SHELL + navigation only — Incoming/Contacts/Identity are thin
-// placeholders; Profile keeps its real identity header (verified badge + Stripe
-// trigger), Day 11-12 adds its card list, Day 17 builds Identity for real.
+// The four-tab card-model shell: Profile / Incoming / PlexChat / Contacts.
+// Incoming is the first-contact consent gate (realtime knocks); PlexChat is the
+// conversation that follows (read view in 16a, compose in 16b); Profile keeps
+// its real identity header (verified badge + Stripe trigger) + card list. The
+// placeholder Identity tab folds into Profile ("My ID") at Day 17 — its screen
+// file is retained but no longer registered here.
 //
 // The carved Deus wordmark sits in a shared header across all tabs. The tab bar
 // stays the working bottom navigator for now; matching the prototype's top pill
@@ -58,8 +60,8 @@ export default function TabNavigator() {
     >
       <Tab.Screen name="Profile" component={ProfileScreen} />
       <Tab.Screen name="Incoming" component={IncomingScreen} />
+      <Tab.Screen name="PlexChat" component={PlexChatScreen} />
       <Tab.Screen name="Contacts" component={ContactsScreen} />
-      <Tab.Screen name="Identity" component={IdentityScreen} />
     </Tab.Navigator>
   );
 }
