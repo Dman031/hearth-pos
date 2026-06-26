@@ -159,6 +159,10 @@ grants: respond_to_inbound -> authenticated; post_message -> authenticated, serv
   (NEEDS a NEW threads SELECT RLS policy — deferred from 16a; add `using (is_thread_participant(id))`
   when the thread-list lands, since 16a grants no direct threads read);
   push notifications (expo-notifications -> prebuild/rebuild).
+- POS: unread tab badges on Incoming + PlexChat — count unread via messages.read_at (NULL =
+  unread; the messages_thread_unread_idx partial index from 16a already backs the cheap count),
+  mark-read on view. Schema is ready from 16a (read_at is per-message); 16b is the consumer.
+  (Observed during 16a device-verify, 2026-06-26.)
 - network/TS: get_messages / post_message MCP tools (crude LLM pull-loop); respond_thread
   refactor -> call the shared RPCs.
 
