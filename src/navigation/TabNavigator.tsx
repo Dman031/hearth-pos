@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import ProfileScreen from '../screens/ProfileScreen';
 import IncomingScreen from '../screens/IncomingScreen';
-import PlexChatScreen from '../screens/PlexChatScreen';
+import PlexChatStack from './PlexChatStack';
 import ContactsScreen from '../screens/ContactsScreen';
 import Wordmark from '../components/Wordmark';
 import useInboundCount from '../hooks/useInboundCount';
@@ -76,7 +76,13 @@ export default function TabNavigator() {
           },
         }}
       />
-      <Tab.Screen name="PlexChat" component={PlexChatScreen} />
+      <Tab.Screen
+        name="PlexChat"
+        component={PlexChatStack}
+        // The nested Stack owns its headers (list + named conversation); hide the
+        // tab-level ShellHeader for this tab to avoid a double header.
+        options={{ headerShown: false }}
+      />
       <Tab.Screen name="Contacts" component={ContactsScreen} />
     </Tab.Navigator>
   );

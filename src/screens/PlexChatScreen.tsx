@@ -9,12 +9,13 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { theme } from '../styles/theme';
 import useEntity from '../hooks/useEntity';
 import useThreadMessages from '../hooks/useThreadMessages';
 import usePostMessage from '../hooks/usePostMessage';
+import useThreadPeer from '../hooks/useThreadPeer';
 import ConversationBubble from '../components/ConversationBubble';
 import MessageComposer from '../components/MessageComposer';
 import type { Message } from '../types/message';
@@ -45,13 +46,22 @@ type Row =
   | { kind: 'pending'; key: string; tempId: string; body: string; status: 'sending' | 'failed' };
 
 export default function PlexChatScreen() {
-  const route = useRoute<{ key: string; name: string; params?: { threadId?: string } }>();
+  const route = useRoute<{ key: string; name: string; params?: { threadId?: string; title?: string } }>();
   const threadId = route.params?.threadId ?? null;
   const headerHeight = useHeaderHeight();
+  const navigation = useNavigation<{ setOptions: (o: { title?: string }) => void }>();
   const { entity } = useEntity();
   const myEntityId = entity?.id ?? null;
   const { messages, isLoading, error } = useThreadMessages(threadId);
   const { postMessage } = usePostMessage();
+  const peerName = useThreadPeer(threadId);
+
+  // Name the native Stack header after the other participant. A list tap passes
+  // the name instantly via route param; Accept resolves it via useThreadPeer.
+  // Header-only — does NOT touch the verified send path below.
+  useEffect(() => {
+    navigation.setOptions({ title: peerName ?? route.params?.title ?? 'Conversation' });
+  }, [navigation, peerName, route.params?.title]);
 
   const [pending, setPending] = useState<PendingMessage[]>([]);
   const nonce = useRef(0);
@@ -143,14 +153,9 @@ export default function PlexChatScreen() {
     [pending, findCanonicalTwin, doSend],
   );
 
-  if (!threadId) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.title}>PlexChat</Text>
-        <Text style={styles.subtitle}>Open a conversation from Incoming.</Text>
-      </View>
-    );
-  }
+  // The list (no threadId) is a sibling Stack screen now; this screen is always
+  // mounted with a threadId. Defensive guard only.
+  if (!threadId) return null;
 
   // Filter at render too (not only in the effect): the instant a canonical twin
   // is in the stream, hide its optimistic bubble in the SAME render — no

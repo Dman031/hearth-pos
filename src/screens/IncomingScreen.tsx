@@ -28,7 +28,9 @@ export default function IncomingScreen() {
       const threadId =
         (data && typeof data === 'object' ? (data as { thread_id?: string }).thread_id : null) ??
         item.thread_id;
-      if (threadId) navigation.navigate('PlexChat', { threadId });
+      // Nested-Stack target: open the thread inside the PlexChat tab's Stack
+      // (same Conversation screen + composer a list tap lands on).
+      if (threadId) navigation.navigate('PlexChat', { screen: 'Conversation', params: { threadId } });
     },
     [navigation],
   );
