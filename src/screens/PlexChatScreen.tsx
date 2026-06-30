@@ -1,22 +1,147 @@
-import React from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useRoute } from '@react-navigation/native';
+import { useHeaderHeight } from '@react-navigation/elements';
 import { theme } from '../styles/theme';
 import useEntity from '../hooks/useEntity';
 import useThreadMessages from '../hooks/useThreadMessages';
+import usePostMessage from '../hooks/usePostMessage';
 import ConversationBubble from '../components/ConversationBubble';
+import MessageComposer from '../components/MessageComposer';
+import type { Message } from '../types/message';
 
-// PlexChatScreen — the conversation that follows an accepted knock. 16a is a
-// READ view only: realtime messages, opened from Incoming on Accept (the tab is
-// navigated with a threadId param). Compose/send is 16b. Reuses the carved
-// ConversationBubble — my messages render as the amber 'vendor' bubble (right),
-// the other party as the 'hearth' surface bubble (left).
+// PlexChatScreen — the conversation that follows an accepted knock. 16b item 1
+// makes it TWO-WAY: a compose bar sends via the canonical post_message RPC with
+// an OPTIMISTIC bubble that reconciles against the 16a realtime stream
+// (useThreadMessages). The RPC derives the sender server-side from auth.uid()
+// (anti-spoof); the app NEVER passes from_entity_id and NEVER inserts into
+// `messages` directly (RLS permits no client insert — the RPC is the only write
+// path). My messages render as the amber 'vendor' bubble (right); the other
+// party as the 'hearth' surface bubble (left).
+
+// Window within which a canonical row counts as the body-match "twin" of an
+// optimistic send. id-match is primary and precise; this bounded body-match is
+// the fallback (and the only signal when an RPC error hid the real message_id).
+const RECENT_TWIN_MS = 5 * 60 * 1000;
+
+interface PendingMessage {
+  tempId: string;
+  body: string;
+  status: 'sending' | 'failed';
+  realId: string | null; // message_id from a successful RPC; enables precise id-match
+}
+
+type Row =
+  | { kind: 'message'; key: string; body: string; mine: boolean }
+  | { kind: 'pending'; key: string; tempId: string; body: string; status: 'sending' | 'failed' };
+
 export default function PlexChatScreen() {
   const route = useRoute<{ key: string; name: string; params?: { threadId?: string } }>();
   const threadId = route.params?.threadId ?? null;
+  const headerHeight = useHeaderHeight();
   const { entity } = useEntity();
   const myEntityId = entity?.id ?? null;
   const { messages, isLoading, error } = useThreadMessages(threadId);
+  const { postMessage } = usePostMessage();
+
+  const [pending, setPending] = useState<PendingMessage[]>([]);
+  const nonce = useRef(0);
+
+  // A pending send is "reconciled" once its canonical row appears in the stream:
+  // id-match (primary, precise) OR body-match from me within the recent window
+  // (fallback — clears a twin in EITHER 'sending' or 'failed' state).
+  const findCanonicalTwin = useCallback(
+    (p: PendingMessage): Message | undefined => {
+      if (p.realId) {
+        const byId = messages.find((m) => m.id === p.realId);
+        if (byId) return byId;
+      }
+      return messages.find(
+        (m) =>
+          m.from_entity_id === myEntityId &&
+          m.body === p.body &&
+          Date.now() - new Date(m.created_at).getTime() < RECENT_TWIN_MS,
+      );
+    },
+    [messages, myEntityId],
+  );
+
+  // Reconcile: when the stream changes, drop any pending whose canonical twin has
+  // arrived (sending OR failed). Returns the same ref when nothing changed so this
+  // never loops.
+  useEffect(() => {
+    setPending((prev) => {
+      const next = prev.filter((p) => !findCanonicalTwin(p));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [findCanonicalTwin]);
+
+  const doSend = useCallback(
+    async (tempId: string, body: string) => {
+      if (!threadId) return;
+      try {
+        const { messageId } = await postMessage(threadId, body);
+        // Tag realId so the realtime arrival reconciles by id; keep the optimistic
+        // bubble visible until the canonical row lands.
+        setPending((prev) =>
+          prev.map((p) => (p.tempId === tempId ? { ...p, realId: messageId } : p)),
+        );
+      } catch (err) {
+        // post_message already logs the cause; record the UI transition too.
+        console.warn('[PlexChat] send failed; marking optimistic bubble failed', {
+          tempId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        setPending((prev) =>
+          prev.map((p) => (p.tempId === tempId ? { ...p, status: 'failed' } : p)),
+        );
+      }
+    },
+    [threadId, postMessage],
+  );
+
+  const handleSend = useCallback(
+    (body: string) => {
+      const trimmed = body.trim();
+      if (!trimmed || !threadId) return;
+      const tempId = `temp-${nonce.current}`;
+      nonce.current += 1;
+      setPending((prev) => [
+        ...prev,
+        { tempId, body: trimmed, status: 'sending', realId: null },
+      ]);
+      void doSend(tempId, trimmed);
+    },
+    [threadId, doSend],
+  );
+
+  const handleRetry = useCallback(
+    (tempId: string) => {
+      const target = pending.find((p) => p.tempId === tempId);
+      if (!target || target.status !== 'failed') return;
+      // Retry guard: if the original send actually landed (canonical twin present),
+      // reconcile instead of double-posting. Identical-text-twice-in-flight is an
+      // accepted V1 limitation (body-match cannot tell two identical bodies apart).
+      if (findCanonicalTwin(target)) {
+        setPending((prev) => prev.filter((p) => p.tempId !== tempId));
+        return;
+      }
+      setPending((prev) =>
+        prev.map((p) => (p.tempId === tempId ? { ...p, status: 'sending' } : p)),
+      );
+      void doSend(tempId, target.body);
+    },
+    [pending, findCanonicalTwin, doSend],
+  );
 
   if (!threadId) {
     return (
@@ -27,56 +152,99 @@ export default function PlexChatScreen() {
     );
   }
 
-  if (isLoading && messages.length === 0) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator color={theme.colors.accent} />
-      </View>
-    );
-  }
+  // Filter at render too (not only in the effect): the instant a canonical twin
+  // is in the stream, hide its optimistic bubble in the SAME render — no
+  // double-bubble flash in the frame before the effect trims state.
+  const visiblePending = pending.filter((p) => !findCanonicalTwin(p));
 
-  if (error && messages.length === 0) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.title}>PlexChat</Text>
-        <Text style={styles.subtitle}>Couldn’t load this conversation.</Text>
-      </View>
-    );
-  }
+  const rows: Row[] = [
+    ...messages.map((m) => ({
+      kind: 'message' as const,
+      key: m.id,
+      body: m.body,
+      mine: m.from_entity_id === myEntityId,
+    })),
+    ...visiblePending.map((p) => ({
+      kind: 'pending' as const,
+      key: p.tempId,
+      tempId: p.tempId,
+      body: p.body,
+      status: p.status,
+    })),
+  ];
 
-  if (messages.length === 0) {
+  const renderRow = ({ item }: { item: Row }) => {
+    if (item.kind === 'message') {
+      return <ConversationBubble speaker={item.mine ? 'vendor' : 'hearth'} text={item.body} />;
+    }
+    if (item.status === 'failed') {
+      return (
+        <Pressable onPress={() => handleRetry(item.tempId)} accessibilityRole="button">
+          <ConversationBubble speaker="vendor" text={item.body} />
+          <Text style={styles.failedCaption}>Failed — tap to retry</Text>
+        </Pressable>
+      );
+    }
     return (
-      <View style={styles.centered}>
-        <Text style={styles.title}>PlexChat</Text>
-        <Text style={styles.subtitle}>No messages yet.</Text>
+      <View>
+        <ConversationBubble speaker="vendor" text={item.body} />
+        <Text style={styles.sendingCaption}>Sending…</Text>
       </View>
     );
-  }
+  };
 
   return (
-    <View style={styles.container}>
-      <FlatList
-        data={messages}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <ConversationBubble
-            speaker={item.from_entity_id === myEntityId ? 'vendor' : 'hearth'}
-            text={item.body}
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={headerHeight}
+    >
+      <View style={styles.container}>
+        {isLoading && rows.length === 0 ? (
+          <View style={styles.centered}>
+            <ActivityIndicator color={theme.colors.accent} />
+          </View>
+        ) : error && rows.length === 0 ? (
+          <View style={styles.centered}>
+            <Text style={styles.title}>PlexChat</Text>
+            <Text style={styles.subtitle}>Couldn’t load this conversation.</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={rows}
+            keyExtractor={(item) => item.key}
+            renderItem={renderRow}
+            contentContainerStyle={[
+              styles.listContent,
+              rows.length === 0 && styles.listContentEmpty,
+            ]}
+            ListEmptyComponent={
+              <View style={styles.centered}>
+                <Text style={styles.subtitle}>No messages yet.</Text>
+              </View>
+            }
           />
         )}
-        contentContainerStyle={styles.listContent}
-      />
-    </View>
+        <MessageComposer onSend={handleSend} />
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
   },
   listContent: {
     padding: theme.spacing.lg,
+  },
+  listContentEmpty: {
+    flexGrow: 1,
+    justifyContent: 'center',
   },
   centered: {
     flex: 1,
@@ -92,5 +260,17 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: theme.colors.textSecondary,
     marginTop: theme.spacing.sm,
+  },
+  sendingCaption: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    textAlign: 'right',
+    marginTop: theme.spacing.xs,
+  },
+  failedCaption: {
+    ...theme.typography.caption,
+    color: theme.colors.danger,
+    textAlign: 'right',
+    marginTop: theme.spacing.xs,
   },
 });
