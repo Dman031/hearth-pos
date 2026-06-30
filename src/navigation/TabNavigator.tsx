@@ -7,6 +7,7 @@ import IncomingScreen from '../screens/IncomingScreen';
 import PlexChatScreen from '../screens/PlexChatScreen';
 import ContactsScreen from '../screens/ContactsScreen';
 import Wordmark from '../components/Wordmark';
+import useInboundCount from '../hooks/useInboundCount';
 import { theme } from '../styles/theme';
 
 // The four-tab card-model shell: Profile / Incoming / PlexChat / Contacts.
@@ -33,6 +34,11 @@ function ShellHeader() {
 }
 
 export default function TabNavigator() {
+  // Incoming tab badge: count of pending knocks awaiting triage (16b item 2,
+  // Incoming half). Read-only + realtime; self-clears as inbound is Accepted/
+  // Declined. undefined hides the badge entirely (no "0" pill).
+  const { count: incomingCount } = useInboundCount();
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -59,7 +65,17 @@ export default function TabNavigator() {
       }}
     >
       <Tab.Screen name="Profile" component={ProfileScreen} />
-      <Tab.Screen name="Incoming" component={IncomingScreen} />
+      <Tab.Screen
+        name="Incoming"
+        component={IncomingScreen}
+        options={{
+          tabBarBadge: incomingCount > 0 ? incomingCount : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: theme.colors.accent,
+            color: theme.colors.background,
+          },
+        }}
+      />
       <Tab.Screen name="PlexChat" component={PlexChatScreen} />
       <Tab.Screen name="Contacts" component={ContactsScreen} />
     </Tab.Navigator>
