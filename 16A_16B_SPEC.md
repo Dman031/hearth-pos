@@ -200,8 +200,14 @@ RPCs already live from 16a) go first; prereqs noted in (parens).
 
 1. PlexChat send — compose + rpc('post_message'), optimistic. (UNBLOCKED: post_message RPC +
    messages table live.) Highest value, no new schema.
-2. Unread tab badges (Incoming + PlexChat) + mark-read on view. (UNBLOCKED: messages.read_at +
-   messages_thread_unread_idx already live from 16a; pure consumer.)
+2. Unread tab badges (Incoming + PlexChat) + mark-read on view. SPLIT (2026-06-30):
+   - 2a. Incoming badge = pending inbound count. DONE (pos-only, no migration; useInboundCount +
+     tabBarBadge). Read-only, self-clears on Accept/Decline.
+   - 2b. PlexChat unread badge + mark-read on view. DEFERRED — NOT a pure consumer: marking read
+     needs a NEW mark_thread_read SECURITY DEFINER RPC (messages has a SELECT policy only; no
+     read_at write path exists), and the badge is un-clearable until an established thread can be
+     re-opened (thread-list, item 4). Build 2b AFTER item 4, bundled with the mark_thread_read
+     migration. The count itself is read-only-buildable now but would only ever increment.
 3. respond_thread reconcile-or-retire (network/TS). Do BEFORE the thread-list so threads.state is
    trustworthy — legacy respond_thread still closes-on-accept and writes no message (the KNOWN
    DIVERGENCE above), which would mis-render a state-based list.
