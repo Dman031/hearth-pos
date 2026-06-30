@@ -172,6 +172,16 @@ Legacy MCP respond_thread CLOSES the thread on accept and never writes a message
 respond_to_inbound KEEPS the thread open + persists message #1. 16b's respond_thread refactor
 should reconcile them (or retire respond_thread). Flagged, not done.
 
+## DEPLOYED STATUS / CONVENTIONS (verified 2026-06-29)
+
+- BUG-006 (hearth-network) — the respond_to_inbound ACCEPT reopen fix — IS APPLIED TO PROD.
+  Verified 2026-06-29 via pg_get_functiondef: the accept branch sets state='open' (reopen) and
+  decline closes only when established_at IS NULL. migrations/0005_respond_to_inbound_reopen.sql is
+  the LIVE definition; 0004's inline body is superseded. (Resolves the prior open question.)
+- BUG-ID CONVENTION: bug IDs are a PER-REPO sequence — ALWAYS name the repo. hearth-network
+  BUG-006 (the 0005 reopen fix) is UNRELATED to hearth-pos BUG-006 (image-URL embedding pollution);
+  a bare "BUG-006" is ambiguous across the family.
+
 ## APPLY / BUILD SEQUENCE
 
 1. Validate every type/table/column against the DEPLOYED schema first (inbound.status values,
@@ -182,3 +192,24 @@ should reconcile them (or retire respond_thread). Flagged, not done.
 5. Device-verify 16a (no rebuild): reach arrives -> Incoming tile (seconds) -> Accept -> thread
    opens + message #1 renders -> Decline -> nothing. Cross-LLM later.
 6. 16b is a SEPARATE build (needs the native rebuild for push).
+
+## 16B BUILD SEQUENCE (dependency-ordered — added 2026-06-29)
+
+The FILE PLAN lists the 16b items; this is the ORDER to build them. UNBLOCKED items (schema +
+RPCs already live from 16a) go first; prereqs noted in (parens).
+
+1. PlexChat send — compose + rpc('post_message'), optimistic. (UNBLOCKED: post_message RPC +
+   messages table live.) Highest value, no new schema.
+2. Unread tab badges (Incoming + PlexChat) + mark-read on view. (UNBLOCKED: messages.read_at +
+   messages_thread_unread_idx already live from 16a; pure consumer.)
+3. respond_thread reconcile-or-retire (network/TS). Do BEFORE the thread-list so threads.state is
+   trustworthy — legacy respond_thread still closes-on-accept and writes no message (the KNOWN
+   DIVERGENCE above), which would mis-render a state-based list.
+4. PlexChat thread-list view. (PREREQ: add a NEW threads SELECT RLS policy
+   `using (is_thread_participant(id))` — the helper already exists; 16a granted no direct threads
+   read.) Build AFTER step 3.
+5. get_messages / post_message MCP tools — crude LLM pull-loop (network/TS). Independent; slot with
+   the network work.
+6. Push notifications — LAST / parallel native track. (PREREQ: expo-notifications prebuild/rebuild;
+   the dep is already in package.json and a Day-15 prebuild ran — re-verify what is actually
+   outstanding rather than assuming a full rebuild.)
