@@ -8,6 +8,7 @@ import PlexChatStack from './PlexChatStack';
 import ContactsScreen from '../screens/ContactsScreen';
 import Wordmark from '../components/Wordmark';
 import useInboundCount from '../hooks/useInboundCount';
+import useUnreadCount from '../hooks/useUnreadCount';
 import { theme } from '../styles/theme';
 
 // The four-tab card-model shell: Profile / Incoming / PlexChat / Contacts.
@@ -38,6 +39,11 @@ export default function TabNavigator() {
   // Incoming half). Read-only + realtime; self-clears as inbound is Accepted/
   // Declined. undefined hides the badge entirely (no "0" pill).
   const { count: incomingCount } = useInboundCount();
+
+  // PlexChat tab badge: total UNREAD messages I've received across all threads
+  // (16b item 2b, PlexChat half). Live via realtime; decrements when a thread is
+  // opened (mark_thread_read on focus). undefined hides the badge (no "0" pill).
+  const { count: unreadCount } = useUnreadCount();
 
   return (
     <Tab.Navigator
@@ -81,7 +87,14 @@ export default function TabNavigator() {
         component={PlexChatStack}
         // The nested Stack owns its headers (list + named conversation); hide the
         // tab-level ShellHeader for this tab to avoid a double header.
-        options={{ headerShown: false }}
+        options={{
+          headerShown: false,
+          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: theme.colors.accent,
+            color: theme.colors.background,
+          },
+        }}
       />
       <Tab.Screen name="Contacts" component={ContactsScreen} />
     </Tab.Navigator>

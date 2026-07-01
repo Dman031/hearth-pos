@@ -9,12 +9,13 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { theme } from '../styles/theme';
 import useEntity from '../hooks/useEntity';
 import useThreadMessages from '../hooks/useThreadMessages';
 import usePostMessage from '../hooks/usePostMessage';
+import useMarkThreadRead from '../hooks/useMarkThreadRead';
 import useThreadPeer from '../hooks/useThreadPeer';
 import ConversationBubble from '../components/ConversationBubble';
 import MessageComposer from '../components/MessageComposer';
@@ -54,6 +55,7 @@ export default function PlexChatScreen() {
   const myEntityId = entity?.id ?? null;
   const { messages, isLoading, error } = useThreadMessages(threadId);
   const { postMessage } = usePostMessage();
+  const { markThreadRead } = useMarkThreadRead();
   const peerName = useThreadPeer(threadId);
 
   // Name the native Stack header after the other participant. A list tap passes
@@ -62,6 +64,24 @@ export default function PlexChatScreen() {
   useEffect(() => {
     navigation.setOptions({ title: peerName ?? route.params?.title ?? 'Conversation' });
   }, [navigation, peerName, route.params?.title]);
+
+  // Mark this thread read when it gains focus (16b item 2b). Clears its unread:
+  // the read_at UPDATE decrements the PlexChat tab badge live (useUnreadCount's
+  // realtime sub) and the per-row dot on the list's next focus refetch. Server-
+  // side idempotent (a re-focus marks 0 rows) and received-only, so it can't
+  // fight the INSERT-only message stream (useThreadMessages) or double-count.
+  // Best-effort: a failure self-heals on the next focus, so log and move on.
+  useFocusEffect(
+    useCallback(() => {
+      if (!threadId) return;
+      void markThreadRead(threadId).catch((err) => {
+        console.warn('[PlexChat] mark_thread_read on focus failed', {
+          threadId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+    }, [threadId, markThreadRead]),
+  );
 
   const [pending, setPending] = useState<PendingMessage[]>([]);
   const nonce = useRef(0);

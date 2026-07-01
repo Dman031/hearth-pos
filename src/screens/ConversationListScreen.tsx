@@ -8,8 +8,9 @@ import useThreads, { type Conversation } from '../hooks/useThreads';
 // conversation I'm in, newest-active first, labelled by the other participant's
 // public name. Tapping a row opens that thread in the SAME conversation screen
 // the Accept flow lands on (the nested Stack's "Conversation" route). List-only:
-// no unread badges / mark-read (item 2b), no compose here (that lives in the
-// thread). Rows carry no timestamp — see useThreads (datetime.ts not built yet).
+// each row shows an unread DOT (16b item 2b) when it has messages I haven't read;
+// the dot clears on the next focus refetch after I open the thread (mark_thread_read
+// stamps read_at). No compose here (that lives in the thread). Rows carry no timestamp — see useThreads (datetime.ts not built yet).
 
 export default function ConversationListScreen() {
   const navigation = useNavigation<{
@@ -59,6 +60,12 @@ export default function ConversationListScreen() {
             <Text style={styles.rowName} numberOfLines={1}>
               {item.peerName}
             </Text>
+            {item.unreadCount > 0 && (
+              <View
+                style={styles.unreadDot}
+                accessibilityLabel="Unread messages"
+              />
+            )}
           </Pressable>
         )}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
@@ -73,6 +80,8 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   row: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.lg,
   },
@@ -80,6 +89,14 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: theme.colors.textPrimary,
     fontWeight: '600',
+    flex: 1,
+  },
+  unreadDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: theme.colors.accent,
+    marginLeft: theme.spacing.md,
   },
   separator: {
     height: 1,
