@@ -219,3 +219,16 @@ RPCs already live from 16a) go first; prereqs noted in (parens).
 6. Push notifications — LAST / parallel native track. (PREREQ: expo-notifications prebuild/rebuild;
    the dep is already in package.json and a Day-15 prebuild ran — re-verify what is actually
    outstanding rather than assuming a full rebuild.)
+
+## DEFERRED — FUTURE FEATURES (post-16b)
+
+CONSENT-GATED READ-RECEIPTS (cross-LLM) — DEFERRED, future.
+The read_at data being captured in item 2b makes read-receipts possible: a sender could learn
+'your message was read at 3:42pm', queryable across any LLM via a status tool (e.g. get_status
+returning delivered/read). This is a real cross-LLM differentiator — BUT read-receipts are
+socially fraught and a forced default would contradict the network's consent-first thesis. So it
+must be PERMISSION-GATED: a per-entity receipt_perm (Off/Contacts/Verified/Anyone) consistent with
+the see_perm/act_perm grammar — read-status is node-controlled and opt-in, never a surveillance
+default. Sender's LLM gets 'delivered' always; 'read' only if the recipient's receipt_perm allows
+it. Implementation when built = hearth-network (status tool + receipt_perm). No rework needed: 2b
+already captures read_at and correctly excludes own-sends, so the data's clean for this later.
