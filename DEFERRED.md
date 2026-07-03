@@ -10,6 +10,12 @@ Convention: when an item is built, move it to "Done" with the commit hash. Don't
 
 ## Scheduled — mapped to a roadmap day
 
+### Identity tab  → FOLDS INTO PROFILE at DAY 17 (no standalone tab)
+Decided 2026-06-25 (Day 16a). Identity does NOT get its own tab. It becomes a "My ID"
+section/button inside Profile at Day 17. **16a's nav is FOUR tabs: Profile / Incoming /
+PlexChat / Contacts** — 16a removes the placeholder Identity tab and adds PlexChat. Do NOT
+create a 5th Identity tab.
+
 ### PDF menu upload  → DAY 14.x (deferred from Day 14 — Step 4.5 menu→cards)
 Day 14 ships PHOTO-only menu parse. PDF is a deliberate follow-on. Of the three seams, two are
 nearly free and ALREADY designed for both file types:
@@ -84,6 +90,19 @@ Build each nudge when its surface is built. Progressive disclosure (Linear/Arc p
 A short "learn more" video for people who want it — lives on Identity/Profile as optional,
 NEVER a mandatory onboarding gate. Also doubles as a sales/investor asset. Build only if
 time; it's a nice-to-have, not a blocker.
+
+### Group / multi-party PlexChat threads  → FUTURE (own migration, post-V1)
+V1 PlexChat is PAIRWISE by design — threads have participant_a / participant_b (canonical
+pair-ordering + unique constraint), and the read_at single-timestamp model assumes exactly two
+participants. Group threads (3+ participants — e.g. property-manager + tenant + plumber, or a
+caterer + couple planning together) are a genuine re-architecture, NOT an extension:
+- threads needs a participants model (join table) instead of two columns
+- RLS shifts from "a or b = me" to "I'm in the participants set"
+- read_at single-timestamp breaks → needs per-participant read state (a message_reads table)
+- the two RPCs (respond_to_inbound, post_message) need participant-set logic
+Conscious omission, not oversight. Build when a real group use-case lands (B2V dispatch threads
+are the likely first driver — a property manager coordinating tenant + vendor in one thread).
+Until then, pairwise covers the dinner-text, the reach-response, and the 1:1 booking flows.
 
 ---
 
