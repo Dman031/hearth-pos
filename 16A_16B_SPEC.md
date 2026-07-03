@@ -1,6 +1,6 @@
 # Day 16 — Incoming + PlexChat — LOCKED SPEC (16a / 16b)
 
-**Status:** approved, pre-migration. This document is the single source of truth.
+**Status:** approved, migrations 0000–0010 applied. This document is the single source of truth.
 If anything in a chat or an agent's re-derivation conflicts with THIS, this wins —
 EXCEPT where this conflicts with the DEPLOYED schema, in which case deployed reality
 wins and this doc must be corrected (see the from_entity_id note).
@@ -166,11 +166,14 @@ grants: respond_to_inbound -> authenticated; post_message -> authenticated, serv
 - network/TS: get_messages / post_message MCP tools (crude LLM pull-loop); respond_thread
   refactor -> call the shared RPCs.
 
-## KNOWN DIVERGENCE TO RECONCILE LATER (not in 16a)
+## KNOWN DIVERGENCE — RESOLVED (16b item 3)
 
-Legacy MCP respond_thread CLOSES the thread on accept and never writes a message; the new
-respond_to_inbound KEEPS the thread open + persists message #1. 16b's respond_thread refactor
-should reconcile them (or retire respond_thread). Flagged, not done.
+Legacy MCP respond_thread CLOSED the thread on accept and never wrote a message; the new
+respond_to_inbound KEEPS the thread open + persists message #1. RESOLVED in 16b item 3
+(hearth-network BUG-007): respond_thread was rewritten as a thin router to the canonical RPCs
+(respond_to_inbound for accept/pass via the 0009 dual-actor branch; post_message for a plain reply),
+so it now behaves byte-identically to the app. Live-verified 2026-07-03 (deployed 161140fa): accept
+via respond_thread keeps state='open', sets established_at, and writes message #1.
 
 ## DEPLOYED STATUS / CONVENTIONS (verified 2026-06-29)
 
@@ -214,8 +217,15 @@ RPCs already live from 16a) go first; prereqs noted in (parens).
 4. PlexChat thread-list view. (PREREQ: add a NEW threads SELECT RLS policy
    `using (is_thread_participant(id))` — the helper already exists; 16a granted no direct threads
    read.) Build AFTER step 3.
-5. get_messages / post_message MCP tools — crude LLM pull-loop (network/TS). Independent; slot with
-   the network work.
+5. get_messages / post_message MCP tools — crude LLM pull-loop (network/TS). DONE, live-verified
+   2026-07-03 (deployed 82a7399c; manifest 6 -> 8). get_messages: participant-gated query-layer
+   read mirroring get_status (non-participant/anonymous -> not-found, no enumeration), read_at
+   EXCLUDED via a fixed column allow-list per the consent-gated read-receipt deferral, senders
+   resolved to public fields only + is_me, limit/since pull-loop cursor. post_message: thin wrapper
+   over the canonical dual-actor post_message RPC (established-thread + participant gates are the
+   guarantee; first contact must go through reach_entity). Cross-thread isolation proven (outsider
+   get_messages -> not-found; write-scoped outsider post_message -> participant-gate reject). No
+   migration. See hearth-network BUG-008 for the negative-test-scoping lesson.
 6. Push notifications — LAST / parallel native track. (PREREQ: expo-notifications prebuild/rebuild;
    the dep is already in package.json and a Day-15 prebuild ran — re-verify what is actually
    outstanding rather than assuming a full rebuild.)
