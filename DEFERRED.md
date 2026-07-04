@@ -104,6 +104,13 @@ Conscious omission, not oversight. Build when a real group use-case lands (B2V d
 are the likely first driver — a property manager coordinating tenant + vendor in one thread).
 Until then, pairwise covers the dinner-text, the reach-response, and the 1:1 booking flows.
 
+### 16b push notifications  → BLOCKED on Apple Developer account + ops gate
+16b push notifications — storage layer (0011 + capture hook, branch feat/16b-push) built +
+verified. Remaining blocked on Apple Developer account + ops gate (eas init/projectId, APNs key,
+prebuild) then send trigger + receive handler. Bites at: first real external recipient / first
+live demo. Log any native-config (app.json plugins, prebuild) changes here while parked so the
+eventual push prebuild stays a bounded change.
+
 ---
 
 ## Pre-launch architecture decisions (locked)
