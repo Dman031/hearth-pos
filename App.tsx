@@ -12,6 +12,7 @@ import { CardProvider } from './src/context/CardContext';
 import useAuth from './src/hooks/useAuth';
 import useEntity from './src/hooks/useEntity';
 import useCards from './src/hooks/useCards';
+import usePushTokenRegistration from './src/hooks/usePushTokenRegistration';
 import AuthScreen from './src/screens/AuthScreen';
 import EntitySetupScreen from './src/screens/EntitySetupScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
@@ -35,6 +36,10 @@ function Root() {
   const { entity, isInitializing: entityInitializing, revealEntity } =
     useEntity();
   const { isInitializing: cardsInitializing, needsOnboarding } = useCards();
+  // 16b push (Route B). Self-gated init effect — captures this device's Expo push
+  // token once the authenticated entity has loaded and upserts it via the
+  // upsert_device_token RPC. No-ops signed-out and pre-`eas init` (see the hook).
+  usePushTokenRegistration();
 
   if (authLoading || entityInitializing) {
     return <SplashScreen />;
