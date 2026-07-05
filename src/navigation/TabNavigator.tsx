@@ -7,6 +7,7 @@ import IncomingScreen from '../screens/IncomingScreen';
 import PlexChatStack from './PlexChatStack';
 import ContactsScreen from '../screens/ContactsScreen';
 import Wordmark from '../components/Wordmark';
+import AccountChip from '../components/AccountChip';
 import useInboundCount from '../hooks/useInboundCount';
 import useUnreadCount from '../hooks/useUnreadCount';
 import { theme } from '../styles/theme';
@@ -24,12 +25,19 @@ import { theme } from '../styles/theme';
 
 const Tab = createBottomTabNavigator();
 
-/** Shared top brand bar: the carved wordmark, owning the top safe-area inset. */
+/** Shared top brand bar: the carved wordmark centered, with the account chip
+ *  trailing (Day 17A — the sign-out/Identity entry, present on every tab). Owns
+ *  the top safe-area inset. */
 function ShellHeader() {
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.header, { paddingTop: insets.top + theme.spacing.sm }]}>
+      {/* Spacer balances the trailing chip so the wordmark stays centered. */}
+      <View style={styles.headerSide} />
       <Wordmark />
+      <View style={styles.headerSide}>
+        <AccountChip />
+      </View>
     </View>
   );
 }
@@ -107,6 +115,15 @@ const styles = StyleSheet.create({
     borderBottomColor: theme.colors.surface,
     borderBottomWidth: 1,
     paddingBottom: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  // Fixed-width sides keep the centered wordmark visually centered while the
+  // trailing chip occupies the right side (the left is an equal-width spacer).
+  headerSide: {
+    width: 32,
+    alignItems: 'flex-end',
   },
 });

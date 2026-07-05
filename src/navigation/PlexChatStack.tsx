@@ -2,6 +2,7 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import ConversationListScreen from '../screens/ConversationListScreen';
 import PlexChatScreen from '../screens/PlexChatScreen';
+import AccountChip from '../components/AccountChip';
 import { theme } from '../styles/theme';
 
 // PlexChatStack — the PlexChat tab's nested Stack (16b item 4). iMessage pattern:
@@ -28,6 +29,9 @@ export default function PlexChatStack() {
         headerTitleStyle: { color: theme.colors.textPrimary },
         headerShadowVisible: false,
         contentStyle: { backgroundColor: theme.colors.background },
+        // The account chip on this tab too (PlexChat opts out of the shared
+        // ShellHeader) so the sign-out/Identity entry is present on ALL four tabs.
+        headerRight: () => <AccountChip />,
       }}
     >
       <Stack.Screen

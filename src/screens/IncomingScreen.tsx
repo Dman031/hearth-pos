@@ -43,6 +43,17 @@ export default function IncomingScreen() {
     if (rpcErr) throw new Error(rpcErr.message);
   }, []);
 
+  // Save the sender to the private rolodex. The owner is derived SERVER-SIDE in
+  // add_contact (current_entity_id) — we pass ONLY the sender id (server-set on
+  // inbound); the RPC ignores any client-supplied owner (anti-spoof). Saving
+  // grants NO reach — a private list entry only (17B is a separate build).
+  const handleAddContact = useCallback(async (item: Inbound) => {
+    const { error: rpcErr } = await supabase.rpc('add_contact', {
+      p_contact_entity_id: item.from_entity_id,
+    });
+    if (rpcErr) throw new Error(rpcErr.message);
+  }, []);
+
   if (isLoading && inbound.length === 0) {
     return (
       <View style={styles.centered}>
@@ -75,7 +86,12 @@ export default function IncomingScreen() {
         data={inbound}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <InboundTile inbound={item} onAccept={handleAccept} onDecline={handleDecline} />
+          <InboundTile
+            inbound={item}
+            onAccept={handleAccept}
+            onDecline={handleDecline}
+            onAddContact={handleAddContact}
+          />
         )}
         contentContainerStyle={styles.listContent}
       />

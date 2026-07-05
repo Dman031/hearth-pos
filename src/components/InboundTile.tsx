@@ -23,14 +23,37 @@ interface InboundTileProps {
   // Returns a resolved promise on success; throws on failure (tile shows error).
   onAccept: (inbound: Inbound, body: string) => Promise<void>;
   onDecline: (inbound: Inbound) => Promise<void>;
+  // Saves the sender to the private rolodex (add_contact RPC). Resolves on
+  // success; throws on failure. Optional — the receipt shows the affordance only
+  // when provided. Saving grants NO reach (private list only).
+  onAddContact?: (inbound: Inbound) => Promise<void>;
 }
 
-export default function InboundTile({ inbound, onAccept, onDecline }: InboundTileProps) {
+export default function InboundTile({ inbound, onAccept, onDecline, onAddContact }: InboundTileProps) {
   const [composing, setComposing] = useState<boolean>(false);
   const [body, setBody] = useState<string>('');
   const [busy, setBusy] = useState<boolean>(false);
   const [receipt, setReceipt] = useState<Outcome | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // "Add to contacts" (post-accept receipt) has its own lifecycle, independent
+  // of the accept/decline busy flag.
+  const [addingContact, setAddingContact] = useState<boolean>(false);
+  const [addedContact, setAddedContact] = useState<boolean>(false);
+  const [addError, setAddError] = useState<string | null>(null);
+
+  const addContact = async () => {
+    if (!onAddContact) return;
+    setAddingContact(true);
+    setAddError(null);
+    try {
+      await onAddContact(inbound);
+      setAddedContact(true);
+    } catch (err) {
+      setAddError(err instanceof Error ? err.message : 'Could not add. Try again.');
+    } finally {
+      setAddingContact(false);
+    }
+  };
 
   const accept = async () => {
     setBusy(true);
@@ -69,11 +92,31 @@ export default function InboundTile({ inbound, onAccept, onDecline }: InboundTil
       <Text style={styles.message}>{inbound.message}</Text>
 
       {receipt ? (
-        // The coral receipt — the acknowledged outcome.
+        // The coral receipt — the acknowledged outcome. On accept, offer to save
+        // the sender to the private rolodex (grants no reach — a list entry only).
         <View style={styles.receiptRow}>
           <Text style={styles.receiptText}>
             {receipt === 'accepted' ? 'Accepted — conversation opened' : 'Declined'}
           </Text>
+          {receipt === 'accepted' && onAddContact ? (
+            addedContact ? (
+              <Text style={styles.addedText}>Added to contacts</Text>
+            ) : (
+              <>
+                <Pressable
+                  style={styles.addContactBtn}
+                  onPress={addContact}
+                  disabled={addingContact}
+                  hitSlop={8}
+                >
+                  <Text style={styles.addContactText}>
+                    {addingContact ? 'Adding…' : 'Add to contacts'}
+                  </Text>
+                </Pressable>
+                {addError ? <Text style={styles.errorText}>{addError}</Text> : null}
+              </>
+            )
+          ) : null}
         </View>
       ) : composing ? (
         <View style={styles.composer}>
@@ -207,6 +250,26 @@ const styles = StyleSheet.create({
   receiptText: {
     ...theme.typography.bodyMuted,
     color: theme.colors.accent,
+    fontWeight: '600',
+  },
+  addContactBtn: {
+    marginTop: theme.spacing.md,
+    alignSelf: 'flex-start',
+    borderRadius: theme.borderRadius.pill,
+    borderWidth: 1,
+    borderColor: theme.colors.accent,
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.md,
+  },
+  addContactText: {
+    ...theme.typography.caption,
+    color: theme.colors.accent,
+    fontWeight: '600',
+  },
+  addedText: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.md,
     fontWeight: '600',
   },
   errorText: {
