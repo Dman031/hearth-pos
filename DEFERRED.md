@@ -111,6 +111,24 @@ prebuild) then send trigger + receive handler. Bites at: first real external rec
 live demo. Log any native-config (app.json plugins, prebuild) changes here while parked so the
 eventual push prebuild stays a bounded change.
 
+### QR-to-CTA deep link  → DAY 24 (build adjacent to the text-to-download funnel)
+Decided 2026-07-04. Day-17A's Identity QR encodes the **bare `deus_id` (display only** —
+scanning it routes nowhere; it's a "read my address off a screen" affordance, nothing more).
+Target: the QR resolves to a **CTA landing page** (open-in-app / get-the-app / connect-your-
+assistant). BLOCKED/DEFERRED behind three prerequisites:
+- a **public entity-resolve route on hearth-network** (does one exist? **UNCONFIRMED** — verify
+  before scoping),
+- a **custom domain**, and
+- **hearth-pos universal-link setup** (`associated-domains` entitlement + AASA file → native
+  config, prebuild/rebuild).
+Build **adjacent to the Day-24 text-to-download funnel**, NOT at Day 17 — same universal-link +
+landing-page surface, so they share the native-config cost.
+⚠️ **OPEN CONSENT QUESTION (decide BEFORE building):** does a scan-to-reach page **bypass the
+directional-contacts gate**? Day-17A's rule is that saving a contact grants NO reach. A QR that
+routes a stranger straight to reach would puncture that. Resolve **per-entity** — a
+`display+download-only` QR vs. a `reach-capable` QR — consistent with the node-controlled,
+consent-first grammar. Do not ship a reach-capable QR by default.
+
 ---
 
 ## Pre-launch architecture decisions (locked)
