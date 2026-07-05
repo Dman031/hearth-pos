@@ -43,16 +43,10 @@ export default function IncomingScreen() {
     if (rpcErr) throw new Error(rpcErr.message);
   }, []);
 
-  // Save the sender to the private rolodex. The owner is derived SERVER-SIDE in
-  // add_contact (current_entity_id) — we pass ONLY the sender id (server-set on
-  // inbound); the RPC ignores any client-supplied owner (anti-spoof). Saving
-  // grants NO reach — a private list entry only (17B is a separate build).
-  const handleAddContact = useCallback(async (item: Inbound) => {
-    const { error: rpcErr } = await supabase.rpc('add_contact', {
-      p_contact_entity_id: item.from_entity_id,
-    });
-    if (rpcErr) throw new Error(rpcErr.message);
-  }, []);
+  // Saving a sender to the private rolodex lives in the PlexChat conversation
+  // header ("Add to contacts"), NOT here — the post-accept receipt affordance was
+  // unreachable (Accept navigates away before it paints; the pending-only list
+  // then unmounts the tile). See PlexChatScreen.AddContactButton.
 
   if (isLoading && inbound.length === 0) {
     return (
@@ -86,12 +80,7 @@ export default function IncomingScreen() {
         data={inbound}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <InboundTile
-            inbound={item}
-            onAccept={handleAccept}
-            onDecline={handleDecline}
-            onAddContact={handleAddContact}
-          />
+          <InboundTile inbound={item} onAccept={handleAccept} onDecline={handleDecline} />
         )}
         contentContainerStyle={styles.listContent}
       />

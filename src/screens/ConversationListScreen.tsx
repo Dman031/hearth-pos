@@ -51,6 +51,7 @@ export default function ConversationListScreen() {
       <FlatList
         data={conversations}
         keyExtractor={(item) => item.threadId}
+        contentContainerStyle={styles.listContent}
         renderItem={({ item }) => (
           <Pressable
             style={styles.row}
@@ -68,7 +69,6 @@ export default function ConversationListScreen() {
             )}
           </Pressable>
         )}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
     </View>
   );
@@ -79,11 +79,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
+  listContent: {
+    padding: theme.spacing.lg,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.card,
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
   },
   rowName: {
     ...theme.typography.body,
@@ -97,11 +103,6 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: theme.colors.accent,
     marginLeft: theme.spacing.md,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: theme.colors.surface,
-    marginLeft: theme.spacing.lg,
   },
   centered: {
     flex: 1,

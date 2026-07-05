@@ -12,6 +12,7 @@ import {
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { theme } from '../styles/theme';
+import { supabase } from '../services/supabase';
 import useEntity from '../hooks/useEntity';
 import useThreadMessages from '../hooks/useThreadMessages';
 import usePostMessage from '../hooks/usePostMessage';
@@ -46,24 +47,70 @@ type Row =
   | { kind: 'message'; key: string; body: string; mine: boolean }
   | { kind: 'pending'; key: string; tempId: string; body: string; status: 'sending' | 'failed' };
 
+// Header-right "Add to contacts": saves the OTHER participant to the owner's
+// private rolodex (add_contact RPC, 0012). This is the ONLY reachable entry point
+// for saving a contact — the old Incoming-receipt affordance was dead-on-arrival
+// (Accept navigates here before it paints and the pending-only list unmounts it).
+// The owner is derived SERVER-SIDE (current_entity_id); we pass ONLY the peer id.
+// add_contact is on-conflict-do-nothing, so a re-save is a success, not an error.
+// Saving grants NO reach — a private list entry only (17A firewall).
+function AddContactButton({ peerEntityId }: { peerEntityId: string | null }) {
+  const [state, setState] = useState<'idle' | 'adding' | 'added'>('idle');
+
+  // No peer resolved yet (thread still loading) — nothing to save.
+  if (!peerEntityId) return null;
+
+  const onPress = async () => {
+    if (state !== 'idle') return;
+    setState('adding');
+    try {
+      const { error: rpcErr } = await supabase.rpc('add_contact', {
+        p_contact_entity_id: peerEntityId,
+      });
+      if (rpcErr) throw new Error(rpcErr.message);
+      setState('added'); // idempotent: on-conflict-do-nothing also lands here
+    } catch (err) {
+      console.warn('[PlexChat] add_contact failed', {
+        peerEntityId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      setState('idle'); // let the vendor retry
+    }
+  };
+
+  return (
+    <Pressable onPress={onPress} disabled={state !== 'idle'} hitSlop={8} accessibilityRole="button">
+      <Text style={[styles.headerAction, state === 'added' && styles.headerActionDone]}>
+        {state === 'added' ? 'Added' : state === 'adding' ? 'Adding…' : 'Add to contacts'}
+      </Text>
+    </Pressable>
+  );
+}
+
 export default function PlexChatScreen() {
   const route = useRoute<{ key: string; name: string; params?: { threadId?: string; title?: string } }>();
   const threadId = route.params?.threadId ?? null;
   const headerHeight = useHeaderHeight();
-  const navigation = useNavigation<{ setOptions: (o: { title?: string }) => void }>();
+  const navigation = useNavigation<{
+    setOptions: (o: { title?: string; headerRight?: () => React.ReactNode }) => void;
+  }>();
   const { entity } = useEntity();
   const myEntityId = entity?.id ?? null;
   const { messages, isLoading, error } = useThreadMessages(threadId);
   const { postMessage } = usePostMessage();
   const { markThreadRead } = useMarkThreadRead();
-  const peerName = useThreadPeer(threadId);
+  const { name: peerName, entityId: peerEntityId } = useThreadPeer(threadId);
 
-  // Name the native Stack header after the other participant. A list tap passes
-  // the name instantly via route param; Accept resolves it via useThreadPeer.
-  // Header-only — does NOT touch the verified send path below.
+  // Name the native Stack header after the other participant and mount the
+  // "Add to contacts" action there. A list tap passes the name instantly via
+  // route param; Accept resolves both name and id via useThreadPeer. Header-only
+  // — does NOT touch the verified send path below.
   useEffect(() => {
-    navigation.setOptions({ title: peerName ?? route.params?.title ?? 'Conversation' });
-  }, [navigation, peerName, route.params?.title]);
+    navigation.setOptions({
+      title: peerName ?? route.params?.title ?? 'Conversation',
+      headerRight: () => <AddContactButton peerEntityId={peerEntityId} />,
+    });
+  }, [navigation, peerName, peerEntityId, route.params?.title]);
 
   // Mark this thread read when it gains focus (16b item 2b). Clears its unread:
   // the read_at UPDATE decrements the PlexChat tab badge live (useUnreadCount's
@@ -297,5 +344,13 @@ const styles = StyleSheet.create({
     color: theme.colors.danger,
     textAlign: 'right',
     marginTop: theme.spacing.xs,
+  },
+  headerAction: {
+    ...theme.typography.body,
+    color: theme.colors.accent,
+    fontWeight: '600',
+  },
+  headerActionDone: {
+    color: theme.colors.textMuted,
   },
 });
