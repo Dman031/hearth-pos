@@ -18,6 +18,7 @@ import useThreadMessages from '../hooks/useThreadMessages';
 import usePostMessage from '../hooks/usePostMessage';
 import useMarkThreadRead from '../hooks/useMarkThreadRead';
 import useThreadPeer from '../hooks/useThreadPeer';
+import useContacts from '../hooks/useContacts';
 import ConversationBubble from '../components/ConversationBubble';
 import MessageComposer from '../components/MessageComposer';
 import type { Message } from '../types/message';
@@ -54,35 +55,31 @@ type Row =
 // The owner is derived SERVER-SIDE (current_entity_id); we pass ONLY the peer id.
 // add_contact is on-conflict-do-nothing, so a re-save is a success, not an error.
 // Saving grants NO reach — a private list entry only (17A firewall).
-function AddContactButton({ peerEntityId }: { peerEntityId: string | null }) {
-  const [state, setState] = useState<'idle' | 'adding' | 'added'>('idle');
-
+//
+// PRESENTATIONAL only: saved-truth is DB-derived by the parent (useContacts ⇒
+// isContact) and persists across leaving/re-entering the thread — iMessage-style.
+// This component holds NO per-mount state; a remount reads the same derived
+// `saved` and never forgets. When saved it renders a NON-tappable muted marker.
+function AddContactButton({
+  peerEntityId,
+  saved,
+  onAdd,
+}: {
+  peerEntityId: string | null;
+  saved: boolean;
+  onAdd: () => void;
+}) {
   // No peer resolved yet (thread still loading) — nothing to save.
   if (!peerEntityId) return null;
 
-  const onPress = async () => {
-    if (state !== 'idle') return;
-    setState('adding');
-    try {
-      const { error: rpcErr } = await supabase.rpc('add_contact', {
-        p_contact_entity_id: peerEntityId,
-      });
-      if (rpcErr) throw new Error(rpcErr.message);
-      setState('added'); // idempotent: on-conflict-do-nothing also lands here
-    } catch (err) {
-      console.warn('[PlexChat] add_contact failed', {
-        peerEntityId,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      setState('idle'); // let the vendor retry
-    }
-  };
+  if (saved) {
+    // Non-tappable, muted — not a button. Reuses the "done" header style.
+    return <Text style={[styles.headerAction, styles.headerActionDone]}>✓ In Contacts</Text>;
+  }
 
   return (
-    <Pressable onPress={onPress} disabled={state !== 'idle'} hitSlop={8} accessibilityRole="button">
-      <Text style={[styles.headerAction, state === 'added' && styles.headerActionDone]}>
-        {state === 'added' ? 'Added' : state === 'adding' ? 'Adding…' : 'Add to contacts'}
-      </Text>
+    <Pressable onPress={onAdd} hitSlop={8} accessibilityRole="button">
+      <Text style={styles.headerAction}>Add to contacts</Text>
     </Pressable>
   );
 }
@@ -101,16 +98,57 @@ export default function PlexChatScreen() {
   const { markThreadRead } = useMarkThreadRead();
   const { name: peerName, entityId: peerEntityId } = useThreadPeer(threadId);
 
+  // Saved-contact truth is DB-DERIVED, not per-mount state: the same useContacts
+  // hook the Contacts tab uses (get_my_contacts on focus) is the source of saved-
+  // truth, so "✓ In Contacts" persists across leaving/re-entering the thread.
+  const { contacts, refresh: refreshContacts } = useContacts();
+  const [optimisticallyAdded, setOptimisticallyAdded] = useState(false);
+  const isContact = !!peerEntityId && contacts.some((c) => c.contact_entity_id === peerEntityId);
+  // Displayed saved-state = DB truth OR the optimistic flip (instant feedback only).
+  const savedAsContact = isContact || optimisticallyAdded;
+
+  // Tap handler: optimistic flip → add_contact (owner server-derived, peer id only)
+  // → refresh so isContact becomes true from DB truth. On error revert + log (no
+  // silent catch) so the vendor can retry. Reconcile makes the optimistic bool moot.
+  const handleAddContact = useCallback(async () => {
+    if (!peerEntityId || savedAsContact) return;
+    setOptimisticallyAdded(true); // instant feedback
+    try {
+      const { error: rpcErr } = await supabase.rpc('add_contact', {
+        p_contact_entity_id: peerEntityId,
+      });
+      if (rpcErr) throw new Error(rpcErr.message);
+      await refreshContacts(); // reconcile: isContact becomes DB-true
+    } catch (err) {
+      setOptimisticallyAdded(false); // revert; let the vendor retry
+      console.warn('[PlexChat] add_contact failed', {
+        peerEntityId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }, [peerEntityId, savedAsContact, refreshContacts]);
+
   // Name the native Stack header after the other participant and mount the
   // "Add to contacts" action there. A list tap passes the name instantly via
   // route param; Accept resolves both name and id via useThreadPeer. Header-only
   // — does NOT touch the verified send path below.
+  //
+  // CRITICAL: savedAsContact + handleAddContact are in the dep array. The header
+  // renders ONCE before get_my_contacts resolves; without these deps it would
+  // never re-render when the async fetch lands, so an already-saved peer would
+  // stick on "Add to contacts" — the exact persistence bug this build fixes.
   useEffect(() => {
     navigation.setOptions({
       title: peerName ?? route.params?.title ?? 'Conversation',
-      headerRight: () => <AddContactButton peerEntityId={peerEntityId} />,
+      headerRight: () => (
+        <AddContactButton
+          peerEntityId={peerEntityId}
+          saved={savedAsContact}
+          onAdd={handleAddContact}
+        />
+      ),
     });
-  }, [navigation, peerName, peerEntityId, route.params?.title]);
+  }, [navigation, peerName, peerEntityId, route.params?.title, savedAsContact, handleAddContact]);
 
   // Mark this thread read when it gains focus (16b item 2b). Clears its unread:
   // the read_at UPDATE decrements the PlexChat tab badge live (useUnreadCount's
