@@ -105,11 +105,18 @@ are the likely first driver — a property manager coordinating tenant + vendor 
 Until then, pairwise covers the dinner-text, the reach-response, and the 1:1 booking flows.
 
 ### 16b push notifications  → BLOCKED on Apple Developer account + ops gate
-16b push notifications — storage layer (0011 + capture hook, branch feat/16b-push) built +
-verified. Remaining blocked on Apple Developer account + ops gate (eas init/projectId, APNs key,
-prebuild) then send trigger + receive handler. Bites at: first real external recipient / first
-live demo. Log any native-config (app.json plugins, prebuild) changes here while parked so the
-eventual push prebuild stays a bounded change.
+16b push notifications — **storage half is now ON MAIN** (Day-17 close-out merge `44c103f`):
+`0011 device_tokens` + the `usePushTokenRegistration` capture hook, **guarded on a missing
+`projectId`** (no-ops cleanly until EAS is initialised, so it's safe on main un-configured).
+Remaining, all blocked on the Apple Developer account + ops gate:
+- **`eas init` → `projectId`** (unblocks the guarded hook — the token capture starts working),
+- **APNs key** (iOS) + FCM (Android) credentials,
+- **`expo-notifications` config plugin + prebuild/native rebuild** (new native module — heed
+  AGENTS.md SDK-55 caution; a rebuild is required), then
+- the **send trigger** (server-side push on new inbound/message, reads `device_tokens`) + the
+  **receive handler** (foreground/background notification → deep-link into the thread).
+Bites at: first real external recipient / first live demo. Log any native-config (app.json
+plugins, prebuild) changes here while parked so the eventual push prebuild stays a bounded change.
 
 ### QR-to-CTA deep link  → DAY 24 (build adjacent to the text-to-download funnel)
 Decided 2026-07-04. Day-17A's Identity QR encodes the **bare `deus_id` (display only** —
@@ -128,6 +135,18 @@ directional-contacts gate**? Day-17A's rule is that saving a contact grants NO r
 routes a stranger straight to reach would puncture that. Resolve **per-entity** — a
 `display+download-only` QR vs. a `reach-capable` QR — consistent with the node-controlled,
 consent-first grammar. Do not ship a reach-capable QR by default.
+
+### Glass-tile / card-surface styling  → PENDING INVESTIGATION (design-consistency, not yet scoped)
+Surfaced during Day 17. Several card surfaces render as **flat panels**, not the **"glass tiles"**
+the canonical design implies (`docs/deus-prototype.html` — the surface treatment behind the SEE/ACT
+card model and the trust-tier screens). Observed at least on: **Profile cards**, **PlexChat
+thread-list rows**, and the **account-menu rows** (Day-17A surfaces). This is a **design-consistency
+task, NOT yet scoped** — investigation is queued to (a) inventory every surface that should read as
+a glass tile vs. a flat panel, (b) confirm the exact treatment against the prototype (blur/tint/
+border/elevation tokens), and (c) decide whether it's a shared surface component or per-screen
+styling before any code. Do not spot-fix one screen ahead of that inventory — piecemeal styling is
+how the surfaces drifted apart in the first place. Not blocking; a visual-polish item (candidate to
+fold into the DAY 30 polish pass, but logged here so it isn't lost before then).
 
 ---
 
