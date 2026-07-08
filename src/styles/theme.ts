@@ -9,6 +9,10 @@ export const theme = {
     success: '#5DCAA5',
     danger: '#E24B4A',
     warning: '#EF9F27',
+    // Glass tile recipe (docs/deus-prototype.html --glass / --hairline): a warm-
+    // white lift over #050505 with a hairline edge. Consumed only via tileSurface.
+    glass: 'rgba(245,240,232,0.04)',
+    hairline: 'rgba(245,240,232,0.08)',
     // HearthOrb gradient palette — see docs/HARVESTONCE_ORB_RECIPE.md
     orb: {
       warmCore: '#fff8e2',
@@ -45,3 +49,15 @@ export const theme = {
 } as const;
 
 export type Theme = typeof theme;
+
+// The single glass-tile surface recipe, defined ONCE. Prototype .tile is a
+// translucent lift + hairline border (blur intentionally dropped — no expo-blur).
+// Radius stays 12 (theme card token), not the prototype's 16. Spread into a
+// component's StyleSheet entry alongside its own layout props:
+//   tile: { ...tileSurface, padding: theme.spacing.lg }
+export const tileSurface = {
+  backgroundColor: theme.colors.glass,
+  borderWidth: 1,
+  borderColor: theme.colors.hairline,
+  borderRadius: theme.borderRadius.card,
+} as const;

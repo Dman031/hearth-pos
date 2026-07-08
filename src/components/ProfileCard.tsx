@@ -8,7 +8,7 @@ import {
   isReservedFieldLabel,
   normalizeFields,
 } from '../utils/card-fields';
-import { theme } from '../styles/theme';
+import { theme, tileSurface } from '../styles/theme';
 import PermissionPill from './PermissionPill';
 import GalleryGrid from './GalleryGrid';
 import ImageViewer from './ImageViewer';
@@ -159,8 +159,7 @@ export default function ProfileCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.card,
+    ...tileSurface,
     padding: theme.spacing.lg,
     gap: theme.spacing.md,
   },

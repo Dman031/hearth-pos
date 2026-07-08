@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { theme } from '../styles/theme';
+import { theme, tileSurface } from '../styles/theme';
 import type { Inbound, InboundKind } from '../types/inbound';
 
 // A single Incoming tile: the "knock". Type-driven header, the sender's line,
@@ -135,8 +135,7 @@ export default function InboundTile({ inbound, onAccept, onDecline }: InboundTil
 
 const styles = StyleSheet.create({
   tile: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.card,
+    ...tileSurface,
     padding: theme.spacing.lg,
     marginBottom: theme.spacing.md,
   },

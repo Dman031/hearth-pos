@@ -1,7 +1,7 @@
 import React from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { theme } from '../styles/theme';
+import { theme, tileSurface } from '../styles/theme';
 import useThreads, { type Conversation } from '../hooks/useThreads';
 
 // ConversationListScreen — the PlexChat list (16b item 4): every established
@@ -83,10 +83,9 @@ const styles = StyleSheet.create({
     padding: theme.spacing.lg,
   },
   row: {
+    ...tileSurface,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.card,
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.lg,
     marginBottom: theme.spacing.md,
