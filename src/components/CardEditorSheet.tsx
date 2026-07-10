@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -32,6 +32,7 @@ import {
   entityIsVerified,
   seeTierRequiresOwnerVerification,
 } from '../services/card-gating';
+import { startBusinessVerification } from '../services/stripe';
 import PermissionPicker from './PermissionPicker';
 import useMediaUpload from '../hooks/useMediaUpload';
 import useGalleryUpload from '../hooks/useGalleryUpload';
@@ -103,8 +104,12 @@ export default function CardEditorSheet({
   onClose,
   createSeed,
 }: CardEditorSheetProps) {
-  const { createCard, updateCard } = useCards();
-  const { entity } = useEntity();
+  const { createCard, updateCard, setCardCommerce } = useCards();
+  const { entity, refresh: refreshEntity } = useEntity();
+  // Latest entity for reads AFTER an awaited refreshEntity() — the closure's
+  // `entity` is stale by then; the ref is not.
+  const entityRef = useRef(entity);
+  entityRef.current = entity;
   // Verified-tier lock matches the network's derivation: ANY badge counts (see
   // entityIsVerified / hearth-network auth.ts), not id_verified alone.
   const ownerVerified = entity ? entityIsVerified(entity) : false;
@@ -122,6 +127,13 @@ export default function CardEditorSheet({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imageBroken, setImageBroken] = useState(false);
+  // Day 18 — commerce (EDIT mode only: set_card_commerce needs a card id).
+  // Staged locally like every other field; persisted on Save via the RPC.
+  const [commerceEnabled, setCommerceEnabled] = useState(false);
+  const [priceText, setPriceText] = useState(''); // dollars; '' = not priced
+  const [commerceTerms, setCommerceTerms] = useState('');
+  const [launchingConnect, setLaunchingConnect] = useState(false);
+  const [connectHint, setConnectHint] = useState<string | null>(null);
 
   // Re-seed local state each time the sheet opens (mode/card change).
   useEffect(() => {
@@ -131,6 +143,7 @@ export default function CardEditorSheet({
     setError(null);
     setImageBroken(false);
     setViewerIndex(null);
+    setConnectHint(null);
     if (mode === 'edit' && card) {
       const all = normalizeFields(card.fields);
       setTitle(card.title);
@@ -140,6 +153,11 @@ export default function CardEditorSheet({
       setGalleryUrlsState(getGalleryUrls(card.fields));
       setSeePerm(card.see_perm);
       setActPerm(card.act_perm);
+      setCommerceEnabled(card.commerce_enabled);
+      setPriceText(
+        card.price_cents === null ? '' : (card.price_cents / 100).toFixed(2),
+      );
+      setCommerceTerms(card.commerce_terms ?? '');
     } else {
       // create — seeded from a parsed draft if one was passed, else empty
       // (onboarding / ＋ Add). Items in seed.fields keep their `available` flag,
@@ -152,6 +170,9 @@ export default function CardEditorSheet({
       setGalleryUrlsState(getGalleryUrls(createSeed?.fields ?? []));
       setSeePerm(DEFAULT_SEE);
       setActPerm(DEFAULT_ACT);
+      setCommerceEnabled(false);
+      setPriceText('');
+      setCommerceTerms('');
     }
   }, [mode, card, createSeed]);
 
@@ -185,6 +206,45 @@ export default function CardEditorSheet({
         return { ...f, available: true };
       }),
     );
+  };
+
+  // Day 18 — the commerce toggle IS the Connect onboarding launch point (no
+  // other affordance exists in the app). Off→on while business-unverified:
+  // refresh the entity first (the webhook may have verified us since load),
+  // and if still unverified, open the Stripe-hosted Express onboarding via
+  // startBusinessVerification(). The box never flips on optimistically —
+  // entities.business_verified is webhook-owned truth.
+  const onCommerceToggle = async (): Promise<void> => {
+    setConnectHint(null);
+    if (commerceEnabled) {
+      setCommerceEnabled(false); // disabling is always allowed
+      return;
+    }
+    if (entity?.business_verified) {
+      setCommerceEnabled(true);
+      return;
+    }
+    setLaunchingConnect(true);
+    setError(null);
+    try {
+      await refreshEntity();
+      if (entityRef.current?.business_verified) {
+        setCommerceEnabled(true);
+        return;
+      }
+      const result = await startBusinessVerification();
+      if (result.ok) {
+        setConnectHint(
+          'Finish payment setup in the browser, then come back and tap again.',
+        );
+      } else if (result.reason === 'cannot_open_browser') {
+        setError("Couldn't open the browser for payment setup.");
+      } else {
+        setError("Couldn't start payment setup. Try again?");
+      }
+    } finally {
+      setLaunchingConnect(false);
+    }
   };
 
   // Stable so useMediaUpload's callbacks don't re-create each render. Used by
@@ -248,6 +308,18 @@ export default function CardEditorSheet({
       return;
     }
 
+    // Price parses BEFORE any write ('' = not priced → null; reject junk).
+    const trimmedPrice = priceText.trim();
+    let priceCents: number | null = null;
+    if (trimmedPrice !== '') {
+      const dollars = Number(trimmedPrice);
+      if (!Number.isFinite(dollars) || dollars < 0) {
+        setError('Enter a price like 12.50, or leave it empty.');
+        return;
+      }
+      priceCents = Math.round(dollars * 100);
+    }
+
     setSaving(true);
     setError(null);
     try {
@@ -266,6 +338,33 @@ export default function CardEditorSheet({
           see_perm: seePerm,
           act_perm: actPerm,
         });
+        // Commerce rides a separate write (set_card_commerce RPC — its ONLY
+        // path), called only when something commerce actually changed. A
+        // failure here lands AFTER the generic save succeeded, so the message
+        // scopes the failure to commerce and the sheet stays open.
+        const termsValue =
+          commerceTerms.trim() === '' ? null : commerceTerms.trim();
+        const commerceDirty =
+          commerceEnabled !== card.commerce_enabled ||
+          priceCents !== card.price_cents ||
+          termsValue !== card.commerce_terms;
+        if (commerceDirty) {
+          try {
+            await setCardCommerce(card.id, {
+              enabled: commerceEnabled,
+              priceCents,
+              terms: termsValue,
+            });
+          } catch (err) {
+            console.warn('[CardEditorSheet] commerce save failed:', err);
+            setError(
+              err instanceof Error && err.message.includes('CONNECT_REQUIRED')
+                ? 'Selling needs payment setup finished first — tap the commerce toggle to continue setup.'
+                : "The card saved, but the selling settings didn't. Try again?",
+            );
+            return;
+          }
+        }
       } else {
         await createCard({
           title: title.trim(),
@@ -545,6 +644,66 @@ export default function CardEditorSheet({
                 onChange={(p) => setActPerm(p as ActPerm)}
               />
             </View>
+
+            {/* Commerce (Day 18) — EDIT mode only (the set_card_commerce RPC
+                needs a card id; a card must exist before it can sell). The
+                toggle doubles as the Connect-onboarding launch point. */}
+            {mode === 'edit' && card ? (
+              <>
+                <Text style={[styles.sectionLabel, styles.spaced]}>
+                  Commerce
+                </Text>
+                <Pressable
+                  style={styles.orderableRow}
+                  onPress={() => void onCommerceToggle()}
+                  disabled={saving || launchingConnect}
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: commerceEnabled }}
+                  accessibilityLabel="Sell from this card"
+                >
+                  <View
+                    style={[
+                      styles.checkbox,
+                      commerceEnabled && styles.checkboxOn,
+                    ]}
+                  >
+                    {commerceEnabled ? (
+                      <Text style={styles.checkboxMark}>✓</Text>
+                    ) : null}
+                  </View>
+                  <Text style={styles.orderableLabel}>
+                    {launchingConnect
+                      ? 'Opening payment setup…'
+                      : 'Sell from this card'}
+                  </Text>
+                </Pressable>
+                {connectHint ? (
+                  <Text style={styles.emptyHint}>{connectHint}</Text>
+                ) : null}
+                {commerceEnabled ? (
+                  <View style={styles.fieldCard}>
+                    <Text style={styles.orderableLabel}>Price (USD)</Text>
+                    <TextInput
+                      style={styles.fieldValueInput}
+                      value={priceText}
+                      onChangeText={setPriceText}
+                      placeholder="12.50 (empty = no set price)"
+                      placeholderTextColor={theme.colors.textMuted}
+                      keyboardType="decimal-pad"
+                    />
+                    <Text style={styles.orderableLabel}>Terms</Text>
+                    <TextInput
+                      style={styles.fieldValueInput}
+                      value={commerceTerms}
+                      onChangeText={setCommerceTerms}
+                      placeholder="e.g. payment up front, 24h cancellation"
+                      placeholderTextColor={theme.colors.textMuted}
+                      multiline
+                    />
+                  </View>
+                ) : null}
+              </>
+            ) : null}
 
             {/* Details (user fields) --------------------------------------- */}
             <Text style={[styles.sectionLabel, styles.spaced]}>Details</Text>

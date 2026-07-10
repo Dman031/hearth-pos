@@ -41,6 +41,9 @@ export interface Card {
   verification_required: VerificationRequired; // not null, default 'none'
   verification_status: VerificationStatus; // not null, default 'pending'
   commerce_enabled: boolean; // not null, default false
+  price_cents: number | null; // null = not priced (0014; never a placeholder)
+  price_currency: string; // not null, default 'usd' (0014)
+  commerce_terms: string | null; // free text (0014)
   display_order: number; // not null, default 0
   created_at: string; // timestamptz → ISO string
   updated_at: string; // timestamptz → ISO string
@@ -49,7 +52,9 @@ export interface Card {
 /**
  * The fields a card-write path proposes. The persisted `verification_status` is
  * derived by the gate (card-gating.ts), never set directly by the writer — so
- * it is intentionally omitted here.
+ * it is intentionally omitted here. Commerce fields (commerce_enabled +
+ * price/terms) are omitted too: their ONLY write path is the set_card_commerce
+ * definer RPC (0014) — single-canonical-write-path rule.
  */
 export type CardDraft = Pick<
   Card,
@@ -59,4 +64,4 @@ export type CardDraft = Pick<
   | 'act_perm'
   | 'verification_required'
 > &
-  Partial<Pick<Card, 'fields' | 'commerce_enabled' | 'display_order'>>;
+  Partial<Pick<Card, 'fields' | 'display_order'>>;
