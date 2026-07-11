@@ -20,7 +20,10 @@
 /// <reference lib="deno.ns" />
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import Stripe from 'https://esm.sh/stripe@17.5.0?target=deno';
+// npm: specifier, NOT esm.sh ?target=deno — the esm.sh deno build polyfills
+// Node builtins via deno.land/std@0.177.1/node, which the current Edge runtime
+// removed (crashes with "Deno.core.runMicrotasks() is not supported").
+import Stripe from 'npm:stripe@17.5.0';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');

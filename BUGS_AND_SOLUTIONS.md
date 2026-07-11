@@ -424,3 +424,58 @@ This lets us observe whether the pollution actually degraded search in practice 
   Idempotent + reversible (re-embeds derived data; source cards untouched). Same model (bge-base-en-v1.5), same dims — no index rebuild.
 
 **INTERIM (run before the gate change):** pass a signed-in vendor's access token as the Bearer — that satisfies `auth.getUser` today, no code change needed.
+
+---
+
+## BUG-007: create-connect-account crashes on the current Edge runtime (legacy std/node shims via esm.sh `?target=deno`)
+
+**Status:** FIXED (code) — deploy + live verification pending (Derrick deploys by hand)
+**Date:** 2026-07-11
+**Severity:** High
+**Category:** stripe (edge-runtime dependency compatibility)
+**Introduced-by:** upstream-dependency
+**Related bugs:** none
+
+### Symptoms
+
+- `create-connect-account` fails on every invocation on the current Supabase Edge runtime; vendor cannot start Stripe Connect (Express) business verification.
+- Invocation log:
+```
+Deno.core.runMicrotasks() is not supported
+```
+  originating from `deno.land/std@0.177.1/node` shims.
+- `entity_stripe_accounts` is empty — the function has never succeeded in this runtime; no load-bearing state existed.
+
+### Root Cause
+
+No file imports `std@0.177.1/node` directly. The Stripe import used esm.sh's Deno target: `import Stripe from 'https://esm.sh/stripe@17.5.0?target=deno'`. That esm.sh build polyfills Node builtins (process, events, …) via the legacy `deno.land/std@0.177.1/node` compatibility layer, which calls `Deno.core.runMicrotasks()` — removed in the current Edge runtime (Deno 2 era; `supabase/config.toml` already sets `deno_version = 2`). The crash happens at module init, before any request handling. The Stripe client construction itself was already the modern shape (`Stripe.createFetchHttpClient()`, pinned `apiVersion`); only the import specifier was legacy.
+
+### Solution
+
+Switched to the runtime-native npm specifier — `import Stripe from 'npm:stripe@17.5.0'` (exact pin kept so the `'2024-12-18.acacia'` apiVersion literal stays type-valid and deploys are deterministic) — in `create-connect-account` and `stripe-connect-webhook`. In the webhook, additionally pass `Stripe.createSubtleCryptoProvider()` to `constructEventAsync` per current Stripe/Supabase Deno guidance (Web Crypto is guaranteed on the Edge runtime; Node-crypto compat is best-effort).
+
+### Files Changed
+
+- `supabase/functions/create-connect-account/index.ts` — Stripe import → `npm:stripe@17.5.0`.
+- `supabase/functions/stripe-connect-webhook/index.ts` — Stripe import → `npm:stripe@17.5.0`; `createSubtleCryptoProvider()` passed to `constructEventAsync`.
+
+### Commits
+
+- `<this commit>` — fix: BUG-007 — npm: Stripe specifier for create-connect-account + stripe-connect-webhook
+
+### Verification
+
+- `deno check` (Deno 2.2.7 via npx deno-bin, `--node-modules-dir=none`): both changed functions type-check with the npm: import; **zero new errors vs the pristine `main` baseline** (6 pre-existing supabase-js type errors exist identically on both — see Cross-check).
+- `npx tsc --noEmit` (app) → exit 0 (`tsconfig.json` excludes `supabase/`; app unaffected).
+- Live verification is deploy-gated (Derrick deploys by hand): after deploy, invoke `create-connect-account` as a signed-in vendor → expect `{ url, account_id }` and a row in `entity_stripe_accounts` (DB state = ground truth), not the runMicrotasks crash.
+
+### Cross-check Performed
+
+- **All Stripe-importing functions swept** (`grep -rn "esm.sh/stripe" supabase/functions`): four sites, identical legacy pattern. Fixed here: `create-connect-account`, `stripe-connect-webhook` (webhook needed for the Connect verification round-trip). **Out-of-scope-but-flagged for follow-up: `create-identity-session/index.ts:21` and `stripe-identity-webhook/index.ts:25`** — same import, will crash the same way on next invocation; same one-line fix (+ crypto provider in the identity webhook, which also calls `constructEventAsync` without one).
+- **Non-Stripe functions** (`classify-business`, `embed-card`, `backfill-embeddings`, etc.): use plain `esm.sh/@supabase/supabase-js@2` WITHOUT `?target=deno` — does not pull the std/node shims; unaffected.
+- **Latent adjacent risk flagged (not fixed):** the supabase-js import is UNPINNED (`@2` floats). Today it resolves to 2.110.x, whose changed generics produce the 6 pre-existing `deno check` type errors (`never`-typed rows). Type-level only — but a floating major-adjacent dependency in deploy-time-resolved functions is the same class of upstream drift that caused this bug. Recommend pinning in the identity-pair follow-up.
+
+### Prevention
+
+- Never use esm.sh `?target=deno` builds for Node-ecosystem packages in Edge functions — use `npm:` specifiers (runtime-native, no shim layer). Detection grep for remaining sites: `grep -rn "target=deno\|deno.land/std" supabase/functions --include='*.ts'` (after the identity follow-up this must return nothing).
+- Pin exact versions in deploy-time-resolved imports (`npm:pkg@X.Y.Z`, not `@^X` or bare `@2`) so runtime behavior can't drift between deploys.
