@@ -148,6 +148,22 @@ styling before any code. Do not spot-fix one screen ahead of that inventory — 
 how the surfaces drifted apart in the first place. Not blocking; a visual-polish item (candidate to
 fold into the DAY 30 polish pass, but logged here so it isn't lost before then).
 
+### Day 18 follow-ons (commerce toggle close-out, 2026-07-13)
+
+- **Identity edge functions still on esm.sh `?target=deno`** (`create-identity-session`,
+  `stripe-identity-webhook`) → NEXT IDENTITY TOUCH — will crash with the BUG-007 runMicrotasks
+  error on next redeploy; same one-line `npm:stripe@17.5.0` fix (+ crypto provider in the webhook).
+- **Pin `@supabase/supabase-js` in edge functions** → WITH THE IDENTITY FIX — currently floats to
+  2.110.x; source of the 6 pre-existing `deno check` type errors in `create-connect-account`.
+- **`query_cards` does not return price fields** (hearth-network) → DAY 19 CANDIDATE — agents
+  comparing prices across vendors must call `get_card_details` per card today.
+- **Per-field pricing for multi-item cards** → DAY 19 (forced there) — Blue Hour Menu has four
+  items at four prices in field text; card-level `price_cents` cannot express that.
+- **Entity-level commerce home (Money tab)** → DAY 22 — the per-card toggle is the interim
+  surface; entity-level commerce settings need a home.
+- **Separate Stripe accounts for Harvest Once vs Teleoplexy** → BEFORE LIVE MODE — they share one
+  Stripe account today; must be separated before live mode / diligence.
+
 ---
 
 ## Pre-launch architecture decisions (locked)
@@ -350,6 +366,11 @@ Cross-repo: spans hearth-pos (app download, caller verify, caller-as-new-owner) 
   string "$16.15". Design the structured price shape ONCE, properly, when wiring payments — don't
   bolt a parser onto free text later. Until then the 86 toggle works fine (availability is
   independent of price format). Part of the card-editor-feel pass; gates the Phase 5 order path.
+- **Commerce toggle can render checked before the RPC accepts (Day 18)** — after returning from
+  Connect onboarding, the editor toggle may briefly show enabled before `set_card_commerce` has
+  accepted the enable. The DB was never wrong (negative sweep clean); UI-only optimism. Spec says
+  the toggle must NEVER flip optimistically — render from the RPC/DB result only. Fix in the
+  card-editor pass.
 
 ---
 
