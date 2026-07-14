@@ -68,6 +68,14 @@ interface CardContextValue {
     fieldIndex: number,
     available: boolean,
   ) => Promise<void>;
+  // Day 18 — the ONLY commerce write path (0014 set_card_commerce definer RPC:
+  // server-side caller derivation, ownership check, enable gated on a usable
+  // Connect account). Throws on failure; a message containing CONNECT_REQUIRED
+  // means the caller has no completed Connect account yet.
+  setCardCommerce: (
+    cardId: string,
+    input: { enabled: boolean; priceCents: number | null; terms: string | null },
+  ) => Promise<Card>;
   completeOnboarding: () => void;
   refresh: () => Promise<void>;
 }
@@ -81,6 +89,7 @@ const CardContext = createContext<CardContextValue | null>(null);
 const CARD_COLUMNS =
   'id, entity_id, title, kind, fields, see_perm, act_perm, ' +
   'verification_required, verification_status, commerce_enabled, ' +
+  'price_cents, price_currency, commerce_terms, ' +
   'display_order, created_at, updated_at';
 
 // Fire-and-forget: embed a newly-created/edited card for semantic search via the
@@ -261,7 +270,8 @@ export function CardProvider({ children }: CardProviderProps) {
         act_perm: draft.act_perm,
         verification_required: draft.verification_required,
         verification_status: verificationStatus,
-        commerce_enabled: draft.commerce_enabled ?? false,
+        // commerce_enabled is NOT set here — table default (false) applies; the
+        // set_card_commerce RPC (0014) is the single commerce write path.
         display_order: draft.display_order ?? cards.length,
       };
 
@@ -431,6 +441,59 @@ export function CardProvider({ children }: CardProviderProps) {
     [cards],
   );
 
+  const setCardCommerce = useCallback(
+    async (
+      cardId: string,
+      input: { enabled: boolean; priceCents: number | null; terms: string | null },
+    ): Promise<Card> => {
+      setError(null);
+
+      try {
+        // The ONLY commerce write path (0014): the definer RPC derives the
+        // caller server-side, verifies ownership, and refuses to enable without
+        // a usable Connect account. p_currency null → DB keeps its value
+        // (COALESCE in the RPC; 'usd' is the Day 18 pin).
+        const { error: rpcError } = await supabase.rpc('set_card_commerce', {
+          p_card_id: cardId,
+          p_enabled: input.enabled,
+          p_price_cents: input.priceCents,
+          p_currency: null,
+          p_terms: input.terms,
+        });
+        if (rpcError) {
+          throw toError(rpcError, 'set_card_commerce failed');
+        }
+
+        // The RPC returns only the card id — re-select the row so local state
+        // reconciles with DB ground truth. NO triggerEmbedCard: price/terms are
+        // transactional facts, not embedding text (mirrors the Day 13 guardrail).
+        const { data, error: selectError } = await supabase
+          .from('cards')
+          .select(CARD_COLUMNS)
+          .eq('id', cardId)
+          .maybeSingle();
+        if (selectError) {
+          throw toError(selectError, 'commerce reload failed');
+        }
+        if (!data) {
+          throw new Error(
+            '[CardProvider] commerce reload returned no row (possible RLS block)',
+          );
+        }
+
+        const updated = data as unknown as Card;
+        setCards((prev) => prev.map((c) => (c.id === cardId ? updated : c)));
+        return updated;
+      } catch (err) {
+        const wrapped = toError(err, 'failed to update card commerce');
+        console.error('[CardProvider] setCardCommerce failed:', wrapped);
+        setError(wrapped);
+        throw wrapped;
+      }
+    },
+    [],
+  );
+
   const completeOnboarding = useCallback(() => {
     setNeedsOnboarding(false);
   }, []);
@@ -445,6 +508,7 @@ export function CardProvider({ children }: CardProviderProps) {
       createCard,
       updateCard,
       setFieldAvailability,
+      setCardCommerce,
       completeOnboarding,
       refresh,
     }),
@@ -457,6 +521,7 @@ export function CardProvider({ children }: CardProviderProps) {
       createCard,
       updateCard,
       setFieldAvailability,
+      setCardCommerce,
       completeOnboarding,
       refresh,
     ],

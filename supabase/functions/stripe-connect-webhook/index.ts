@@ -15,7 +15,10 @@
 /// <reference lib="deno.ns" />
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import Stripe from 'https://esm.sh/stripe@17.5.0?target=deno';
+// npm: specifier, NOT esm.sh ?target=deno — the esm.sh deno build polyfills
+// Node builtins via deno.land/std@0.177.1/node, which the current Edge runtime
+// removed (crashes with "Deno.core.runMicrotasks() is not supported").
+import Stripe from 'npm:stripe@17.5.0';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -46,6 +49,10 @@ const stripe = new Stripe(STRIPE_SECRET_KEY, {
   httpClient: Stripe.createFetchHttpClient(),
   apiVersion: '2024-12-18.acacia',
 });
+
+// Web Crypto-based signature verification — the Edge runtime guarantees
+// SubtleCrypto; Node crypto compat is best-effort there.
+const cryptoProvider = Stripe.createSubtleCryptoProvider();
 
 function textResponse(body: string, status = 200): Response {
   return new Response(body, { status, headers: { 'content-type': 'text/plain' } });
@@ -107,6 +114,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
       rawBody,
       signature,
       STRIPE_CONNECT_WEBHOOK_SECRET!,
+      undefined,
+      cryptoProvider,
     );
   } catch (err) {
     console.warn('[stripe-connect-webhook] signature verification failed:', err);
