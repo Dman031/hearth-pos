@@ -18,13 +18,16 @@ The vendor-facing mobile app. Vendors download from App Store, fill conversation
 - New templates: JSON insert into Supabase, no app update needed
 - Launch templates: generic_service, plumber, coffee_shop, task_runner
 
-## Design system
-**Canonical design reference: `docs/deus-prototype.html`** — the interactive Claude Design prototype (dark #050505, amber orb, four tabs: Profile / Incoming / Contacts / Identity, the card model with SEE/ACT permission pills, trust-tier identity screen). READ IT before building ANY screen, and match it for all app UI work.
+## Design system — Teleoplexy "Field" (reskinned 2026-07-14)
+**Canonical token source: `docs/brand/field-tokens.css`** (see `docs/brand/README.md` for the brand decisions); `src/styles/theme.ts` is its React Native translation and must stay in sync. Light-first, light-ONLY (dark is a deferred token flip — no switcher).
 
-Background #050505 (deepest), Surface #111111, Text primary #F5F0E8, Text secondary #A5A99A, Text muted #7D8471, Accent #D4A574 (hearth amber), Success #5DCAA5, Danger #E24B4A, Warning #EF9F27
-HearthOrb: 4-layer radial gradient, 4s breathing cycle, canonical RGBA values: outer rgba(125,140,113,0.22), mid rgba(150,160,120,0.35), inner rgba(200,175,120,0.65), core rgba(255,250,235,0.90)
+Paper #E8E6D2 (app background), Surface #FBFAF0 (raised cards, opaque + hairline + e1 shadow — NOT translucent glass), Surface-inset #DED8C0, Ink #1E2415, Ink-2 #414A30, Soft #73785C, Accent #556327 (moss — actions/links), Accent-2 #BE9F49 (wheat — highlight/verified; use accent2Deep #A8791F for wheat TEXT, raw wheat fails contrast on paper), On-accent #F2F0E2, Success #5C6B36, Danger #A23B22, Warning #A8791F, Hairline rgba(33,38,24,0.16)
 Border radius: 12px cards, 24px inputs
-Font: system sans-serif
+Type: Hanken Grotesk everywhere (loaded via expo-font, families in `theme.fonts` — set families, never `fontWeight`, or Android fake-bolds). The bespoke Teleo face lives ONLY inside the logo SVGs (`src/constants/brand.ts`), never as a UI font.
+Logo: the TELE⟡PLEXY lockup + crest, inlined SVGs in `src/constants/brand.ts`; app icons derive from the crest signet.
+HearthOrb: 4-layer radial gradient, 4s breathing cycle, canonical RGBA values: outer rgba(125,140,113,0.22), mid rgba(150,160,120,0.35), inner rgba(200,175,120,0.65), core rgba(255,250,235,0.90). OPEN DECISION: keep orb vs replace with crest (Derrick to confirm) — do not touch the recipe meanwhile.
+
+`docs/deus-prototype.html` is SUPERSEDED for colors/type/brand (it shows the retired dark Deus world). It remains the reference for layout, interaction, and the card model (four tabs, SEE/ACT permission pills, trust-tier identity) until a Field-world prototype replaces it.
 
 ## Critical rules
 - NEVER expose MCP/protocol terminology to the vendor
@@ -33,7 +36,7 @@ Font: system sans-serif
 - ALWAYS track completed_transaction_count for paywall trigger
 - ALWAYS use Opus (claude-opus-4-8), never Haiku
 - One app, one codebase, infinite business types via templates
-- The user-facing app name comes from a SINGLE `APP_NAME` constant — NEVER hardcode the brand string per screen. Currently "Deus"; a brand pass to "Flow" is planned pending name research, so centralization keeps the rename a one-line change. (As of 2026-06-06 no `APP_NAME` constant exists yet; `src/screens/AuthScreen.tsx` and `src/screens/OnboardingScreen.tsx` still hardcode the stale "Hearth" brand and must route through it when the constant lands.)
+- The user-facing app name comes from a SINGLE `APP_NAME` constant (`src/constants/app.ts`) — NEVER hardcode the brand string per screen; derived labels ("{APP_NAME} ID") too. Renamed Deus → **Teleoplexy** 2026-07-14. USER-FACING STRINGS ONLY: infrastructure is not brand — hearth-* repo names and worker URLs (hearth-network.hearthnet.workers.dev is LIVE), package/bundle ids, the `hearth-pos` slug, Supabase refs, edge function names, the `deus_id` column + `deus-id.ts` service, and code identifiers like `HearthOrb` all keep their names. A future rename must also regenerate the lockup SVG (wordmark is baked into vector paths — see `src/constants/brand.ts`).
 
 ## Revenue logic
 - Free until vendor completes 10 transactions
