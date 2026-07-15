@@ -45,7 +45,8 @@
           "merchantIdentifier": "merchant.com.hearth.pos",
           "enableGooglePay": false
         }
-      ]
+      ],
+      "expo-font"
     ]
   }
 }
