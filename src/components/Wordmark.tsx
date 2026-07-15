@@ -1,17 +1,15 @@
 import React from 'react';
-import { Platform, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { StyleSheet, View, type ViewStyle } from 'react-native';
+import { SvgXml } from 'react-native-svg';
 import { APP_NAME } from '../constants/app';
-import { theme } from '../styles/theme';
+import { LOCKUP_ASPECT_RATIO, LOCKUP_SVG } from '../constants/brand';
 
-// Wordmark — the Deus brand mark for the app shell. "Carved" treatment: the
-// serif wordmark sits slightly recessed into the dark-warm surface via a soft
-// dark text-shadow (engraved look) rather than floating on top. Brand text
-// routes through APP_NAME (single source of truth), never a hardcoded string,
-// so the planned Deus→Flow rename stays a one-line change.
-//
-// Serif matches the AuthScreen brand treatment (Georgia on iOS, serif default).
+// Wordmark — the Teleoplexy lockup (crest + TELE⟡PLEXY) for the app shell.
+// Rendered from the inlined brand SVG (src/constants/brand.ts); the visible
+// brand string is baked into the vector, so the accessibility label routes
+// through APP_NAME to keep the spoken name on the single source of truth.
 
-const SERIF = Platform.select({ ios: 'Georgia', default: 'serif' });
+const LOCKUP_HEIGHT = 26;
 
 interface WordmarkProps {
   /** Optional container override (e.g. extra padding from a nav header). */
@@ -20,10 +18,16 @@ interface WordmarkProps {
 
 export default function Wordmark({ style }: WordmarkProps) {
   return (
-    <View style={[styles.container, style]} accessibilityRole="header">
-      <Text style={styles.mark} allowFontScaling={false}>
-        {APP_NAME}
-      </Text>
+    <View
+      style={[styles.container, style]}
+      accessibilityRole="header"
+      accessibilityLabel={APP_NAME}
+    >
+      <SvgXml
+        xml={LOCKUP_SVG}
+        height={LOCKUP_HEIGHT}
+        width={LOCKUP_HEIGHT * LOCKUP_ASPECT_RATIO}
+      />
     </View>
   );
 }
@@ -32,16 +36,5 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  mark: {
-    fontFamily: SERIF,
-    fontSize: 22,
-    color: theme.colors.textPrimary,
-    letterSpacing: 3,
-    // Carved/engraved: a dark shadow dropped just below the glyphs reads as the
-    // text being pressed into the warm-dark surface.
-    textShadowColor: 'rgba(0, 0, 0, 0.6)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 1,
   },
 });
