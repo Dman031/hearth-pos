@@ -21,6 +21,7 @@ import useMediaUpload from '../hooks/useMediaUpload';
 import { parseMenu } from '../services/menu-parse';
 import { startIdentityVerification } from '../services/stripe';
 import type { Card } from '../types/card';
+import { APP_NAME } from '../constants/app';
 import { theme } from '../styles/theme';
 
 // ProfileScreen — the vendor's identity surface and the PERMANENT home of the
@@ -163,7 +164,7 @@ export default function ProfileScreen() {
           <Text style={styles.name}>{displayName}</Text>
 
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Deus ID</Text>
+            <Text style={styles.metaLabel}>{APP_NAME} ID</Text>
             <Text style={styles.deusId}>
               {deusId ?? '—'}
             </Text>

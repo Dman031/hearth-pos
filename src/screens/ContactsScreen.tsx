@@ -1,5 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { APP_NAME } from '../constants/app';
 import { theme } from '../styles/theme';
 import useContacts from '../hooks/useContacts';
 import type { Contact } from '../types/contact';
@@ -30,7 +31,7 @@ function ContactRow({ contact }: { contact: Contact }) {
       <View style={styles.rowMain}>
         <Text style={styles.name}>{contactLabel(contact)}</Text>
         {contact.deus_id ? (
-          <Text style={styles.deusId}>Deus ID {contact.deus_id}</Text>
+          <Text style={styles.deusId}>{APP_NAME} ID {contact.deus_id}</Text>
         ) : null}
       </View>
       {isVerified(contact) ? (
