@@ -1,0 +1,96 @@
+/* ============================================================
+   TELEOPLEXY / "CONNECT" — Field (Direction III) design tokens
+   The product surface. Light-first. Moss + wheat over olive.
+   Import once at the app root. Ship Teleo.otf alongside.
+   ------------------------------------------------------------
+   Decisions baked in (see CTO note):
+   - Field is THE product. Stone/Ember are marketing, not app.
+   - Light-first. Dark is a token flip, deferred until post-raise.
+   - TYPE: Teleo owns the WORDMARK + CREST only. All in-product
+     type (titles, labels, body) is Hanken Grotesk. A bespoke
+     face in the UI reads as a demo; reserved for the logo it
+     reads as a brand. This is the prototype->company move.
+   ============================================================ */
+
+@font-face{
+  font-family:'Teleo';
+  src:url('/fonts/Teleo.otf') format('opentype');
+  font-weight:400; font-display:swap;
+}
+/* UI face — load Hanken Grotesk 400/500/600/700 (Google Fonts or self-host). */
+
+:root{
+  /* ---- color: surfaces & ink ---- */
+  --paper:      #E8E6D2;   /* app background / e0            */
+  --surface:    #FBFAF0;   /* raised card / e1 (near-white paper stock = lifts clearly) */
+  --surface-2:  #DED8C0;   /* nested / inset / pressed       */
+  --ink:        #1E2415;   /* primary text / titles          */
+  --ink-2:      #414A30;   /* secondary text                 */
+  --soft:       #73785C;   /* muted / captions / placeholder */
+  --accent:     #556327;   /* moss — primary action, links   */
+  --accent-press:#414A22;  /* moss pressed                   */
+  --accent-2:   #BE9F49;   /* wheat — highlight / focus ring  */
+  --on-accent:  #F2F0E2;   /* text on moss fills             */
+  --ok:         #5C6B36;   /* success = moss                 */
+  --warn:       #A8791F;   /* deep wheat for caution         */
+  --danger:     #A23B22;   /* clay-red, tuned to warm palette*/
+  --line:       rgba(33,38,24,.16);   /* hairline           */
+  --line-strong:rgba(33,38,24,.30);   /* emphasized border  */
+  --line-soft:  rgba(33,38,24,.08);
+
+  /* ---- type ---- */
+  --font-brand: 'Teleo','Helvetica Neue',Arial,sans-serif;   /* WORDMARK + CREST ONLY */
+  --font-ui:    'Hanken Grotesk',system-ui,-apple-system,sans-serif; /* ALL in-product type */
+  --font-mono:  ui-monospace,'SF Mono','JetBrains Mono',monospace;     /* ids, coords */
+
+  /* named type scale — size / line-height / weight / tracking */
+  --t-display:  30px; --lh-display: 1.08;   /* Teleo · profile name        */
+  --t-title:    21px; --lh-title:   1.18;   /* Teleo · card title          */
+  --t-headline: 17px; --lh-headline:1.3;    /* section heads               */
+  --t-body:     15px; --lh-body:    1.5;    /* system · default copy       */
+  --t-callout:  14px; --lh-callout: 1.45;   /* field values                */
+  --t-subhead:  13px; --lh-subhead: 1.4;    /* meta rows                   */
+  --t-footnote: 12px; --lh-footnote:1.4;    /* helper text                 */
+  --t-caption:  10.5px;                     /* Teleo · eyebrows/chips, UPPER, .18em */
+  --track-caption:.18em;
+
+  /* ---- spacing (4px base) ---- */
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:20px; --s6:24px; --s8:32px; --s10:40px;
+
+  /* ---- radii (flat & structural → small) ---- */
+  --r-chip:999px; --r-card:12px; --r-sheet:20px; --r-field:10px;
+
+  /* ---- elevation: separate by SURFACE + LINE, not big shadows ---- */
+  --e0:none;                                             /* page             */
+  --e1:0 4px 16px -6px rgba(30,36,21,.14);               /* card lifts off paper */
+  --e2:0 6px 24px rgba(33,38,24,.12);                    /* sheet / popover  */
+  /* nested surfaces use --surface-2 + inset hairline, NO shadow            */
+  --inset:inset 0 0 0 1px var(--line-soft);
+
+  /* ---- touch targets (phone, not web) ---- */
+  --hit-min:44px;      /* every tappable element's hit box */
+  --tabbar-h:52px;     /* + safe-area-inset-bottom          */
+  --statusbar-h:44px;
+
+  /* ---- iOS safe areas ---- */
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+
+  /* ---- motion ---- */
+  --tap:transform .08s ease;
+  --ease:cubic-bezier(.2,.85,.25,1);
+}
+
+/* Dark = "ink-field" world. Deferred; ships as a token flip on <html data-theme="dark">. */
+[data-theme="dark"]{
+  --paper:#161A0F; --surface:#212618; --surface-2:#2A3020;
+  --ink:#E8E6D2; --ink-2:#BFC79E; --soft:#8B9070;
+  --accent:#9FB052; --accent-press:#B4C466; --accent-2:#D8BE6A; --on-accent:#161A0F;
+  --danger:#D9765C;
+  --line:rgba(232,230,210,.16); --line-strong:rgba(232,230,210,.3); --line-soft:rgba(232,230,210,.08);
+  --e1:0 1px 2px rgba(0,0,0,.4); --e2:0 6px 24px rgba(0,0,0,.55);
+}
+
+/* iOS status bar glyph color: dark on paper, light on dark theme.
+   Set in the native shell — <meta name="theme-color">, UIStatusBarStyle.
+   Light theme → .dark-content (dark glyphs). Dark theme → .light-content. */
