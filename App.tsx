@@ -4,14 +4,14 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
-import {
-  useFonts,
-  HankenGrotesk_400Regular,
-  HankenGrotesk_500Medium,
-  HankenGrotesk_600SemiBold,
-  HankenGrotesk_700Bold,
-  HankenGrotesk_700Bold_Italic,
-} from '@expo-google-fonts/hanken-grotesk';
+import { useFonts } from 'expo-font';
+// Per-weight subpath imports — the package index re-exports all 36 weight
+// files and metro would bundle every one of them (~1.3MB of unused fonts).
+import { HankenGrotesk_400Regular } from '@expo-google-fonts/hanken-grotesk/400Regular';
+import { HankenGrotesk_500Medium } from '@expo-google-fonts/hanken-grotesk/500Medium';
+import { HankenGrotesk_600SemiBold } from '@expo-google-fonts/hanken-grotesk/600SemiBold';
+import { HankenGrotesk_700Bold } from '@expo-google-fonts/hanken-grotesk/700Bold';
+import { HankenGrotesk_700Bold_Italic } from '@expo-google-fonts/hanken-grotesk/700Bold_Italic';
 import HearthOrb from './src/components/HearthOrb';
 import { AuthProvider } from './src/context/AuthContext';
 import { EntityProvider } from './src/context/EntityContext';
