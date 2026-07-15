@@ -101,8 +101,6 @@ export default function IdentityPanel() {
   );
 }
 
-const ACCENT_BORDER = 'rgba(212,165,116,0.28)';
-const ACCENT_FILL = 'rgba(212,165,116,0.07)';
 
 const styles = StyleSheet.create({
   container: {
@@ -147,11 +145,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   pillOn: {
-    borderColor: ACCENT_BORDER,
-    backgroundColor: ACCENT_FILL,
+    borderColor: theme.colors.accentBorder,
+    backgroundColor: theme.colors.accentFill,
   },
   pillOff: {
-    borderColor: theme.colors.surface,
+    borderColor: theme.colors.hairline,
     backgroundColor: 'transparent',
   },
   pillDot: {

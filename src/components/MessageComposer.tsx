@@ -53,7 +53,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.md,
     backgroundColor: theme.colors.background,
     borderTopWidth: 1,
-    borderTopColor: theme.colors.surface,
+    borderTopColor: theme.colors.hairline,
   },
   input: {
     flex: 1,
@@ -76,12 +76,12 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.accent,
   },
   sendDisabled: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.surfaceInset,
   },
   sendLabel: {
     ...theme.typography.body,
     fontWeight: '600',
-    color: theme.colors.background,
+    color: theme.colors.onAccent,
   },
   sendLabelDisabled: {
     color: theme.colors.textMuted,

@@ -84,8 +84,6 @@ export default function ContactsScreen() {
   );
 }
 
-const ACCENT_BORDER = 'rgba(212,165,116,0.28)';
-const ACCENT_FILL = 'rgba(212,165,116,0.07)';
 
 const styles = StyleSheet.create({
   container: {
@@ -140,8 +138,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     borderRadius: theme.borderRadius.pill,
     borderWidth: 1,
-    borderColor: ACCENT_BORDER,
-    backgroundColor: ACCENT_FILL,
+    borderColor: theme.colors.accentBorder,
+    backgroundColor: theme.colors.accentFill,
     marginLeft: theme.spacing.md,
   },
   pillDot: {

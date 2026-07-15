@@ -201,7 +201,7 @@ export default function AuthScreen() {
                   disabled={submitting}
                 >
                   {submitting ? (
-                    <ActivityIndicator color={theme.colors.background} />
+                    <ActivityIndicator color={theme.colors.onAccent} />
                   ) : (
                     <Text style={styles.primaryButtonLabel}>
                       {isSignUp ? 'Create account' : 'Sign in'}
@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
   fieldShell: {
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: 'rgba(245, 240, 232, 0.08)',
+    borderColor: theme.colors.hairline,
     borderRadius: 14,
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.lg,
@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
   notice: {
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: 'rgba(212, 165, 116, 0.4)',
+    borderColor: theme.colors.accentBorder,
     borderRadius: 14,
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.md,
@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
     color: theme.colors.danger,
   },
   primaryButton: {
-    backgroundColor: theme.colors.textPrimary,
+    backgroundColor: theme.colors.accent,
     borderRadius: theme.borderRadius.pill,
     paddingVertical: theme.spacing.lg,
     alignItems: 'center',
@@ -349,11 +349,11 @@ const styles = StyleSheet.create({
   primaryButtonLabel: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#0a0a0a',
+    color: theme.colors.onAccent,
   },
   ghostButton: {
     borderWidth: 1,
-    borderColor: 'rgba(245, 240, 232, 0.08)',
+    borderColor: theme.colors.hairline,
     borderRadius: theme.borderRadius.pill,
     paddingVertical: theme.spacing.lg,
     alignItems: 'center',
@@ -385,7 +385,7 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.hairline,
   },
   dividerLabel: {
     ...theme.typography.bodyMuted,

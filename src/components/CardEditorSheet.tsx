@@ -805,7 +805,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.surface,
+    borderBottomColor: theme.colors.hairline,
   },
   headerTitle: {
     ...theme.typography.body,
@@ -854,12 +854,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.md,
     borderRadius: theme.borderRadius.pill,
     borderWidth: 1,
-    borderColor: theme.colors.surface,
+    borderColor: theme.colors.hairline,
     backgroundColor: theme.colors.surface,
   },
   flavorChipSelected: {
     borderColor: theme.colors.accent,
-    backgroundColor: 'rgba(212,165,116,0.12)',
+    backgroundColor: theme.colors.accentWash,
   },
   flavorChipLabel: {
     ...theme.typography.bodyMuted,
@@ -893,7 +893,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.card,
     borderWidth: 1,
     borderColor: theme.colors.accent,
-    backgroundColor: 'rgba(212,165,116,0.12)',
+    backgroundColor: theme.colors.accentWash,
   },
   mediaButtonPressed: {
     opacity: 0.6,
@@ -1021,7 +1021,7 @@ const styles = StyleSheet.create({
   },
   checkboxOn: {
     borderColor: theme.colors.accent,
-    backgroundColor: 'rgba(212,165,116,0.12)',
+    backgroundColor: theme.colors.accentWash,
   },
   checkboxMark: {
     color: theme.colors.accent,

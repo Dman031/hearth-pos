@@ -61,7 +61,7 @@ export default function TabNavigator() {
         header: () => <ShellHeader />,
         tabBarStyle: {
           backgroundColor: theme.colors.background,
-          borderTopColor: theme.colors.surface,
+          borderTopColor: theme.colors.hairline,
           borderTopWidth: 1,
           height: 88,
           paddingBottom: 24,
@@ -86,7 +86,7 @@ export default function TabNavigator() {
           tabBarBadge: incomingCount > 0 ? incomingCount : undefined,
           tabBarBadgeStyle: {
             backgroundColor: theme.colors.accent,
-            color: theme.colors.background,
+            color: theme.colors.onAccent,
           },
         }}
       />
@@ -100,7 +100,7 @@ export default function TabNavigator() {
           tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
           tabBarBadgeStyle: {
             backgroundColor: theme.colors.accent,
-            color: theme.colors.background,
+            color: theme.colors.onAccent,
           },
         }}
       />
@@ -112,7 +112,7 @@ export default function TabNavigator() {
 const styles = StyleSheet.create({
   header: {
     backgroundColor: theme.colors.background,
-    borderBottomColor: theme.colors.surface,
+    borderBottomColor: theme.colors.hairline,
     borderBottomWidth: 1,
     paddingBottom: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,

@@ -154,7 +154,7 @@ export default function EntitySetupScreen() {
               disabled={submitting}
             >
               {submitting ? (
-                <ActivityIndicator color={theme.colors.background} />
+                <ActivityIndicator color={theme.colors.onAccent} />
               ) : (
                 <Text style={styles.primaryButtonLabel}>Continue</Text>
               )}
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonLabel: {
     ...theme.typography.body,
-    color: theme.colors.background,
+    color: theme.colors.onAccent,
     fontWeight: '600',
   },
   // Reveal phase

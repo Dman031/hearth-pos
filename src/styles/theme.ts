@@ -26,6 +26,9 @@ export const theme = {
     // Wheat tints — verified-tier chrome (VerifiedHumanBadge, verified pills).
     accent2Border: 'rgba(190,159,73,0.38)',
     accent2Fill: 'rgba(190,159,73,0.10)',
+    // Deep wheat — the TEXT-safe wheat (raw #BE9F49 fails contrast on paper).
+    // Same value as warning by design; distinct token for distinct semantics.
+    accent2Deep: '#A8791F',
     // HearthOrb gradient palette — see docs/HARVESTONCE_ORB_RECIPE.md.
     // Deliberately NOT reskinned: orb keep-vs-crest is an open brand decision
     // (Derrick to confirm); the recipe is design-critical and stays untouched.

@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
   },
   btnPrimaryText: {
     ...theme.typography.body,
-    color: theme.colors.background,
+    color: theme.colors.onAccent,
     fontWeight: '600',
   },
   btnGhost: {
@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
   },
   receiptRow: {
     borderRadius: theme.borderRadius.card,
-    backgroundColor: 'rgba(212, 165, 116, 0.12)', // amber wash — the coral receipt
+    backgroundColor: theme.colors.accentWash, // accent wash — the receipt tint
     paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
   },

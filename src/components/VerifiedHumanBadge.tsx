@@ -33,11 +33,9 @@ export default function VerifiedHumanBadge({
   );
 }
 
-// Amber chip values mirror the prototype: text/dot use the hearth accent,
-// border/background are the accent at low alpha.
-const ACCENT_BORDER = 'rgba(212,165,116,0.28)';
-const ACCENT_FILL = 'rgba(212,165,116,0.07)';
-
+// Verified = wheat in the Field palette (wheat is the highlight/verified
+// accent; moss stays the action accent). Dot is raw wheat; the label uses
+// deep wheat because raw #BE9F49 fails text contrast on paper.
 const styles = StyleSheet.create({
   chip: {
     flexDirection: 'row',
@@ -48,17 +46,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     borderRadius: theme.borderRadius.pill,
     borderWidth: 1,
-    borderColor: ACCENT_BORDER,
-    backgroundColor: ACCENT_FILL,
+    borderColor: theme.colors.accent2Border,
+    backgroundColor: theme.colors.accent2Fill,
   },
   dot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: theme.colors.accent,
+    backgroundColor: theme.colors.accent2,
   },
   label: {
-    color: theme.colors.accent,
+    color: theme.colors.accent2Deep,
     fontSize: 10,
     letterSpacing: 0.7,
     textTransform: 'uppercase',

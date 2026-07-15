@@ -553,7 +553,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.md,
     borderTopWidth: 1,
-    borderTopColor: theme.colors.surface,
+    borderTopColor: theme.colors.hairline,
   },
   input: {
     flex: 1,
@@ -577,7 +577,7 @@ const styles = StyleSheet.create({
   },
   sendIcon: {
     ...theme.typography.h2,
-    color: theme.colors.background,
+    color: theme.colors.onAccent,
   },
   // --- closing beat ---------------------------------------------------------
   closingWrap: {
@@ -620,7 +620,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonLabel: {
     ...theme.typography.body,
-    color: theme.colors.background,
+    color: theme.colors.onAccent,
     fontWeight: '600',
   },
 });

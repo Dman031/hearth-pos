@@ -78,7 +78,8 @@ export default function App() {
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
-        <StatusBar style="light" />
+        {/* Dark glyphs on the light Field paper (field-tokens.css footer note). */}
+        <StatusBar style="dark" />
         {/* EntityProvider and VendorProvider read useAuth() — keep nested
             inside AuthProvider. CardProvider reads useEntity() — keep nested
             inside EntityProvider. */}
