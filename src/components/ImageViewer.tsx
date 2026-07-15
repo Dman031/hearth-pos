@@ -13,8 +13,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../styles/theme';
 
 // ImageViewer — full-screen, horizontally paged viewer for a card's gallery.
-// Opened by tapping a thumbnail (GalleryGrid). Read-only: browse + close. The
-// backdrop is the deepest #050505 so photos sit on the brand black.
+// Opened by tapping a thumbnail (GalleryGrid). Read-only: browse + close.
+// The backdrop stays DARK (ink) even in the light Field world — a lightbox
+// is the one surface where photos must sit on dark, not paper.
 
 interface ImageViewerProps {
   urls: string[];
@@ -83,7 +84,7 @@ export default function ImageViewer({ urls, index, onClose }: ImageViewerProps) 
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.colors.textPrimary, // ink — deliberate dark lightbox
   },
   headerBar: {
     flexDirection: 'row',
@@ -94,11 +95,11 @@ const styles = StyleSheet.create({
   },
   counter: {
     ...theme.typography.bodyMuted,
-    color: theme.colors.textSecondary,
+    color: theme.colors.background, // paper-on-ink (viewer inverts the world)
   },
   close: {
     ...theme.typography.body,
-    color: theme.colors.accent,
+    color: theme.colors.accent2, // raw wheat is contrast-safe on ink
     fontFamily: theme.fonts.semiBold,
   },
   page: {

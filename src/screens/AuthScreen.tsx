@@ -20,12 +20,10 @@ import { theme } from '../styles/theme';
 type AuthView = 'welcome' | 'form';
 type Mode = 'signin' | 'signup';
 
-// The cold-open's display heading and the "find and reach you" accent come
-// straight from docs/deus-prototype.html (Onboarding step 0). The app loads no
-// custom fonts yet, so the serif display falls back to Georgia/serif — the same
-// face the prototype's own thumbnail uses for the wordmark.
-// Brand type: Hanken Grotesk everywhere (Field decision — the old Deus serif
-// cold-open treatment is gone; Teleo lives only in the logo SVGs).
+// The cold-open's display heading and the "find and reach you" accent keep the
+// prototype's structure (Onboarding step 0) restyled to the Field brand:
+// Hanken Grotesk everywhere (the old Deus serif treatment is gone; Teleo
+// lives only in the logo SVGs).
 
 export default function AuthScreen() {
   const { signIn, signUp, signInWithGoogle, signInWithApple } = useAuth();
