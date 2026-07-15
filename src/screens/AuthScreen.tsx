@@ -24,7 +24,8 @@ type Mode = 'signin' | 'signup';
 // straight from docs/deus-prototype.html (Onboarding step 0). The app loads no
 // custom fonts yet, so the serif display falls back to Georgia/serif — the same
 // face the prototype's own thumbnail uses for the wordmark.
-const SERIF = Platform.select({ ios: 'Georgia', default: 'serif' });
+// Brand type: Hanken Grotesk everywhere (Field decision — the old Deus serif
+// cold-open treatment is gone; Teleo lives only in the logo SVGs).
 
 export default function AuthScreen() {
   const { signIn, signUp, signInWithGoogle, signInWithApple } = useAuth();
@@ -280,14 +281,13 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   display: {
-    fontFamily: SERIF,
+    fontFamily: theme.fonts.bold,
     fontSize: 34,
     lineHeight: 40,
     color: theme.colors.textPrimary,
   },
   displayAccent: {
-    fontFamily: SERIF,
-    fontStyle: 'italic',
+    fontFamily: theme.fonts.boldItalic,
     color: theme.colors.accent,
   },
   lead: {
@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
   noticeAction: {
     ...theme.typography.bodyMuted,
     color: theme.colors.accent,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
   errorText: {
     ...theme.typography.bodyMuted,
@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonLabel: {
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
     color: theme.colors.onAccent,
   },
   ghostButton: {
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
   },
   ghostButtonLabel: {
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
     color: theme.colors.textSecondary,
   },
   toggle: {

@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 0.7,
     textTransform: 'uppercase',
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
   pillLabelOn: {
     color: theme.colors.accent,

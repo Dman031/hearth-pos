@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
   primaryButtonLabel: {
     ...theme.typography.body,
     color: theme.colors.onAccent,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
   // Reveal phase
   revealWrap: {

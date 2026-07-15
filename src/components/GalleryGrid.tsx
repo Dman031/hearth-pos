@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
   brokenMark: {
     ...theme.typography.body,
     color: theme.colors.textMuted,
-    fontWeight: '700',
+    fontFamily: theme.fonts.bold,
   },
   removeBadge: {
     position: 'absolute',
@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
   removeMark: {
     color: theme.colors.danger,
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: theme.fonts.bold,
     lineHeight: 18,
   },
 });

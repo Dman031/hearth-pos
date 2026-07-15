@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
   kindText: {
     ...theme.typography.caption,
     color: theme.colors.accent,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
   message: {
     ...theme.typography.body,
@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
   btnPrimaryText: {
     ...theme.typography.body,
     color: theme.colors.onAccent,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
   btnGhost: {
     borderWidth: 1,
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
   btnGhostText: {
     ...theme.typography.body,
     color: theme.colors.textSecondary,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
   btnDisabled: {
     opacity: 0.5,
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
   receiptText: {
     ...theme.typography.bodyMuted,
     color: theme.colors.accent,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
   errorText: {
     ...theme.typography.caption,

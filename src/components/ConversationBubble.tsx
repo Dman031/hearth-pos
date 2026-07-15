@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
   },
   buttonLabel: {
     ...theme.typography.body,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
   buttonLabelHearth: {
     color: theme.colors.accent,

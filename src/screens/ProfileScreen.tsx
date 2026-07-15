@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
   addCardLabel: {
     ...theme.typography.bodyMuted,
     color: theme.colors.accent,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
   cardsEmpty: {
     ...theme.typography.bodyMuted,
@@ -413,7 +413,7 @@ const styles = StyleSheet.create({
   verifyCtaLabel: {
     ...theme.typography.bodyMuted,
     color: theme.colors.accent,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
   verifyHint: {
     ...theme.typography.caption,

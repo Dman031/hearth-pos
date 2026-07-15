@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
   rowName: {
     ...theme.typography.body,
     color: theme.colors.textPrimary,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
     flex: 1,
   },
   unreadDot: {

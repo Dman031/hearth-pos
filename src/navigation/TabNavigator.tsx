@@ -71,7 +71,7 @@ export default function TabNavigator() {
         tabBarInactiveTintColor: theme.colors.textMuted,
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: '600',
+          fontFamily: theme.fonts.semiBold,
         },
         // Labels-only for the shell step; the prototype's icon/pill treatment
         // comes in the design pass.

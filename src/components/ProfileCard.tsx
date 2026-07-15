@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
   outTagText: {
     ...theme.typography.caption,
     color: theme.colors.danger,
-    fontWeight: '700',
+    fontFamily: theme.fonts.bold,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },

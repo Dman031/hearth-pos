@@ -4,6 +4,14 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
+import {
+  useFonts,
+  HankenGrotesk_400Regular,
+  HankenGrotesk_500Medium,
+  HankenGrotesk_600SemiBold,
+  HankenGrotesk_700Bold,
+  HankenGrotesk_700Bold_Italic,
+} from '@expo-google-fonts/hanken-grotesk';
 import HearthOrb from './src/components/HearthOrb';
 import { AuthProvider } from './src/context/AuthContext';
 import { EntityProvider } from './src/context/EntityContext';
@@ -75,6 +83,21 @@ function Root() {
 }
 
 export default function App() {
+  // Hanken Grotesk runs all in-product type (theme.fonts). Per rule B.1 the
+  // fonts must be ready before any text renders — an unknown fontFamily falls
+  // back to system silently — so the splash holds until loading resolves.
+  // fontError is deliberately non-fatal: if loading fails we render with the
+  // system fallback rather than blank the app, and log the error.
+  const [fontsLoaded, fontError] = useFonts({
+    HankenGrotesk_400Regular,
+    HankenGrotesk_500Medium,
+    HankenGrotesk_600SemiBold,
+    HankenGrotesk_700Bold,
+    HankenGrotesk_700Bold_Italic,
+  });
+  if (fontError) {
+    console.error('[fonts] Hanken Grotesk failed to load', fontError);
+  }
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
@@ -83,15 +106,19 @@ export default function App() {
         {/* EntityProvider and VendorProvider read useAuth() — keep nested
             inside AuthProvider. CardProvider reads useEntity() — keep nested
             inside EntityProvider. */}
-        <AuthProvider>
-          <EntityProvider>
-            <VendorProvider>
-              <CardProvider>
-                <Root />
-              </CardProvider>
-            </VendorProvider>
-          </EntityProvider>
-        </AuthProvider>
+        {fontsLoaded || fontError ? (
+          <AuthProvider>
+            <EntityProvider>
+              <VendorProvider>
+                <CardProvider>
+                  <Root />
+                </CardProvider>
+              </VendorProvider>
+            </EntityProvider>
+          </AuthProvider>
+        ) : (
+          <SplashScreen />
+        )}
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

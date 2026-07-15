@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
   headerAction: {
     ...theme.typography.body,
     color: theme.colors.accent,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
   headerActionDone: {
     color: theme.colors.textMuted,

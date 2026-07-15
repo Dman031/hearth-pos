@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
   close: {
     ...theme.typography.body,
     color: theme.colors.accent,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
   page: {
     width: SCREEN_W,

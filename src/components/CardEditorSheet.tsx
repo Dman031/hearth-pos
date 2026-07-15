@@ -810,7 +810,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     ...theme.typography.body,
     color: theme.colors.textPrimary,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
   cancel: {
     ...theme.typography.body,
@@ -819,7 +819,7 @@ const styles = StyleSheet.create({
   save: {
     ...theme.typography.body,
     color: theme.colors.accent,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
   saveDisabled: {
     opacity: 0.4,
@@ -864,7 +864,7 @@ const styles = StyleSheet.create({
   flavorChipLabel: {
     ...theme.typography.bodyMuted,
     color: theme.colors.textSecondary,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
   flavorChipLabelSelected: {
     color: theme.colors.accent,
@@ -904,7 +904,7 @@ const styles = StyleSheet.create({
   mediaButtonLabel: {
     ...theme.typography.bodyMuted,
     color: theme.colors.accent,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
   uploadingRow: {
     flexDirection: 'row',
@@ -918,7 +918,7 @@ const styles = StyleSheet.create({
   removePhoto: {
     ...theme.typography.caption,
     color: theme.colors.danger,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
     alignSelf: 'flex-start',
   },
   mediaInput: {
@@ -964,7 +964,7 @@ const styles = StyleSheet.create({
   galleryRetry: {
     ...theme.typography.bodyMuted,
     color: theme.colors.accent,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
   permsBlock: {
     gap: theme.spacing.lg,
@@ -990,13 +990,13 @@ const styles = StyleSheet.create({
     flex: 1,
     color: theme.colors.textPrimary,
     fontSize: theme.typography.body.fontSize,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
     paddingVertical: theme.spacing.xs,
   },
   removeField: {
     ...theme.typography.caption,
     color: theme.colors.danger,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
   fieldValueInput: {
     color: theme.colors.textSecondary,
@@ -1026,7 +1026,7 @@ const styles = StyleSheet.create({
   checkboxMark: {
     color: theme.colors.accent,
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: theme.fonts.bold,
     lineHeight: 16,
   },
   orderableLabel: {
@@ -1049,7 +1049,7 @@ const styles = StyleSheet.create({
   addFieldLabel: {
     ...theme.typography.bodyMuted,
     color: theme.colors.accent,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
   errorText: {
     ...theme.typography.bodyMuted,

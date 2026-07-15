@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
   name: {
     ...theme.typography.body,
     color: theme.colors.textPrimary,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
   deusId: {
     ...theme.typography.bodyMuted,
@@ -153,6 +153,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 0.7,
     textTransform: 'uppercase',
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
 });

@@ -50,6 +50,8 @@ export const theme = {
     medium: 'HankenGrotesk_500Medium',
     semiBold: 'HankenGrotesk_600SemiBold',
     bold: 'HankenGrotesk_700Bold',
+    // True italic file — Android does not synthesize italics for custom fonts.
+    boldItalic: 'HankenGrotesk_700Bold_Italic',
   },
   borderRadius: {
     card: 12,

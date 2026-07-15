@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
   },
   sendLabel: {
     ...theme.typography.body,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
     color: theme.colors.onAccent,
   },
   sendLabelDisabled: {

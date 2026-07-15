@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
   chipInitial: {
     ...theme.typography.bodyMuted,
     color: theme.colors.accent,
-    fontWeight: '700',
+    fontFamily: theme.fonts.bold,
   },
   backdrop: {
     flex: 1,
@@ -200,6 +200,6 @@ const styles = StyleSheet.create({
   back: {
     ...theme.typography.bodyMuted,
     color: theme.colors.accent,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
 });
