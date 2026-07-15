@@ -29,17 +29,6 @@ export const theme = {
     // Deep wheat — the TEXT-safe wheat (raw #BE9F49 fails contrast on paper).
     // Same value as warning by design; distinct token for distinct semantics.
     accent2Deep: '#A8791F',
-    // HearthOrb gradient palette — see docs/HARVESTONCE_ORB_RECIPE.md.
-    // Deliberately NOT reskinned: orb keep-vs-crest is an open brand decision
-    // (Derrick to confirm); the recipe is design-critical and stays untouched.
-    orb: {
-      warmCore: '#fff8e2',
-      goldMid: '#d2be91',
-      deepGold: '#b89e61',
-      sageEdge: '#7d8471',
-      darkSage: '#595e51',
-      glow: 'rgba(210, 190, 145, 0.05)',
-    },
   },
   // Hanken Grotesk runs ALL in-product type (brand decision: the bespoke Teleo
   // face lives only inside the logo SVGs, never as UI). Weights are distinct

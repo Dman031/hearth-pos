@@ -29,8 +29,10 @@ React Native translation and MUST stay in sync with it.
 - `assets/Teleo.otf` — brand face, kept ONLY for regenerating logo paths.
   Never bundle into the app.
 
-## Known open decision
+## Resolved decisions
 
-- HearthOrb (breathing gold orb): keep as-is vs replace with the Teleoplexy
-  crest — Derrick to confirm. Until then the orb and its recipe
-  (`docs/HARVESTONCE_ORB_RECIPE.md`, `theme.colors.orb`) are untouched.
+- HearthOrb (breathing gold orb): **REMOVED 2026-07-15** (Derrick: Hearth-era
+  leftover). Replaced everywhere by the static crest (`src/components/Crest.tsx`)
+  — one mark across the app, matching the icon. Deliberately static: no
+  breathing animation this pass. The recipe doc
+  (`docs/HARVESTONCE_ORB_RECIPE.md`) is retained as history only.

@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import HearthOrb from '../components/HearthOrb';
+import Crest from '../components/Crest';
 import { APP_NAME } from '../constants/app';
 import useAuth from '../hooks/useAuth';
 import { theme } from '../styles/theme';
@@ -112,7 +112,7 @@ export default function AuthScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.orbZone}>
-            <HearthOrb size={104} />
+            <Crest size={104} />
           </View>
 
           {view === 'welcome' ? (

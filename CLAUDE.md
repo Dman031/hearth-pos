@@ -25,7 +25,7 @@ Paper #E8E6D2 (app background), Surface #FBFAF0 (raised cards, opaque + hairline
 Border radius: 12px cards, 24px inputs
 Type: Hanken Grotesk everywhere (loaded via expo-font, families in `theme.fonts` — set families, never `fontWeight`, or Android fake-bolds). The bespoke Teleo face lives ONLY inside the logo SVGs (`src/constants/brand.ts`), never as a UI font.
 Logo: the TELE⟡PLEXY lockup + crest, inlined SVGs in `src/constants/brand.ts`; app icons derive from the crest signet.
-HearthOrb: 4-layer radial gradient, 4s breathing cycle, canonical RGBA values: outer rgba(125,140,113,0.22), mid rgba(150,160,120,0.35), inner rgba(200,175,120,0.65), core rgba(255,250,235,0.90). OPEN DECISION: keep orb vs replace with crest (Derrick to confirm) — do not touch the recipe meanwhile.
+Brand mark: ONE mark app-wide — the crest sigil (`src/components/Crest.tsx`, static by decision, no breathing animation) on auth/entity-setup/onboarding/splash, the lockup in the header, the crest-derived app icons. HearthOrb was REMOVED 2026-07-15 (Hearth-era leftover; recipe survives in docs/HARVESTONCE_ORB_RECIPE.md for history only — do not resurrect without Derrick).
 
 `docs/deus-prototype.html` is SUPERSEDED for colors/type/brand (it shows the retired dark Deus world). It remains the reference for layout, interaction, and the card model (four tabs, SEE/ACT permission pills, trust-tier identity) until a Field-world prototype replaces it.
 

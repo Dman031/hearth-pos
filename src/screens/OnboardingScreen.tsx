@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ConversationBubble, {
   type ConversationAction,
 } from '../components/ConversationBubble';
-import HearthOrb from '../components/HearthOrb';
+import Crest from '../components/Crest';
 import SignOutButton from '../components/SignOutButton';
 import useCards from '../hooks/useCards';
 import { generateFollowup } from '../services/followup';
@@ -31,7 +31,7 @@ import { theme } from '../styles/theme';
 // by removing classification entirely (see DEFERRED.md).
 //
 // It reuses the existing conversational shell: ConversationBubble (typing dots +
-// streaming), HearthOrb, the input bar, and the no-WIMP action model
+// streaming), the crest mark, the input bar, and the no-WIMP action model
 // (kind: 'input' | 'navigation' only — never a binary decision pair).
 //
 // Editorial voice: spare, lowercase, human-first. Never the word "schema", never
@@ -443,7 +443,7 @@ export default function OnboardingScreen() {
       <SafeAreaView style={styles.safe}>
         <View style={styles.closingWrap}>
           <View style={styles.orbContainer}>
-            <HearthOrb size={140} />
+            <Crest size={140} />
           </View>
           <Text style={styles.closingTitle}>you&apos;re now findable.</Text>
           {firstCardTitle ? (
@@ -465,12 +465,9 @@ export default function OnboardingScreen() {
     <SafeAreaView style={styles.safe}>
       <SignOutButton />
       <View style={styles.orbContainer}>
-        <HearthOrb
-          size={140}
-          listening={
-            phase === 'saving_card' || phase === 'generating_followup'
-          }
-        />
+        {/* Static crest — the orb's `listening` brighten is gone; the saving/
+            generating states still surface via the typing indicator. */}
+        <Crest size={140} />
       </View>
 
       <KeyboardAvoidingView

@@ -12,7 +12,7 @@ import { HankenGrotesk_500Medium } from '@expo-google-fonts/hanken-grotesk/500Me
 import { HankenGrotesk_600SemiBold } from '@expo-google-fonts/hanken-grotesk/600SemiBold';
 import { HankenGrotesk_700Bold } from '@expo-google-fonts/hanken-grotesk/700Bold';
 import { HankenGrotesk_700Bold_Italic } from '@expo-google-fonts/hanken-grotesk/700Bold_Italic';
-import HearthOrb from './src/components/HearthOrb';
+import Crest from './src/components/Crest';
 import { AuthProvider } from './src/context/AuthContext';
 import { EntityProvider } from './src/context/EntityContext';
 import { VendorProvider } from './src/context/VendorContext';
@@ -30,7 +30,7 @@ import { theme } from './src/styles/theme';
 function SplashScreen() {
   return (
     <SafeAreaView style={styles.splash}>
-      <HearthOrb size={120} />
+      <Crest size={120} />
     </SafeAreaView>
   );
 }
