@@ -1,5 +1,5 @@
 import React from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import type { ActPerm, SeePerm } from '../types/card';
 import { theme } from '../styles/theme';
 
@@ -14,10 +14,13 @@ import { theme } from '../styles/theme';
 type Axis = 'see' | 'act';
 type Perm = SeePerm | ActPerm;
 
+// Field-palette tier colors: verified is WHEAT (the brand's highlight/
+// verified accent — deep wheat, the text-safe variant) so it stays distinct
+// from 'anyone' (success = moss-green, near-identical to the moss accent).
 const TIER_COLOR: Record<Perm, string> = {
   off: theme.colors.textMuted,
   contacts: theme.colors.textSecondary,
-  verified: theme.colors.accent,
+  verified: theme.colors.accent2Deep,
   anyone: theme.colors.success,
 };
 
@@ -45,7 +48,7 @@ export default function PermissionPill({ axis, perm }: PermissionPillProps) {
 /** A soft border tint of the tier color (prototype uses ~0.4-alpha borders). */
 function hairlineFor(color: string): string {
   return color === theme.colors.textMuted
-    ? 'rgba(125,132,113,0.35)'
+    ? `${theme.colors.textMuted}59` // 0.35 alpha
     : `${color}66`; // ~0.4 alpha in 8-digit hex
 }
 
@@ -68,9 +71,9 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 11,
-    letterSpacing: 0.5,
-    fontWeight: '600',
-    // Evoke the prototype's mono pill label without shipping a new font.
-    fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }),
+    // Field-guide chip type: Hanken, UPPER, .18em tracking (~2px at 11px).
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    fontFamily: theme.fonts.semiBold,
   },
 });
