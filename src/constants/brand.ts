@@ -1,10 +1,14 @@
-// Teleoplexy brand marks, inlined as SVG XML for react-native-svg's SvgXml
-// (no metro svg-transformer configured — do not import .svg files).
+// Teleoplexy SIGNET-era vector marks (ring/dot sigil), inlined as SVG XML.
+//
+// STATUS (2026-07-15): no longer rendered in-app. The mark hierarchy is now
+// face-orb = hero screens (assets/brand/face-orb-*.png via Crest) and
+// lockup-horizontal.png = header (via Wordmark); the signet survives ONLY at
+// tiny scale — app icon / adaptive icons / favicon (generated from this
+// geometry). Kept here as the icon-generation source of record.
 //
 // Source of truth: docs/brand/assets/ (see docs/brand/README.md). The lockup
 // wordmark is Teleo converted to paths — the Teleo face itself is never
-// loaded as a UI font (brand decision). Colors are baked brand constants,
-// not theme tokens: the mark is the one surface that does NOT re-theme.
+// loaded as a UI font (brand decision).
 
 /** Horizontal lockup — crest + TELE⟡PLEXY wordmark, ink on transparent,
  *  tuned for the paper background. Intrinsic viewBox 426×80. */

@@ -14,6 +14,26 @@ React Native translation and MUST stay in sync with it.
   ("hearth-*" repos, worker URLs, package names, Supabase refs, edge function
   names, code identifiers like `HearthOrb`) is NOT brand and keeps its names.
 
+## Mark hierarchy (Derrick, 2026-07-15)
+
+**face-orb = hero. signet = tiny icon only.** The ring/dot signet reads as a
+bullseye at hero size. In-app marks live in `assets/brand/`:
+
+- `face-orb-ink.png` (804×824) — hero mark, ink linework, for PAPER surfaces
+  (all current heroes: splash, auth, entity setup, onboarding). Rendered by
+  `src/components/Crest.tsx`.
+- `face-orb-light.png` (804×824) — hero mark for DARK surfaces (unused today,
+  shipped for when one exists; `Crest variant="light"`).
+- `lockup-horizontal.png` (924×540) — source lockup (face-orb + TELE⟡PLEXY +
+  tagline). Opaque dark bg with heavy padding — NOT header-legible as-is.
+- `lockup-horizontal-header.png` (680×187) — content-trimmed derivative
+  (sharp trim + matched margins) actually rendered in the shell header, as a
+  rounded dark plaque on paper.
+
+The SVG signet/lockup in `src/constants/brand.ts` no longer render in-app;
+they remain the app-icon generation source (small scale is where the signet
+belongs). DEFERRED(brand-vector): PNGs now; vector/hi-res before Day 30.
+
 ## Assets
 
 - `assets/lockup-teleoplexy-paper.svg` — the in-app header lockup (crest +
