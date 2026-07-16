@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
     color: theme.colors.danger,
   },
   textVendor: {
-    color: theme.colors.background,
+    color: theme.colors.onAccent,
   },
   typingRow: {
     flexDirection: 'row',
@@ -309,20 +309,20 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.accent,
   },
   buttonVendor: {
-    borderColor: theme.colors.background,
+    borderColor: theme.colors.onAccent,
   },
   buttonDanger: {
     borderColor: theme.colors.danger,
   },
   buttonLabel: {
     ...theme.typography.body,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
   buttonLabelHearth: {
     color: theme.colors.accent,
   },
   buttonLabelVendor: {
-    color: theme.colors.background,
+    color: theme.colors.onAccent,
   },
   buttonLabelDanger: {
     color: theme.colors.danger,

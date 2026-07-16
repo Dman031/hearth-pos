@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import HearthOrb from '../components/HearthOrb';
+import Crest from '../components/Crest';
 import { APP_NAME } from '../constants/app';
 import useAuth from '../hooks/useAuth';
 import { theme } from '../styles/theme';
@@ -20,11 +20,10 @@ import { theme } from '../styles/theme';
 type AuthView = 'welcome' | 'form';
 type Mode = 'signin' | 'signup';
 
-// The cold-open's display heading and the "find and reach you" accent come
-// straight from docs/deus-prototype.html (Onboarding step 0). The app loads no
-// custom fonts yet, so the serif display falls back to Georgia/serif — the same
-// face the prototype's own thumbnail uses for the wordmark.
-const SERIF = Platform.select({ ios: 'Georgia', default: 'serif' });
+// The cold-open's display heading and the "find and reach you" accent keep the
+// prototype's structure (Onboarding step 0) restyled to the Field brand:
+// Hanken Grotesk everywhere (the old Deus serif treatment is gone; Teleo
+// lives only in the logo SVGs).
 
 export default function AuthScreen() {
   const { signIn, signUp, signInWithGoogle, signInWithApple } = useAuth();
@@ -113,7 +112,7 @@ export default function AuthScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.orbZone}>
-            <HearthOrb size={104} />
+            <Crest size={104} />
           </View>
 
           {view === 'welcome' ? (
@@ -201,7 +200,7 @@ export default function AuthScreen() {
                   disabled={submitting}
                 >
                   {submitting ? (
-                    <ActivityIndicator color={theme.colors.background} />
+                    <ActivityIndicator color={theme.colors.onAccent} />
                   ) : (
                     <Text style={styles.primaryButtonLabel}>
                       {isSignUp ? 'Create account' : 'Sign in'}
@@ -280,14 +279,13 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   display: {
-    fontFamily: SERIF,
+    fontFamily: theme.fonts.bold,
     fontSize: 34,
     lineHeight: 40,
     color: theme.colors.textPrimary,
   },
   displayAccent: {
-    fontFamily: SERIF,
-    fontStyle: 'italic',
+    fontFamily: theme.fonts.boldItalic,
     color: theme.colors.accent,
   },
   lead: {
@@ -306,7 +304,7 @@ const styles = StyleSheet.create({
   fieldShell: {
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: 'rgba(245, 240, 232, 0.08)',
+    borderColor: theme.colors.hairline,
     borderRadius: 14,
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.lg,
@@ -319,7 +317,7 @@ const styles = StyleSheet.create({
   notice: {
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: 'rgba(212, 165, 116, 0.4)',
+    borderColor: theme.colors.accentBorder,
     borderRadius: 14,
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.md,
@@ -332,14 +330,14 @@ const styles = StyleSheet.create({
   noticeAction: {
     ...theme.typography.bodyMuted,
     color: theme.colors.accent,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
   errorText: {
     ...theme.typography.bodyMuted,
     color: theme.colors.danger,
   },
   primaryButton: {
-    backgroundColor: theme.colors.textPrimary,
+    backgroundColor: theme.colors.accent,
     borderRadius: theme.borderRadius.pill,
     paddingVertical: theme.spacing.lg,
     alignItems: 'center',
@@ -348,12 +346,12 @@ const styles = StyleSheet.create({
   },
   primaryButtonLabel: {
     fontSize: 15,
-    fontWeight: '600',
-    color: '#0a0a0a',
+    fontFamily: theme.fonts.semiBold,
+    color: theme.colors.onAccent,
   },
   ghostButton: {
     borderWidth: 1,
-    borderColor: 'rgba(245, 240, 232, 0.08)',
+    borderColor: theme.colors.hairline,
     borderRadius: theme.borderRadius.pill,
     paddingVertical: theme.spacing.lg,
     alignItems: 'center',
@@ -362,7 +360,7 @@ const styles = StyleSheet.create({
   },
   ghostButtonLabel: {
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
     color: theme.colors.textSecondary,
   },
   toggle: {
@@ -385,7 +383,7 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.hairline,
   },
   dividerLabel: {
     ...theme.typography.bodyMuted,

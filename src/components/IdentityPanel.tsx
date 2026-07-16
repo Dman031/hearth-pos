@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import useAuth from '../hooks/useAuth';
 import useEntity from '../hooks/useEntity';
+import { APP_NAME } from '../constants/app';
 import { theme } from '../styles/theme';
 
 // IdentityPanel — the "My ID" view inside the account menu (Day 17A). Layout
@@ -80,10 +81,10 @@ export default function IdentityPanel() {
               />
             </View>
             <Text style={styles.deusId}>{deusId}</Text>
-            <Text style={styles.deusIdCaption}>Your Deus ID — present this to be found</Text>
+            <Text style={styles.deusIdCaption}>Your {APP_NAME} ID — present this to be found</Text>
           </>
         ) : (
-          <Text style={styles.deusIdCaption}>No Deus ID yet</Text>
+          <Text style={styles.deusIdCaption}>No {APP_NAME} ID yet</Text>
         )}
       </View>
 
@@ -101,8 +102,6 @@ export default function IdentityPanel() {
   );
 }
 
-const ACCENT_BORDER = 'rgba(212,165,116,0.28)';
-const ACCENT_FILL = 'rgba(212,165,116,0.07)';
 
 const styles = StyleSheet.create({
   container: {
@@ -147,11 +146,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   pillOn: {
-    borderColor: ACCENT_BORDER,
-    backgroundColor: ACCENT_FILL,
+    borderColor: theme.colors.accentBorder,
+    backgroundColor: theme.colors.accentFill,
   },
   pillOff: {
-    borderColor: theme.colors.surface,
+    borderColor: theme.colors.hairline,
     backgroundColor: 'transparent',
   },
   pillDot: {
@@ -164,7 +163,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 0.7,
     textTransform: 'uppercase',
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
   pillLabelOn: {
     color: theme.colors.accent,

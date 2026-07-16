@@ -1,0 +1,58 @@
+# Teleoplexy brand — Field (Direction III)
+
+Vendored from the Teleoplexy brand handoff (Claude Design export, 2026-07-14).
+`field-tokens.css` is the canonical token source; `src/styles/theme.ts` is its
+React Native translation and MUST stay in sync with it.
+
+## Decisions baked in (from the handoff + Derrick, 2026-07-14)
+
+- **Field is THE product surface.** Stone/Ember palettes are marketing only.
+- **Light-first, light-only.** Dark is a deferred token flip — no switcher ships.
+- **Hanken Grotesk runs all in-product type.** The bespoke Teleo face lives only
+  inside the logo SVGs (converted to paths) and is never loaded as a UI font.
+- **The app is named Teleoplexy** — user-facing strings only. Infrastructure
+  ("hearth-*" repos, worker URLs, package names, Supabase refs, edge function
+  names, code identifiers like `HearthOrb`) is NOT brand and keeps its names.
+
+## Mark hierarchy (Derrick, 2026-07-15)
+
+**face-orb = hero. signet = tiny icon only.** The ring/dot signet reads as a
+bullseye at hero size. In-app marks live in `assets/brand/`:
+
+- `face-orb-ink.png` (804×824) — hero mark, ink linework, for PAPER surfaces
+  (all current heroes: splash, auth, entity setup, onboarding). Rendered by
+  `src/components/Crest.tsx`.
+- `face-orb-light.png` (804×824) — hero mark for DARK surfaces (unused today,
+  shipped for when one exists; `Crest variant="light"`).
+- `lockup-horizontal.png` (924×540) — source lockup (face-orb + TELE⟡PLEXY +
+  tagline). Opaque dark bg with heavy padding — NOT header-legible as-is.
+- `lockup-horizontal-header.png` (680×187) — content-trimmed derivative
+  (sharp trim + matched margins) actually rendered in the shell header, as a
+  rounded dark plaque on paper.
+
+The SVG signet/lockup in `src/constants/brand.ts` no longer render in-app;
+they remain the app-icon generation source (small scale is where the signet
+belongs). DEFERRED(brand-vector): PNGs now; vector/hi-res before Day 30.
+
+## Assets
+
+- `assets/lockup-teleoplexy-paper.svg` — the in-app header lockup (crest +
+  TELE⟡PLEXY wordmark, signet in place of the O). **Generated, not from the
+  handoff**: the handoff's `lockup-*.svg` wordmarks read "Connect" (the
+  prototype product name), so this file was built from `Teleo.otf` per the
+  brand book's lockup spec (Teleo 400 caps, .26em tracking, ink on paper).
+  Inlined as `LOCKUP_SVG` in `src/constants/brand.ts` — regenerate with a
+  font-to-path pass over Teleo.otf if the mark changes.
+- `assets/crest-{paper,dark}.svg` — standalone crest tile (moss square + signet).
+- `assets/lockup-{paper,dark}.svg` — handoff originals ("Connect" wordmark),
+  kept for geometry reference only. Do not ship.
+- `assets/Teleo.otf` — brand face, kept ONLY for regenerating logo paths.
+  Never bundle into the app.
+
+## Resolved decisions
+
+- HearthOrb (breathing gold orb): **REMOVED 2026-07-15** (Derrick: Hearth-era
+  leftover). Replaced everywhere by the static crest (`src/components/Crest.tsx`)
+  — one mark across the app, matching the icon. Deliberately static: no
+  breathing animation this pass. The recipe doc
+  (`docs/HARVESTONCE_ORB_RECIPE.md`) is retained as history only.

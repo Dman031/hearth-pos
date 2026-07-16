@@ -1,3 +1,5 @@
+> **RETIRED (2026-07-15):** HearthOrb was removed from the product with the Teleoplexy Field reskin — the static crest (`src/components/Crest.tsx`) is the single brand mark. This recipe is kept for history only.
+
 # HarvestOnce Orb Recipe
 
 Reference notes for `src/components/HearthOrb.tsx` — an SVG approximation of the

@@ -1,17 +1,22 @@
 import React from 'react';
-import { Platform, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { Image, StyleSheet, View, type ViewStyle } from 'react-native';
 import { APP_NAME } from '../constants/app';
-import { theme } from '../styles/theme';
 
-// Wordmark — the Deus brand mark for the app shell. "Carved" treatment: the
-// serif wordmark sits slightly recessed into the dark-warm surface via a soft
-// dark text-shadow (engraved look) rather than floating on top. Brand text
-// routes through APP_NAME (single source of truth), never a hardcoded string,
-// so the planned Deus→Flow rename stays a one-line change.
+// Wordmark — the Teleoplexy horizontal lockup (face-orb + TELE⟡PLEXY +
+// tagline) for the shared shell header. The visible brand string is baked
+// into the art, so the accessibility label routes through APP_NAME.
 //
-// Serif matches the AuthScreen brand treatment (Georgia on iOS, serif default).
+// Asset note: assets/brand/lockup-horizontal.png is the source of record but
+// carries an opaque dark background with heavy internal padding; the header
+// renders lockup-horizontal-header.png — the same art content-trimmed (sharp
+// .trim + even margins, background-matched) so the wordmark stays legible at
+// header scale. It reads as a dark brand plaque on the paper header bar.
+// DEFERRED(brand-vector): replace with a transparent vector lockup pre-Day 30.
 
-const SERIF = Platform.select({ ios: 'Georgia', default: 'serif' });
+const LOCKUP = require('../../assets/brand/lockup-horizontal-header.png');
+// Trimmed art is 680×187 — explicit dimensions always.
+const ASPECT = 680 / 187;
+const HEADER_HEIGHT = 36;
 
 interface WordmarkProps {
   /** Optional container override (e.g. extra padding from a nav header). */
@@ -20,10 +25,17 @@ interface WordmarkProps {
 
 export default function Wordmark({ style }: WordmarkProps) {
   return (
-    <View style={[styles.container, style]} accessibilityRole="header">
-      <Text style={styles.mark} allowFontScaling={false}>
-        {APP_NAME}
-      </Text>
+    <View
+      style={[styles.container, style]}
+      accessibilityRole="header"
+      accessibilityLabel={APP_NAME}
+    >
+      <Image
+        source={LOCKUP}
+        style={styles.lockup}
+        resizeMode="contain"
+        accessibilityIgnoresInvertColors
+      />
     </View>
   );
 }
@@ -33,15 +45,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  mark: {
-    fontFamily: SERIF,
-    fontSize: 22,
-    color: theme.colors.textPrimary,
-    letterSpacing: 3,
-    // Carved/engraved: a dark shadow dropped just below the glyphs reads as the
-    // text being pressed into the warm-dark surface.
-    textShadowColor: 'rgba(0, 0, 0, 0.6)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 1,
+  lockup: {
+    width: Math.round(HEADER_HEIGHT * ASPECT),
+    height: HEADER_HEIGHT,
+    borderRadius: 8, // the opaque plaque gets soft corners on the paper bar
   },
 });

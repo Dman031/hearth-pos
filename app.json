@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "hearth-pos",
+    "name": "Teleoplexy",
     "slug": "hearth-pos",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -9,7 +9,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#E8E6D2"
     },
     "ios": {
       "supportsTablet": true,
@@ -17,7 +17,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#556327",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -34,8 +34,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Deus uses your photos so you can add an image to a card people can find you by.",
-          "cameraPermission": "Deus uses your camera so you can take a photo for a card people can find you by.",
+          "photosPermission": "Teleoplexy uses your photos so you can add an image to a card people can find you by.",
+          "cameraPermission": "Teleoplexy uses your camera so you can take a photo for a card people can find you by.",
           "microphonePermission": false
         }
       ],
@@ -45,7 +45,8 @@
           "merchantIdentifier": "merchant.com.hearth.pos",
           "enableGooglePay": false
         }
-      ]
+      ],
+      "expo-font"
     ]
   }
 }

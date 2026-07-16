@@ -83,7 +83,7 @@ Unless the prompt specifically names these. Most of these don't exist on Day 0; 
 
 - Stripe Connect Express integration — `src/services/stripe.ts`
 - Supabase client and auth flow — `src/services/supabase.ts`, `src/hooks/useAuth.ts`
-- HearthOrb component — `src/components/HearthOrb.tsx` (the canonical breathing orb, design-critical)
+- Brand marks — `src/components/Crest.tsx` + `src/constants/brand.ts` (the canonical Teleoplexy crest/lockup SVGs, design-critical; HearthOrb removed 2026-07-15)
 - Template renderer — `src/components/TemplateRenderer.tsx` (changes here affect every business type)
 - Design tokens — `src/styles/theme.ts` (changes affect every screen)
 - Push notification service — `src/services/notifications.ts` (when it exists)

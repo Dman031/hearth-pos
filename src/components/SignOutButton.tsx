@@ -92,6 +92,6 @@ const styles = StyleSheet.create({
   inlineLabel: {
     ...theme.typography.body,
     color: theme.colors.danger,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
 });

@@ -4,7 +4,15 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
-import HearthOrb from './src/components/HearthOrb';
+import { useFonts } from 'expo-font';
+// Per-weight subpath imports — the package index re-exports all 36 weight
+// files and metro would bundle every one of them (~1.3MB of unused fonts).
+import { HankenGrotesk_400Regular } from '@expo-google-fonts/hanken-grotesk/400Regular';
+import { HankenGrotesk_500Medium } from '@expo-google-fonts/hanken-grotesk/500Medium';
+import { HankenGrotesk_600SemiBold } from '@expo-google-fonts/hanken-grotesk/600SemiBold';
+import { HankenGrotesk_700Bold } from '@expo-google-fonts/hanken-grotesk/700Bold';
+import { HankenGrotesk_700Bold_Italic } from '@expo-google-fonts/hanken-grotesk/700Bold_Italic';
+import Crest from './src/components/Crest';
 import { AuthProvider } from './src/context/AuthContext';
 import { EntityProvider } from './src/context/EntityContext';
 import { VendorProvider } from './src/context/VendorContext';
@@ -22,7 +30,7 @@ import { theme } from './src/styles/theme';
 function SplashScreen() {
   return (
     <SafeAreaView style={styles.splash}>
-      <HearthOrb size={120} />
+      <Crest size={120} />
     </SafeAreaView>
   );
 }
@@ -75,22 +83,42 @@ function Root() {
 }
 
 export default function App() {
+  // Hanken Grotesk runs all in-product type (theme.fonts). Per rule B.1 the
+  // fonts must be ready before any text renders — an unknown fontFamily falls
+  // back to system silently — so the splash holds until loading resolves.
+  // fontError is deliberately non-fatal: if loading fails we render with the
+  // system fallback rather than blank the app, and log the error.
+  const [fontsLoaded, fontError] = useFonts({
+    HankenGrotesk_400Regular,
+    HankenGrotesk_500Medium,
+    HankenGrotesk_600SemiBold,
+    HankenGrotesk_700Bold,
+    HankenGrotesk_700Bold_Italic,
+  });
+  if (fontError) {
+    console.error('[fonts] Hanken Grotesk failed to load', fontError);
+  }
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
-        <StatusBar style="light" />
+        {/* Dark glyphs on the light Field paper (field-tokens.css footer note). */}
+        <StatusBar style="dark" />
         {/* EntityProvider and VendorProvider read useAuth() — keep nested
             inside AuthProvider. CardProvider reads useEntity() — keep nested
             inside EntityProvider. */}
-        <AuthProvider>
-          <EntityProvider>
-            <VendorProvider>
-              <CardProvider>
-                <Root />
-              </CardProvider>
-            </VendorProvider>
-          </EntityProvider>
-        </AuthProvider>
+        {fontsLoaded || fontError ? (
+          <AuthProvider>
+            <EntityProvider>
+              <VendorProvider>
+                <CardProvider>
+                  <Root />
+                </CardProvider>
+              </VendorProvider>
+            </EntityProvider>
+          </AuthProvider>
+        ) : (
+          <SplashScreen />
+        )}
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

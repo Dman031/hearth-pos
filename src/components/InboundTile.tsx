@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
   kindText: {
     ...theme.typography.caption,
     color: theme.colors.accent,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
   message: {
     ...theme.typography.body,
@@ -188,8 +188,8 @@ const styles = StyleSheet.create({
   },
   btnPrimaryText: {
     ...theme.typography.body,
-    color: theme.colors.background,
-    fontWeight: '600',
+    color: theme.colors.onAccent,
+    fontFamily: theme.fonts.semiBold,
   },
   btnGhost: {
     borderWidth: 1,
@@ -198,21 +198,21 @@ const styles = StyleSheet.create({
   btnGhostText: {
     ...theme.typography.body,
     color: theme.colors.textSecondary,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
   btnDisabled: {
     opacity: 0.5,
   },
   receiptRow: {
     borderRadius: theme.borderRadius.card,
-    backgroundColor: 'rgba(212, 165, 116, 0.12)', // amber wash — the coral receipt
+    backgroundColor: theme.colors.accentWash, // accent wash — the receipt tint
     paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
   },
   receiptText: {
     ...theme.typography.bodyMuted,
     color: theme.colors.accent,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
   errorText: {
     ...theme.typography.caption,

@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import HearthOrb from '../components/HearthOrb';
+import Crest from '../components/Crest';
 import SignOutButton from '../components/SignOutButton';
 import useAuth from '../hooks/useAuth';
 import useEntity from '../hooks/useEntity';
@@ -74,7 +74,7 @@ export default function EntitySetupScreen() {
       <SafeAreaView style={styles.safe}>
         <View style={styles.revealWrap}>
           <View style={styles.orbWrap}>
-            <HearthOrb size={140} />
+            <Crest size={140} />
           </View>
           <Text style={styles.revealLabel}>This is you</Text>
           <Text style={styles.deusId}>{revealEntity.deus_id}</Text>
@@ -102,7 +102,7 @@ export default function EntitySetupScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.orbWrap}>
-            <HearthOrb size={120} />
+            <Crest size={120} />
           </View>
 
           <Text style={styles.heading}>Let&apos;s set up your profile</Text>
@@ -154,7 +154,7 @@ export default function EntitySetupScreen() {
               disabled={submitting}
             >
               {submitting ? (
-                <ActivityIndicator color={theme.colors.background} />
+                <ActivityIndicator color={theme.colors.onAccent} />
               ) : (
                 <Text style={styles.primaryButtonLabel}>Continue</Text>
               )}
@@ -242,8 +242,8 @@ const styles = StyleSheet.create({
   },
   primaryButtonLabel: {
     ...theme.typography.body,
-    color: theme.colors.background,
-    fontWeight: '600',
+    color: theme.colors.onAccent,
+    fontFamily: theme.fonts.semiBold,
   },
   // Reveal phase
   revealWrap: {

@@ -129,12 +129,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: 'rgba(212,165,116,0.28)',
+    borderColor: theme.colors.accentBorder,
   },
   chipInitial: {
     ...theme.typography.bodyMuted,
     color: theme.colors.accent,
-    fontWeight: '700',
+    fontFamily: theme.fonts.bold,
   },
   backdrop: {
     flex: 1,
@@ -200,6 +200,6 @@ const styles = StyleSheet.create({
   back: {
     ...theme.typography.bodyMuted,
     color: theme.colors.accent,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
 });

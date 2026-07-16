@@ -1,5 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { APP_NAME } from '../constants/app';
 import { theme } from '../styles/theme';
 import useContacts from '../hooks/useContacts';
 import type { Contact } from '../types/contact';
@@ -30,7 +31,7 @@ function ContactRow({ contact }: { contact: Contact }) {
       <View style={styles.rowMain}>
         <Text style={styles.name}>{contactLabel(contact)}</Text>
         {contact.deus_id ? (
-          <Text style={styles.deusId}>Deus ID {contact.deus_id}</Text>
+          <Text style={styles.deusId}>{APP_NAME} ID {contact.deus_id}</Text>
         ) : null}
       </View>
       {isVerified(contact) ? (
@@ -84,8 +85,6 @@ export default function ContactsScreen() {
   );
 }
 
-const ACCENT_BORDER = 'rgba(212,165,116,0.28)';
-const ACCENT_FILL = 'rgba(212,165,116,0.07)';
 
 const styles = StyleSheet.create({
   container: {
@@ -126,7 +125,7 @@ const styles = StyleSheet.create({
   name: {
     ...theme.typography.body,
     color: theme.colors.textPrimary,
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
   deusId: {
     ...theme.typography.bodyMuted,
@@ -140,8 +139,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     borderRadius: theme.borderRadius.pill,
     borderWidth: 1,
-    borderColor: ACCENT_BORDER,
-    backgroundColor: ACCENT_FILL,
+    borderColor: theme.colors.accentBorder,
+    backgroundColor: theme.colors.accentFill,
     marginLeft: theme.spacing.md,
   },
   pillDot: {
@@ -155,6 +154,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 0.7,
     textTransform: 'uppercase',
-    fontWeight: '600',
+    fontFamily: theme.fonts.semiBold,
   },
 });
