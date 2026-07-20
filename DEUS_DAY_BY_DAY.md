@@ -24,9 +24,10 @@ flow, commit locally, then come back to the strategy chat to checkpoint. One cha
 - **Test fixture, live:** entity "Blue Hour Coffee" (deus_id 184203), a presence card + a Menu
   card, cortado `available:false`.
 
-**Where you are:** Days 1–18 complete and merged to main in both repos.
+**Where you are:** Days 1–19 complete and merged to main.
 Phases 1–4 done. Phase 5 open: Step 5.1 (commerce toggle + Connect) shipped and
-verified live 2026-07-13. **Start at Day 19 (Step 5.2 · process_payment).**
+verified live 2026-07-13; Step 5.2 (process_payment) shipped and verified
+2026-07-20. **Start at Day 20 (Step 5.3 · MCP Apps inline payment sheet).**
 
 > Position claims in this file go stale. Verify against the repos before acting on
 > them. Ground truth: live repos → this file → session decisions.
@@ -383,7 +384,7 @@ appear. Commit locally.
 
 ---
 
-# DAY 19 — Step 5.2 · process_payment + imprint
+# DAY 19 — Step 5.2 · process_payment + imprint  ✅ DONE (2026-07-20)
 *Repo: hearth-network.*
 
 ```
@@ -402,48 +403,59 @@ entity's Connect account, transaction + imprint recorded, idempotency prevents d
 Commit locally.
 ```
 
+**Design note (2026-07-20, informs Day 22):** Acceptance is per-inbound, not per-thread.
+One thread carried three reaches — a hike (passed), and a catering order (accepted, paid).
+`thread.state` stays `'open'` while individual inbounds resolve independently. The Day 22
+engagement model must bind an engagement to a specific inbound (order/booking), so one
+conversation can produce multiple independently-tracked engagements. `process_payment`
+already gates on inbound status correctly. (An earlier BUG-009 suspicion was a misread of
+thread-level state — investigated, not a bug; see the Day 19 note in BUGS_AND_SOLUTIONS.md.)
+
 ---
 
-# DAY 20 — Step 5.3 · ACP (inline checkout in ChatGPT)
+# DAY 20 — Step 5.3 · Inline payment sheet (MCP Apps)  [AMENDED 2026-07-20]
 *Repo: hearth-network.*
+
+> **Supersedes "ACP inline checkout in ChatGPT."** Verified 2026-07-20: ACP's in-chat checkout is a gated program (~30 merchants, US-only, retreating after Instant Checkout narrowed); AP2/UCP is Google-stack, retail-SKU oriented, mid-rollout. Both single-host. MCP Apps (SEP-1865, official Jan 26 2026, co-authored Anthropic + OpenAI) renders interactive HTML from MCP tools inline in Claude AND ChatGPT — the open standard ships the original Day 20/21 goal in one day, ungated, on the layer we already ship on. ACP/AP2/UCP demoted to interop targets (see Day 21).
 
 ```
 Read CLAUDE.md first, then this:
 
-You are in hearth-network. Add ACP so payment happens inline inside ChatGPT. ACP sits ON TOP
-of Stripe Connect — it changes where the payment METHOD comes from (a shared token from
-ChatGPT), not the charge logic.
-1. Implement the ACP REST endpoints per OpenAI's open spec (order/checkout completion that
-   receives the shared payment token). (Apply at chatgpt.com/merchants; spec on GitHub.)
-2. Accept the shared payment token as the payment_method in process_payment (the existing
-   PaymentIntent — only the method source changes).
-3. Map the ACP order → a Deus card/booking → imprint.
-Verify: a full inline-checkout round-trip INSIDE ChatGPT — pay without leaving the chat —
-charges through your Connect account. Commit locally.
+You are in hearth-network. Build the inline payment sheet as an MCP App so a
+human can enter their card IN THE CHAT after an order is accepted.
+
+0. INVESTIGATE FIRST (report before build): hello-world MCP App from this
+   worker — does Claude's sandboxed iframe render it, and does its CSP permit
+   loading js.stripe.com (Stripe Payment Element)? This answer forks the design:
+   CSP allows -> inline card fields. CSP blocks -> the sheet renders a branded
+   payment-link/QR instead. Either way the sheet ships.
+1. New tool request_payment(card_id, thread_id): guards identical to
+   process_payment (accepted order inbound, verified seller, price derived from
+   card); creates the PaymentIntent (destination charge + PLATFORM_FEE_BPS) and
+   returns client_secret + _meta.ui.resourceUri.
+2. ui://payment-sheet resource: Field-palette HTML (paper/moss, sigil, amount,
+   vendor, Stripe Payment Element or link per step 0), served by the worker,
+   postMessage handshake per @modelcontextprotocol/ext-apps.
+3. TEXT FALLBACK IS MANDATORY (spec-guaranteed): hosts without MCP Apps (e.g.
+   Grok today) receive a hosted Stripe payment-link URL in the tool text.
+   No dead ends.
+4. Confirmation flows through the EXISTING payments webhook (Day 19 STOP 3) —
+   payment_intent.succeeded flips the transactions row. No new reconciliation path.
+Verify: card entered in-chat in Claude -> charge succeeds -> transactions row
+succeeded -> imprint written; AND the fallback link completes the same payment
+from a host without MCP Apps. Commit locally.
 ```
 
 ---
 
-# DAY 21 — Step 5.4 · AP2 (inline payment in Gemini)
-*Repo: hearth-network.*
+# DAY 21 — Step 5.4 · Protocol interop posture (ACP/AP2/UCP)  [AMENDED 2026-07-20]
+*Repo: none — decision + docs; buffer day.*
 
-```
-Read CLAUDE.md first, then this:
-
-You are in hearth-network. Add AP2 for Gemini. NOTE: Gemini's consumer payment surface is
-still rolling out — confirm it's live when you test; if not, build + unit-test and stage it,
-note it, move on.
-1. Implement AP2 mandate handling: Intent / Cart / Payment mandates (signed).
-2. Map the mandate chain onto the audit_log imprint — it's the SAME
-   observe/suggest/confirm/execute shape you already built. Reuse, don't rebuild.
-3. Feed the AP2-authorized payment into the same Stripe Connect PaymentIntent.
-Verify: an AP2 mandate chain authorizes a payment that charges via Connect; the imprint
-captures the mandate chain. Commit locally.
-```
+> **Supersedes "AP2 inline payment in Gemini."** Not a build day. ACP, AP2, and UCP all bind to MCP; Teleoplexy already ships on MCP. Position: protocol-agnostic payment on the substrate the walled gardens depend on. Integrate a specific protocol only when it becomes a real distribution channel (currently trending Google/UCP, not OpenAI/ACP). Raise-deck line: "Their checkout programs gate merchants; we walked in through the protocol layer both of them co-authored." Use the freed day as Day 20 overflow or pull Day 22 forward.
 
 ---
 
-# DAY 22 — Step 5.5 · Money tab + paywall + branded checkout  ★ PHASE 5 DONE
+# DAY 22 — Step 5.5 · Money tab + engagement model (engagement binds to a specific INBOUND — one thread can carry many engagements, each independently accepted/declined; per the Day 19 design note) + structured accept UI + branded checkout  ★ PHASE 5 DONE
 *Repo: hearth-pos.*
 
 ```
