@@ -27,7 +27,8 @@ flow, commit locally, then come back to the strategy chat to checkpoint. One cha
 **Where you are:** Days 1–19 complete and merged to main.
 Phases 1–4 done. Phase 5 open: Step 5.1 (commerce toggle + Connect) shipped and
 verified live 2026-07-13; Step 5.2 (process_payment) shipped and verified
-2026-07-20. **Start at Day 20 (Step 5.3 · MCP Apps inline payment sheet).**
+2026-07-20. **Start at Day 20 (Step 5.3 · MCP Apps inline payment sheet), then Day 21
+(Step 5.4 · engagement model).**
 
 > Position claims in this file go stale. Verify against the repos before acting on
 > them. Ground truth: live repos → this file → session decisions.
@@ -448,15 +449,150 @@ from a host without MCP Apps. Commit locally.
 
 ---
 
-# DAY 21 — Step 5.4 · Protocol interop posture (ACP/AP2/UCP)  [AMENDED 2026-07-20]
-*Repo: none — decision + docs; buffer day.*
+# DAY 21 — Step 5.4 · Engagement model + structured accept  [AMENDED 2026-07-21]
+*Repos: hearth-network (schema, RPCs, writers) + hearth-pos (accept UI, tab).*
 
-> **Supersedes "AP2 inline payment in Gemini."** Not a build day. ACP, AP2, and UCP all bind to MCP; Teleoplexy already ships on MCP. Position: protocol-agnostic payment on the substrate the walled gardens depend on. Integrate a specific protocol only when it becomes a real distribution channel (currently trending Google/UCP, not OpenAI/ACP). Raise-deck line: "Their checkout programs gate merchants; we walked in through the protocol layer both of them co-authored." Use the freed day as Day 20 overflow or pull Day 22 forward.
+> **Was the ACP/AP2 interop buffer; now the engagement build.** Interop posture
+> retained as a one-line stance: ACP/AP2/UCP all bind to MCP; integrate a
+> specific protocol only when it becomes a real distribution channel. This day
+> builds the commitment layer Day 19 proved missing.
+>
+> **STOP-0 DECISIONS (locked 2026-07-21 — do not re-litigate):**
+> - **Separate `engagements` table** — NOT an extension of inbound. Decisive
+>   reasons: (1) inbound's FKs are all ON DELETE CASCADE — deleting a card would
+>   destroy paid commitments; converting the posture in place breaks the frozen
+>   app contract. (2) An engagement needs an `agreed_price_cents` snapshot taken
+>   at accept time — process_payment charges the card's CURRENT price_cents, so
+>   a vendor price-edit between accept and payment silently diverges from what
+>   was agreed; the knock record has nowhere to hold the snapshot. (3) Keeps
+>   inbound.status single-writer instead of dragging the Stripe webhook into the
+>   consent table. Engagement FKs are ON DELETE SET NULL — the commitment
+>   outlives its referents, mirroring 0016's money-record posture.
+> - **Created inside respond_to_inbound's accept branch**, same transaction,
+>   strictly 1:1 with its inbound (`inbound_id UNIQUE`).
+> - **States:** accepted → paid → fulfilled; cancelled terminal (from accepted;
+>   from paid only via the refund policy below). `scheduled_for` is an
+>   ATTRIBUTE (timestamptz), never a state — payment and scheduling have no
+>   fixed order. Unpriced engagements skip paid (accepted → fulfilled). The
+>   product flow is DEPOSIT-THEN-SCHEDULE.
+> - **Kinds that spawn an engagement on accept: `booking` + `order` only.** A
+>   plain accepted reach is promoted to an engagement later, only when a
+>   schedule is attached — no auto-engagement for every hello.
+> - **transactions gains `engagement_id`** (uuid, references engagements, on
+>   delete set null). Engagement→transactions is 1:N (failed charge + retry;
+>   deposit + balance under capture_method manual). The FK lives on
+>   transactions; never a single transaction_id on the engagement. The
+>   (thread_id, card_id) pair is NOT a sufficient join — threads_pair_unique
+>   means a repeat order reuses the identical tuple.
+> - **Cancellation & refund policy (verbatim):** An engagement requiring a
+>   deposit may be cancelled by either party. Cancelled 14 or more days before
+>   `scheduled_for` → deposit refunded in full (Stripe refund of the original
+>   PaymentIntent, platform fee returned, engagement → cancelled). Cancelled
+>   fewer than 14 days before `scheduled_for`, or with no `scheduled_for` set →
+>   deposit non-refundable; engagement → cancelled, transaction stands.
+>   Engagements without a deposit cancel at any time with no financial effect.
+>   The 14-day boundary is evaluated at the moment the cancel request is
+>   received, in the vendor's timezone.
+> - **`completed_transaction_count`** (the Day-22 paywall feed; today has ZERO
+>   writers) is incremented by the complete_engagement RPC on the fulfilled
+>   transition.
+> - **Vocabulary boundary:** "engagement" is INTERNAL ONLY (schema, MCP tools,
+>   docs). The app never shows it. UI uses the kind noun — Order / Booking /
+>   Plan (a scheduled accepted reach) / Trial (future). Vendor-side status
+>   words: Accepted / Paid / Done / Cancelled. Never "fulfilled" or
+>   "lifecycle" in the app.
+> - **Surface:** the 5th bottom tab is **Engagement** — bottom bar becomes
+>   Profile / Incoming / PlexChat / Engagement. A CALENDAR view lives INSIDE
+>   the Engagement tab, rendering all engagements by scheduled_for. CONTACTS
+>   and MONEY (balance / payouts / earnings / transaction history) both move
+>   OFF the bottom bar into the top-corner cluster alongside Settings and
+>   Sign-out. Money is a corner utility, not a tab.
+> - **The Josh fix:** the structured Accept/Decline must ALSO appear as a
+>   pinned, kind-aware banner INSIDE PlexChat on the relevant thread ("Accept
+>   order — $12.50"), not only as a tile in Incoming. The Day-19 failure mode
+>   was the accept control sitting in a different tab from where the vendor was
+>   looking, so he answered in prose.
+
+```
+Read CLAUDE.md first, then this. Build the engagement model. Rooted in
+hearth-network; hearth-pos sibling at ../hearth-pos. Branch: engagements.
+Build in stops; each stop ends with a report and Derrick's approval. Nothing
+to main unverified. Derrick applies migrations, deploys, and pushes by hand.
+
+STOP 1 — MIGRATION 0017 (file only; Derrick hand-applies).
+  ls migrations/ first; confirm 0017 is next. House style + apply-once note
+  per 0016. Contents:
+  - engagements table: id uuid pk; inbound_id uuid UNIQUE references
+    inbound(id) on delete set null; kind; buyer_entity_id / seller_entity_id /
+    card_id / thread_id (all uuid, on delete set null — snapshot posture);
+    agreed_price_cents integer null (null = unpriced, never a placeholder);
+    currency text default 'usd'; status engagement_status not null default
+    'accepted'; scheduled_for timestamptz null; fulfilled_at timestamptz null;
+    cancelled_at timestamptz null; created_at / updated_at.
+  - create type engagement_status as enum ('accepted','paid','fulfilled',
+    'cancelled').
+  - RLS: on; service-role backstop; vendor-side select policy so the pos
+    Engagement tab can read own rows (either participant).
+  - alter table transactions add column engagement_id uuid references
+    engagements(id) on delete set null.
+  - respond_to_inbound v3: accept branch, for kind IN ('booking','order'),
+    inserts the engagement in the same transaction — snapshotting the card's
+    current price_cents into agreed_price_cents at that moment.
+  - Backfill: insert engagements for already-accepted booking/order inbounds
+    (test-era rows, including c2ef5c08). Idempotent (on conflict inbound_id
+    do nothing).
+  Show the file. STOP. Derrick ls's, verifies, applies in the SQL editor,
+  confirms applied.
+
+STOP 2 — NETWORK WRITERS (hearth-network).
+  - process_payment: it already resolves the exact accepted inbound row;
+    resolve inbound→engagement (unique inbound_id) and stamp engagement_id on
+    the transactions insert.
+  - Payments webhook: extract one canonical markEngagementPaid(stripe_pi) that
+    walks pi → transactions.engagement_id → engagement, advances accepted→paid.
+    Never regress a terminal state (copy the discipline already in
+    stripe-webhook.ts for transactions).
+  - complete_engagement SECURITY DEFINER RPC: owner check (seller), sets
+    fulfilled + fulfilled_at, increments completed_transaction_count.
+  - cancel_engagement SECURITY DEFINER RPC: either participant. Enforces the
+    refund policy: if agreed_price_cents is null → cancel free. Else if
+    scheduled_for is set AND now() <= scheduled_for - interval '14 days' →
+    full Stripe refund of the successful transaction (+ fee return) then
+    cancelled; else cancelled with no refund. cancelled_at stamped.
+  - Audit imprint on every transition. tsc clean. Show diffs. STOP.
+  Derrick deploys.
+
+STOP 3 — POS ACCEPT UI (the Josh fix).
+  - InboundTile goes kind-aware: for booking/order fetch the card via
+    inbound.card_id, show title + price_cents + terms; accept button reads
+    "Accept order — $X" / "Accept booking — $X" (or no price when unpriced).
+    Same respond_to_inbound RPC; pass explicit p_inbound_ids.
+  - PlexChatScreen: pinned banner above the composer for pending inbounds on
+    this thread addressed to me — kind-aware accept/decline in the
+    conversation itself. After accept, the same slot shows the status chip
+    (Accepted → Paid → Done).
+  Bundle rebuild. Show diffs. STOP. Derrick device-verifies.
+
+STOP 4 — POS ENGAGEMENT TAB + RELOCATIONS.
+  - Bottom bar: replace Contacts with Engagement (Profile / Incoming /
+    PlexChat / Engagement). Badge = engagements needing action.
+  - Engagement tab: list view (Upcoming / Past filters; kind nouns Order /
+    Booking / Plan; status chips Accepted / Paid / Done / Cancelled; schedule
+    line when scheduled_for set; amount when priced, "No charge" when not)
+    PLUS an in-tab Calendar view rendering all engagements by scheduled_for.
+  - Top-corner cluster (with Settings + Sign-out): add Contacts AND a Money
+    surface (available balance, pay out, earnings summary, transaction
+    history — each line tracing to its engagement).
+  Field palette throughout; reuse existing card/list styling. Bundle rebuild.
+  Show diffs. STOP. Derrick device-verifies, then merges and pushes.
+```
 
 ---
 
-# DAY 22 — Step 5.5 · Money tab + engagement model (engagement binds to a specific INBOUND — one thread can carry many engagements, each independently accepted/declined; per the Day 19 design note) + structured accept UI + branded checkout  ★ PHASE 5 DONE
+# DAY 22 — Step 5.5 · Money surface + paywall + branded checkout  ★ PHASE 5 DONE
 *Repo: hearth-pos.*
+
+The engagement model landed Day 21; this day ships the funds surface (top-corner Money: balance / payouts / earnings / history), the transaction-10 → $50/mo paywall — now actually fed by completed_transaction_count via the fulfilled transition — and branded checkout polish.
 
 ```
 Read CLAUDE.md first, then this:
