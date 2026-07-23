@@ -414,38 +414,48 @@ thread-level state — investigated, not a bug; see the Day 19 note in BUGS_AND_
 
 ---
 
-# DAY 20 — Step 5.3 · Inline payment sheet (MCP Apps)  [AMENDED 2026-07-20]
-*Repo: hearth-network.*
+# DAY 20 — Step 5.3 · Inline payment sheet (MCP Apps)  ✅ SHIPPED [CLOSED 2026-07-22]
+*Repo: hearth-network. Branch: day20-payment-sheet.*
 
-> **Supersedes "ACP inline checkout in ChatGPT."** Verified 2026-07-20: ACP's in-chat checkout is a gated program (~30 merchants, US-only, retreating after Instant Checkout narrowed); AP2/UCP is Google-stack, retail-SKU oriented, mid-rollout. Both single-host. MCP Apps (SEP-1865, official Jan 26 2026, co-authored Anthropic + OpenAI) renders interactive HTML from MCP tools inline in Claude AND ChatGPT — the open standard ships the original Day 20/21 goal in one day, ungated, on the layer we already ship on. ACP/AP2/UCP demoted to interop targets (see Day 21).
-
-```
-Read CLAUDE.md first, then this:
-
-You are in hearth-network. Build the inline payment sheet as an MCP App so a
-human can enter their card IN THE CHAT after an order is accepted.
-
-0. INVESTIGATE FIRST (report before build): hello-world MCP App from this
-   worker — does Claude's sandboxed iframe render it, and does its CSP permit
-   loading js.stripe.com (Stripe Payment Element)? This answer forks the design:
-   CSP allows -> inline card fields. CSP blocks -> the sheet renders a branded
-   payment-link/QR instead. Either way the sheet ships.
-1. New tool request_payment(card_id, thread_id): guards identical to
-   process_payment (accepted order inbound, verified seller, price derived from
-   card); creates the PaymentIntent (destination charge + PLATFORM_FEE_BPS) and
-   returns client_secret + _meta.ui.resourceUri.
-2. ui://payment-sheet resource: Field-palette HTML (paper/moss, sigil, amount,
-   vendor, Stripe Payment Element or link per step 0), served by the worker,
-   postMessage handshake per @modelcontextprotocol/ext-apps.
-3. TEXT FALLBACK IS MANDATORY (spec-guaranteed): hosts without MCP Apps (e.g.
-   Grok today) receive a hosted Stripe payment-link URL in the tool text.
-   No dead ends.
-4. Confirmation flows through the EXISTING payments webhook (Day 19 STOP 3) —
-   payment_intent.succeeded flips the transactions row. No new reconciliation path.
-Verify: card entered in-chat in Claude -> charge succeeds -> transactions row
-succeeded -> imprint written; AND the fallback link completes the same payment
-from a host without MCP Apps. Commit locally.
-```
+> **What shipped (not what was planned — the plan forked twice on evidence):**
+>
+> **Fork verdict: BLOCKED.** Probe on Claude Desktop 2026-07-21 — script
+> js.stripe.com LOADED, fetch api.stripe.com PERMITTED (HTTP 401), element
+> mount BLOCKED, three securitypolicyviolation events reading
+> `frame-src ← js.stripe.com`. Claude honors resourceDomains and
+> connectDomains, NOT frameDomains. Payment Element cannot render in the
+> sandbox; the sheet ships as LINK + QR.
+>
+> **Mechanism A replaced "hosted Stripe payment link."** No Stripe-hosted
+> surface (Payment Link / Checkout Session) can attach to a pre-created
+> PaymentIntent — since API 2022-08-01 their intent exists only after
+> checkout completes — so the webhook's `stripe_payment_intent_id` match
+> could not be satisfied. Shipped shape: intent-first (unconfirmed
+> PaymentIntent at request time, ledger row written immediately) + a
+> worker-served checkout page at `GET /pay/:transaction_id`.
+>
+> **Shipped:** `request_payment` (Day 19 guards reused verbatim via
+> `payment-guards.ts`); the public `/pay` page with Stripe Payment Element
+> (card data browser→Stripe, worker holds only intent id + client_secret);
+> `ui://deus/payment-sheet.html` (link + QR, vendored qrcodegen MIT,
+> ZERO external CSP domains); `_meta.ui.resourceUri` on request_payment;
+> `structuredContent` on the tool result; an authorized additive 'execute'
+> imprint in stripe-webhook.ts (payment_intent.succeeded branch only,
+> non-fatal, fed by the existing row lookup); probe teardown; and a
+> tool-description overhaul for agent legibility (buyer-voiced payment
+> tools, thread_id provenance, grounding-source statements; rename
+> request_payment→start_checkout DEFERRED with trigger — see DEFERRED.md).
+>
+> **Live verification:** request_payment fired on Grok and Claude; the same
+> idempotency key returned an identical link and a single ledger row across
+> both hosts; a human paid on /pay; the untouched webhook reconciled to
+> succeeded in under a second; all three guard denials rejected before any
+> Stripe call. Provenance ladder verified end to end on transaction
+> 83fc28b8 — suggest 03:26:32 (requires_payment_method) → execute 03:27:23
+> (succeeded), same intent, detail.tool 'request_payment' on both.
+>
+> **Commit chain:** fbe9828 → 63b7fcb → 5dbb2be → ea02c0a → 95e3048 →
+> fc5ffe0 → a9bf478 → 42b58ac → b366dc1.
 
 ---
 
@@ -512,6 +522,22 @@ from a host without MCP Apps. Commit locally.
 >   order — $12.50"), not only as a tile in Incoming. The Day-19 failure mode
 >   was the accept control sitting in a different tab from where the vendor was
 >   looking, so he answered in prose.
+>
+> **DAY 20 CLOSE-OUT EVIDENCE (2026-07-22) — what forces this day's scope:**
+> - **Structured accept.** Thread 621e521a contains "I accept what's the
+>   order" — an acceptance with no order in it. The payment guard passed on a
+>   contentless acceptance. Acceptance must name what was accepted, quantity,
+>   and total.
+> - **Cold-start enumeration (PRIORITY).** An authenticated agent cannot list
+>   its threads, pending inbounds, or accepted-unpaid orders without already
+>   holding a thread_id. Verified 2026-07-21: the agent asked the user for
+>   the reference and could not proceed. Descriptions cannot fix this; it
+>   needs a read tool.
+> - **Multi-item card pricing.** Cards carry one price_cents; Blue Hour's
+>   Menu lists four priced items and is unpayable.
+> - **Open question: seller-initiated payment does not exist** (caller is
+>   always buyer, seller derives from the card). A seller billing a buyer
+>   after accepting is arguably the more natural commerce flow.
 
 ```
 Read CLAUDE.md first, then this. Build the engagement model. Rooted in
