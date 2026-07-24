@@ -462,6 +462,10 @@ thread-level state — investigated, not a bug; see the Day 19 note in BUGS_AND_
 # DAY 21 — Step 5.4 · Engagement model + structured accept  [AMENDED 2026-07-21]
 *Repos: hearth-network (schema, RPCs, writers) + hearth-pos (accept UI, tab).*
 
+> **STOP numbering amended 2026-07-23** — catch_me_up inserted at 3, POS stops
+> shifted to 4/5. Any prompt citing "roadmap STOP 3" before this date means the
+> POS accept UI.
+
 > **Was the ACP/AP2 interop buffer; now the engagement build.** Interop posture
 > retained as a one-line stance: ACP/AP2/UCP all bind to MCP; integrate a
 > specific protocol only when it becomes a real distribution channel. This day
@@ -539,13 +543,86 @@ thread-level state — investigated, not a bug; see the Day 19 note in BUGS_AND_
 >   always buyer, seller derives from the card). A seller billing a buyer
 >   after accepting is arguably the more natural commerce flow.
 
+> **STEP 0 RULINGS (locked 2026-07-23 — do not re-litigate):**
+> - **(a) ENUMERATION TOOL — name `catch_me_up`**, not get_my_threads: the
+>   tool exists because agents failed to navigate to state, so its name is the
+>   phrase users say. Description in the Day 20 legibility voice, opening
+>   "YOU, the caller, ask this for your own current state on the network",
+>   listing trigger phrases: 'catch me up', 'what's waiting for me', 'my
+>   threads', 'my orders', 'did they accept', 'pick up where I left off'.
+>   Ships at STOP 3, AFTER 0017, so the engagement field is in v1 rather than
+>   a retrofit. Identity-only: no required args, optional limit (default 50,
+>   clamped per get_messages). Anonymous token errors per resolve_contact
+>   precedent. readOnlyHint.
+>
+>   Return shape, ordered by last_message_at desc:
+>   ```
+>   { count, threads: [{ thread_id, state, established, last_message_at,
+>     peer: { entity_id, display_name, deus_id, entity_type },
+>     pending_inbounds: [ ... ],    -- ARRAY, not a single newest
+>     engagements:     [ ... ] }] } -- ARRAY, not a single row
+>   ```
+>
+>   ARRAYS ARE LOAD-BEARING. The Day 19 design note in this file is locked:
+>   acceptance is per-inbound, not per-thread; one live thread carried three
+>   reaches (hike passed, catering accepted and paid) and one conversation can
+>   produce multiple independently-tracked engagements. A singular "newest
+>   pending" under-reports exactly that thread.
+>
+>   PER-ITEM HANDLE. Each pending inbound carries a stable handle so an agent
+>   can accept a NAMED item. Today respond_thread resolves the target
+>   internally as newest-pending-wins (respond-thread.ts:85-137), which is
+>   what produced "I accept what's the order" on thread 621e521a. Under 0017
+>   that heuristic now picks which engagement gets created and which price is
+>   snapshotted — on a multi-reach thread an agent can accept the hike and get
+>   an engagement for the catering, and the re-anchored guard 3 passes cleanly
+>   because an accepted engagement with a non-null agreed_price_cents exists.
+>   The guard hardens against contentless accepts, not mis-targeted ones. POS
+>   already passes explicit p_inbound_ids; the agent surface must be able to
+>   do the same.
+>
+>   THREAD-KEYING CAVEAT (STEP 0 query, answered 2026-07-23): every inbound
+>   row is born with a non-null thread_id — the single insert site
+>   (reach-entity.ts:253) runs after locateOrCreateThread and no migration RPC
+>   inserts inbound rows. But inbound.thread_id is ON DELETE SET NULL
+>   (0001:51), so a pending inbound CAN be orphaned by a thread deletion —
+>   schema-possible, code-impossible today (nothing deletes threads).
+>   catch_me_up may key on threads; it must not assume thread_id is non-null
+>   forever.
+>
+>   CONSENT STANDARD (keep this sentence in a code comment at the handler):
+>   enumeration shows the caller what its own app already shows it — nothing
+>   pre-consent. A thread exists only because a reach already passed the
+>   directional contacts gate; a pending inbound is already rendered to this
+>   same entity in Incoming. Service-role client, participant gate in the
+>   query layer (participant_a = me OR participant_b = me), same model
+>   get_status/get_messages use. No RLS change, no definer RPC, no migration.
+>
+>   MUST NOT LEAK: non-participant threads (filter in the query, never
+>   post-hoc); peer fields beyond the public five (never email, phone,
+>   user_id); read_at; message bodies other than the pending inbound's own
+>   knock text (this is an index, get_messages is the transcript); anything in
+>   the forbidden financial set; and no entity discoverable through it that
+>   the contacts gate protects.
+> - **(b) GUARD 3 RE-ANCHOR** — resolve inbound → engagement (inbound_id is
+>   unique), require engagement.status = 'accepted' AND agreed_price_cents IS
+>   NOT NULL, validate the amount echo against engagement.agreed_price_cents —
+>   the snapshot, never the card's live price. Guard 2 keeps card-exists /
+>   commerce_enabled / no-self-pay and LOSES amount authority. Both payment
+>   tools' amount_cents descriptions name the snapshot as authority, same
+>   commit. Unpriced engagements remain unpayable by this path — correct, not
+>   a gap.
+> - **(c) SELLER-INITIATED PAYMENT** — consciously deferred. See DEFERRED.md.
+
 ```
 Read CLAUDE.md first, then this. Build the engagement model. Rooted in
 hearth-network; hearth-pos sibling at ../hearth-pos. Branch: engagements.
 Build in stops; each stop ends with a report and Derrick's approval. Nothing
 to main unverified. Derrick applies migrations, deploys, and pushes by hand.
 
-STOP 1 — MIGRATION 0017 (file only; Derrick hand-applies).
+STOP 1 — MIGRATION 0017  ✅ APPLIED 2026-07-23 (afeb490; backfill 2,
+  priced 1 — the unpriced row is Blue Hour's multi-item Menu card,
+  price_cents null, the known Day 20 finding, not a data error).
   ls migrations/ first; confirm 0017 is next. House style + apply-once note
   per 0016. Contents:
   - engagements table: id uuid pk; inbound_id uuid UNIQUE references
@@ -570,14 +647,27 @@ STOP 1 — MIGRATION 0017 (file only; Derrick hand-applies).
   Show the file. STOP. Derrick ls's, verifies, applies in the SQL editor,
   confirms applied.
 
-STOP 2 — NETWORK WRITERS (hearth-network).
+STOP 2a — NETWORK WRITERS, TS ONLY (hearth-network). No migration.
+  Deployable and verifiable on its own.
+  - Guard re-anchor per STEP 0 ruling (b): guard 3 resolves inbound →
+    engagement (unique inbound_id), requires status 'accepted' AND
+    agreed_price_cents IS NOT NULL, validates the amount echo against the
+    snapshot. Guard 2 keeps card-exists / commerce_enabled / no-self-pay,
+    loses amount authority.
+  - engagement_id threaded through the ledger (TransactionRow /
+    TRANSACTION_SELECT / insertTransactionRow).
   - process_payment: it already resolves the exact accepted inbound row;
     resolve inbound→engagement (unique inbound_id) and stamp engagement_id on
-    the transactions insert.
+    the transactions insert. request_payment stamps identically.
   - Payments webhook: extract one canonical markEngagementPaid(stripe_pi) that
     walks pi → transactions.engagement_id → engagement, advances accepted→paid.
     Never regress a terminal state (copy the discipline already in
     stripe-webhook.ts for transactions).
+  - Both tools' amount_cents manifest descriptions → snapshot authority,
+    same commit.
+  tsc clean. Show diffs. STOP. Derrick deploys.
+
+STOP 2b — MIGRATION 0018 (file only; Derrick hand-applies).
   - complete_engagement SECURITY DEFINER RPC: owner check (seller), sets
     fulfilled + fulfilled_at, increments completed_transaction_count.
   - cancel_engagement SECURITY DEFINER RPC: either participant. Enforces the
@@ -585,10 +675,17 @@ STOP 2 — NETWORK WRITERS (hearth-network).
     scheduled_for is set AND now() <= scheduled_for - interval '14 days' →
     full Stripe refund of the successful transaction (+ fee return) then
     cancelled; else cancelled with no refund. cancelled_at stamped.
-  - Audit imprint on every transition. tsc clean. Show diffs. STOP.
-  Derrick deploys.
+  - Audit imprint on every transition. (See STOP 2 RULINGS below for refund
+    execution, timezone, counter-skip, currency.)
+  Show the file. STOP. Derrick applies in the SQL editor, confirms.
 
-STOP 3 — POS ACCEPT UI (the Josh fix).
+STOP 3 — catch_me_up (the cold-start fix). WAS the POS accept UI.
+  STEP 0 ruling (a) above is the spec: identity-only read tool returning
+  threads + pending_inbounds[] + engagements[] for the token-bound entity.
+  Ships AFTER 0017 so the engagement field is in v1. tsc clean. Show diffs.
+  STOP. Derrick deploys and re-auths a host (hosts cache tools/list).
+
+STOP 4 — POS ACCEPT UI (the Josh fix). Was STOP 3.
   - InboundTile goes kind-aware: for booking/order fetch the card via
     inbound.card_id, show title + price_cents + terms; accept button reads
     "Accept order — $X" / "Accept booking — $X" (or no price when unpriced).
@@ -599,7 +696,7 @@ STOP 3 — POS ACCEPT UI (the Josh fix).
     (Accepted → Paid → Done).
   Bundle rebuild. Show diffs. STOP. Derrick device-verifies.
 
-STOP 4 — POS ENGAGEMENT TAB + RELOCATIONS.
+STOP 5 — POS ENGAGEMENT TAB + RELOCATIONS. Was STOP 4.
   - Bottom bar: replace Contacts with Engagement (Profile / Incoming /
     PlexChat / Engagement). Badge = engagements needing action.
   - Engagement tab: list view (Upcoming / Past filters; kind nouns Order /
@@ -612,6 +709,45 @@ STOP 4 — POS ENGAGEMENT TAB + RELOCATIONS.
   Field palette throughout; reuse existing card/list styling. Bundle rebuild.
   Show diffs. STOP. Derrick device-verifies, then merges and pushes.
 ```
+
+> **STOP 2 RULINGS (locked 2026-07-23 — apply to STOP 2a/2b above):**
+> 1. **REFUND EXECUTION.** plpgsql cannot call Stripe. cancel_engagement
+>    finalizes free-cancel paths itself; on the refund-due path it makes NO
+>    state change and returns `{ refund_due: true, transaction_id,
+>    stripe_payment_intent_id }`. The webhook gains charge.refunded handling
+>    that marks the transaction refunded and finalizes the engagement to
+>    cancelled. Refund initiation on Day 21 is the Stripe dashboard by hand.
+>    REQUIRED: the refund-due return writes an AUDIT IMPRINT, so a cancel
+>    request that never gets refunded is not invisible. Do not add an enum
+>    state — the status enum is locked by STOP-0.
+> 2. **TIMEZONE.** No timezone column exists in either repo. The 14-day
+>    boundary evaluates in UTC as interim. DEFERRED entry names the column's
+>    future home as entities, NOT vendor_profiles — engagements carry
+>    seller_entity_id, and hanging it on vendor_profiles makes every boundary
+>    evaluation a three-hop cross-repo join.
+> 3. **WEBHOOK ORDERING.** markEngagementPaid MUST run on the already-applied
+>    path. DO NOT RESTRUCTURE the early return. stripe-webhook.ts is CLOSED
+>    and was touched inside 24h. Insert the call ABOVE the short-circuit,
+>    between the transaction lookup and the already-applied check at 147-149.
+>    It is idempotent and only advances from 'accepted', it keys off the
+>    payment_intent.succeeded event rather than the transaction row's status,
+>    so it does not need the update at 167 to have happened. The existing
+>    transaction writer's control flow stays byte-identical; the diff is one
+>    insertion. Show before/after of that block specifically.
+> 4. **COUNTER SKIP.** Missing vendor_profiles row for the seller: skip
+>    without failing the fulfill — but record an AUDIT IMPRINT, not a RAISE
+>    NOTICE. Day 22's paywall is fed entirely by completed_transaction_count;
+>    a silent no-increment means the paywall never fires and it surfaces a
+>    month late. ALSO REPORT at the STOP 2b gate: a count of sellers with
+>    engagements who have no vendor_profiles row. If nonzero today, the
+>    counter's location is a Day 22 prerequisite, not a footnote.
+> 5. **CURRENCY.** Charge currency from engagement.currency (snapshot), not
+>    live card.price_currency. Consistent with the posture.
+>
+> **BACKFILL CAVEAT (recorded here, it is easy to lose):** 0017's backfill
+> snapshots each card's CURRENT price_cents, which is not the price that was
+> agreed at accept time. Those values are reconstructed, not agreed, and are
+> test-era rows only. Do not later treat them as evidence.
 
 ---
 

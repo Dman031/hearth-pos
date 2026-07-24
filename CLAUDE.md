@@ -29,6 +29,23 @@ Brand mark hierarchy (Derrick, 2026-07-15): **face-orb = hero, signet = tiny ico
 
 `docs/deus-prototype.html` is SUPERSEDED for colors/type/brand (it shows the retired dark Deus world). It remains the reference for layout, interaction, and the card model (four tabs, SEE/ACT permission pills, trust-tier identity) until a Field-world prototype replaces it.
 
+## Canon hierarchy (locked 2026-07-23)
+
+1. Ground truth for what EXISTS: code + applied migrations.
+2. Canon for PLAN, SCOPE, and DECISIONS: DEUS_DAY_BY_DAY.md. Locked blocks are locked.
+3. SESSION_STATE.md is a bookmark, never a decision-carrier. If it disagrees with the
+   roadmap on scope, the roadmap wins and SESSION_STATE is the bug.
+4. DEFERRED.md is the cut ledger. Entries move to Done when built. A fired trigger gets
+   a home or a new trigger — never left fired.
+5. BUGS_AND_SOLUTIONS.md stays canonical for bugs (unchanged).
+
+Process rules:
+
+- A RULING IS NOT A RULING UNTIL IT IS IN THE ROADMAP. Decisions made in strategy chat
+  are written into the Day N block BEFORE the build prompt is issued.
+- A QUEUED ITEM YOU CANNOT COMPLETE IS REPORTED BLOCKED, NEVER SILENTLY DROPPED.
+  Flag-and-proceed is not stop-and-report.
+
 ## Critical rules
 - NEVER expose MCP/protocol terminology to the vendor
 - NEVER show features the template has disabled
