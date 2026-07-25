@@ -515,6 +515,12 @@ thread-level state — investigated, not a bug; see the Day 19 note in BUGS_AND_
 >   Plan (a scheduled accepted reach) / Trial (future). Vendor-side status
 >   words: Accepted / Paid / Done / Cancelled. Never "fulfilled" or
 >   "lifecycle" in the app.
+>   [AMENDED 2026-07-24 — STOP 5 vocabulary ruling] The tab is called
+>   **Engagement**; "engagement" is the product noun and may appear in UI
+>   strings. The internal-only rule NARROWS to MCP/protocol language —
+>   inbound, thread_id, RPC, kind, entity_id — which never appear in
+>   anything a user reads. Status words unchanged: Accepted / Paid / Done /
+>   Cancelled; never "fulfilled" in the app.
 > - **Surface:** the 5th bottom tab is **Engagement** — bottom bar becomes
 >   Profile / Incoming / PlexChat / Engagement. A CALENDAR view lives INSIDE
 >   the Engagement tab, rendering all engagements by scheduled_for. CONTACTS
