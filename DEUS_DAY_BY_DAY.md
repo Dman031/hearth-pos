@@ -558,10 +558,24 @@ thread-level state — investigated, not a bug; see the Day 19 note in BUGS_AND_
 >   Return shape, ordered by last_message_at desc:
 >   ```
 >   { count, threads: [{ thread_id, state, established, last_message_at,
->     peer: { entity_id, display_name, deus_id, entity_type },
+>     peer: { entity_id, display_name, deus_id, entity_type,
+>             id_verified, business_verified, credential_verified },
 >     pending_inbounds: [ ... ],    -- ARRAY, not a single newest
 >     engagements:     [ ... ] }] } -- ARRAY, not a single row
 >   ```
+>
+>   [AMENDED 2026-07-24] Peer block widened from four fields to seven.
+>   Verification flags are already public via ENTITY_PUBLIC_SELECT and
+>   get_card_details; withholding them left an agent deciding whether
+>   to surface a stranger's knock on a display name alone. No new leak
+>   surface — these are the remaining columns of an allow-list this
+>   tool already reads.
+>
+>   [AMENDED 2026-07-24] pending_inbounds direction: addressed-to-me only
+>   (to_entity_id = caller, status = 'pending'); the caller's own
+>   sent-and-still-pending reaches appear as bare threads. Rationale: this
+>   is what Incoming shows, and the consent standard is that enumeration
+>   shows the caller what its own app already shows it.
 >
 >   ARRAYS ARE LOAD-BEARING. The Day 19 design note in this file is locked:
 >   acceptance is per-inbound, not per-thread; one live thread carried three
