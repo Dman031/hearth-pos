@@ -51,6 +51,18 @@ export function formatAcceptLabel(
   return `Accept ${noun} — ${formatCents(priceCents, currency)}`;
 }
 
+/**
+ * Engagement rows show the COMMITMENT noun (Day 21 STOP-0): a promoted
+ * scheduled reach is a "Plan", not a "Reach". ('message' cannot mint an
+ * engagement; mapped for exhaustiveness only.)
+ */
+export const ENGAGEMENT_KIND_LABEL: Record<InboundKind, string> = {
+  reach: 'Plan',
+  booking: 'Booking',
+  order: 'Order',
+  message: 'Message',
+};
+
 /** Vendor-side status words (Day 21 STOP-0): never "fulfilled" in the app. */
 export const STATUS_LABEL: Record<EngagementStatus, string> = {
   accepted: 'Accepted',

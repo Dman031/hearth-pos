@@ -5,19 +5,23 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import ProfileScreen from '../screens/ProfileScreen';
 import IncomingScreen from '../screens/IncomingScreen';
 import PlexChatStack from './PlexChatStack';
-import ContactsScreen from '../screens/ContactsScreen';
+import EngagementScreen from '../screens/EngagementScreen';
 import Wordmark from '../components/Wordmark';
 import AccountChip from '../components/AccountChip';
 import useInboundCount from '../hooks/useInboundCount';
 import useUnreadCount from '../hooks/useUnreadCount';
+import useEngagementActionCount from '../hooks/useEngagementActionCount';
 import { theme } from '../styles/theme';
 
-// The four-tab card-model shell: Profile / Incoming / PlexChat / Contacts.
-// Incoming is the first-contact consent gate (realtime knocks); PlexChat is the
-// conversation that follows (read view in 16a, compose in 16b); Profile keeps
-// its real identity header (verified badge + Stripe trigger) + card list. The
-// placeholder Identity tab folds into Profile ("My ID") at Day 17 — its screen
-// file is retained but no longer registered here.
+// The four-tab card-model shell: Profile / Incoming / PlexChat / Engagement
+// (Day 21 STOP 5 — Contacts REPLACED by Engagement; the rolodex moved into the
+// AccountChip sheet). Incoming is the first-contact consent gate (realtime
+// knocks); PlexChat is the conversation that follows (read view in 16a,
+// compose in 16b); Profile keeps its real identity header (verified badge +
+// Stripe trigger) + card list; Engagement is the commitments surface (list +
+// calendar). The placeholder Identity tab folded into Profile ("My ID") at
+// Day 17; ContactsScreen follows the same precedent — its screen file is
+// retained but no longer registered here (ContactsPanel is the live surface).
 //
 // The carved Deus wordmark sits in a shared header across all tabs. The tab bar
 // stays the working bottom navigator for now; matching the prototype's top pill
@@ -52,6 +56,11 @@ export default function TabNavigator() {
   // (16b item 2b, PlexChat half). Live via realtime; decrements when a thread is
   // opened (mark_thread_read on focus). undefined hides the badge (no "0" pill).
   const { count: unreadCount } = useUnreadCount();
+
+  // Engagement tab badge: commitments needing the vendor's action — status
+  // accepted|paid where the vendor is the seller (STOP 5 ruling 5: work or
+  // money owed to them). Live via realtime; undefined hides the badge.
+  const { count: engagementCount } = useEngagementActionCount();
 
   return (
     <Tab.Navigator
@@ -104,7 +113,17 @@ export default function TabNavigator() {
           },
         }}
       />
-      <Tab.Screen name="Contacts" component={ContactsScreen} />
+      <Tab.Screen
+        name="Engagement"
+        component={EngagementScreen}
+        options={{
+          tabBarBadge: engagementCount > 0 ? engagementCount : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: theme.colors.accent,
+            color: theme.colors.onAccent,
+          },
+        }}
+      />
     </Tab.Navigator>
   );
 }
