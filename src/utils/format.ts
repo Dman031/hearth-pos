@@ -1,0 +1,60 @@
+/**
+ * Shared display formatters + the vendor-facing vocabulary for the decision
+ * surfaces (Incoming tile, PlexChat decision slot).
+ *
+ * VOCABULARY BOUNDARY (Day 21 STOP-0, locked): user-visible strings use the
+ * kind noun (Order / Booking / Reach / Message) and the plain status words
+ * below. The schema's internal terms never appear in anything a user reads.
+ */
+import type { InboundKind } from '../types/inbound';
+import type { EngagementStatus } from '../types/engagement';
+
+/** Cents → "$12.50". Currency-aware via Intl (present under Hermes on SDK 55). */
+export function formatCents(cents: number, currency: string = 'usd'): string {
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency.toUpperCase(),
+    }).format(cents / 100);
+  } catch (err) {
+    // Unknown currency code (or an engine without Intl): fall back to a plain
+    // dollar rendering rather than crashing a decision surface.
+    console.warn('[format] Intl currency format failed; using fallback', {
+      currency,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return `$${(cents / 100).toFixed(2)}`;
+  }
+}
+
+/** The user-facing noun for each knock kind (never the schema term). */
+export const KIND_LABEL: Record<InboundKind, string> = {
+  reach: 'Reach',
+  booking: 'Booking',
+  order: 'Order',
+  message: 'Message',
+};
+
+/**
+ * The accept control names WHAT is being accepted and FOR HOW MUCH — the
+ * Day 21 STOP 4 contract ("Accept order — $12.50"). An unpriced booking/order
+ * names the kind alone; a plain reach/message accept stays bare.
+ */
+export function formatAcceptLabel(
+  kind: InboundKind,
+  priceCents: number | null,
+  currency: string = 'usd',
+): string {
+  if (kind !== 'booking' && kind !== 'order') return 'Accept';
+  const noun = KIND_LABEL[kind].toLowerCase();
+  if (priceCents === null) return `Accept ${noun}`;
+  return `Accept ${noun} — ${formatCents(priceCents, currency)}`;
+}
+
+/** Vendor-side status words (Day 21 STOP-0): never "fulfilled" in the app. */
+export const STATUS_LABEL: Record<EngagementStatus, string> = {
+  accepted: 'Accepted',
+  paid: 'Paid',
+  fulfilled: 'Done',
+  cancelled: 'Cancelled',
+};

@@ -21,6 +21,7 @@ import useThreadPeer from '../hooks/useThreadPeer';
 import useContacts from '../hooks/useContacts';
 import ConversationBubble from '../components/ConversationBubble';
 import MessageComposer from '../components/MessageComposer';
+import ThreadDecisionBanner from '../components/ThreadDecisionBanner';
 import type { Message } from '../types/message';
 
 // PlexChatScreen — the conversation that follows an accepted knock. 16b item 1
@@ -335,6 +336,12 @@ export default function PlexChatScreen() {
             }
           />
         )}
+        {/* The decision slot (Day 21 STOP 4, the Josh fix): pending decisions
+            and commitment status for THIS thread, pinned where the vendor is
+            actually looking — see ThreadDecisionBanner for the slot contract
+            and the visual-differentiation rationale. It renders null when the
+            thread has nothing to decide and no commitments. */}
+        <ThreadDecisionBanner threadId={threadId} />
         <MessageComposer onSend={handleSend} />
       </View>
     </KeyboardAvoidingView>
