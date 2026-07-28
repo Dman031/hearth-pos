@@ -771,8 +771,95 @@ STOP 5 — POS ENGAGEMENT TAB + RELOCATIONS. Was STOP 4.
 
 ---
 
-# DAY 22 — Step 5.5 · Money surface + paywall + branded checkout  ★ PHASE 5 DONE
+# DAY 22 — Step 5.4b · Commerce model — locked ruling  [WRITTEN 2026-07-28]
+*Repos: hearth-network (order payload, accept message, webhook, successor migration) +
+hearth-pos (buyer-side cancel surface). Roadmap only — no build prompt has been issued
+against this block. The prior occupant of this slot ("Money surface + paywall + branded
+checkout") is RELOCATED intact to Day 22B below, text unchanged.*
+
+Day 21 built the engagement layer. Derrick has now ruled the commerce model that sits
+on top of it. Several Day 21 assumptions are superseded by this ruling, and per the
+canon hierarchy ("a ruling is not a ruling until it is in the roadmap") they are
+written down here before any code is built against them. Day 21 is closed history:
+nothing in its block is edited — every supersession lives here, in Day 22.
+
+> **THE MODEL (locked 2026-07-28 — Derrick's ruling, do not re-litigate):**
+> 1. **SEQUENCE.** Buyer asks → seller accepts → buyer pays. The engagement exists
+>    from the seller's yes. It is not closed until paid.
+> 2. **THE ACCEPT CARRIES THE PAYMENT CALL.** Accepting generates a structured
+>    message into the thread naming the amount and the action — "Accepted. $12.50
+>    to book." The buyer's agent already holds request_payment; the accept is what
+>    cues it. Auto-generated from the engagement so it cannot be vague, with the
+>    seller's optional note appended. This is the direct fix for the 2026-07-24
+>    failure where a seller replied "Approved" and nothing structured happened.
+> 3. **NOTHING IS RESERVED UNTIL PAID.** An accepted-unpaid engagement holds no
+>    slot. The seller's yes opens the door; payment walks through it. No expiry
+>    mechanic, no scheduler — deliberately deferred until a real seller reports a
+>    held-slot problem.
+> 4. **THE DATE IS A CONTRACT TERM.** scheduled_for cannot be null on any paid
+>    engagement. It arrives with the order.
+> 5. **THE DATE CANNOT BE MOVED.** To change a date the buyer asks the seller to
+>    cancel, which refunds, and the buyer places a new order.
+> 6. **CANCEL SPLITS BY ACTOR.** Seller cancels: always refunds, any time,
+>    regardless of the 14-day boundary. Buyer cancels: refund only more than 14
+>    days before the scheduled date; inside the window, cancellation without
+>    refund.
+
+> **SUPERSESSIONS (each cites what it overrides; the overridden text stays where
+> it is — Day 21 and applied migrations are history, this block is the ruling):**
+> 1. **0017's design comment "scheduled_for is an ATTRIBUTE, never a state"**
+>    (0017:22-24 header comment; 0017:66 column comment `-- attribute, never a
+>    state`) is SUPERSEDED by decision 4. On any paid engagement scheduled_for is
+>    a contract term and cannot be null; "payment and scheduling have no fixed
+>    order" (Day 21 STOP-0) no longer describes the model. The 0017 schema stands
+>    as applied — what is superseded is the comment's claim, not the column.
+> 2. **0018's cancel tree applies one 14-day test to both parties**
+>    (0018:240-242 — cancel_engagement is either-participant with a single
+>    boundary; likewise the Day 21 STOP-0 policy text "may be cancelled by either
+>    party"). SUPERSEDED by decision 6: seller-cancel always refunds, any time;
+>    buyer-cancel refunds only more than 14 days out. 0018 IS APPLIED
+>    (2026-07-24) — a SUCCESSOR MIGRATION IS REQUIRED (build item below). It is
+>    not written yet; do not write it from this block.
+> 3. **0019 (set_engagement_schedule) is HELD, NOT APPLIED** — file only,
+>    migrations/0019_engagement_schedule.sql, commit be7ffda — and is
+>    SUPERSEDED-PENDING-REVIEW by decision 5: nobody moves a date under this
+>    model. The date arrives with the order and changes only by
+>    cancel-and-reorder. The file is NOT deleted; its status is recorded here.
+> 4. **Guard 3 (status='accepted' + non-null agreed_price_cents permits payment —
+>    Day 21 STOP 2a, STEP 0 ruling (b)) is UNCHANGED and CORRECT under this
+>    model.** Decision 1's sequence is exactly what the guard enforces: payment
+>    only after the seller's yes. Stated explicitly so it is not re-litigated.
+> 5. **Day 21's five STOPs all stand.** Nothing in Day 21 is edited —
+>    supersessions live here, in Day 22.
+
+> **BLOCKING DEPENDENCY — STRUCTURED ORDERS. The whole model is blocked on this.**
+> reach_entity carries no order payload, so a date named in prose cannot reach the
+> engagement — src/tools/reach-entity.ts:254 is the only inbound writer, and it
+> writes no structured terms. Decision 4 makes the date a contract term, so nothing
+> in this model ships until orders carry structure. This PROMOTES the DEFERRED
+> entry **"Repeat orders into an established thread degrade to prose"** (DEFERRED.md,
+> Day 21 STOP 4 finding, commit b62406a — the "orders arrive as prose" problem)
+> from parked-with-trigger to Day 22 scope. The entry is cited here as promoted,
+> not deleted; it moves to Done when the structured order payload lands.
+
+**REQUIRED BUILD ITEMS (unordered — sequencing into STOPs is ruled separately; do
+NOT treat list order as build order, do NOT issue a build prompt from this list):**
+- Structured order payload (migration + reach_entity + respond_to_inbound).
+- Accept-generated payment call message into the thread (decision 2).
+- charge.refunded webhook handler — HANDLED_EVENTS (stripe-webhook.ts:47) is
+  payment_intent.succeeded and payment_intent.payment_failed only, so BOTH cancel
+  paths dead-end today (matches the DEFERRED entry "charge.refunded webhook
+  finalizer does not exist").
+- Actor-split cancel: successor migration to 0018 (decision 6).
+- Buyer-side cancel surface in hearth-pos — none exists; the Engagement tab's only
+  action today is the seller-only Done.
+
+---
+
+# DAY 22B — Step 5.5 · Money surface + paywall + branded checkout  ★ PHASE 5 DONE
 *Repo: hearth-pos.*
+*[RELOCATED 2026-07-28 — this block was Day 22; the commerce-model ruling above
+displaced it. Body text unchanged.]*
 
 The engagement model landed Day 21; this day ships the funds surface (top-corner Money: balance / payouts / earnings / history), the transaction-10 → $50/mo paywall — now actually fed by completed_transaction_count via the fulfilled transition — and branded checkout polish.
 
