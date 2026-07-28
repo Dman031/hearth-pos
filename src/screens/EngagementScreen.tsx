@@ -1,16 +1,20 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { theme, tileSurface } from '../styles/theme';
-import useMyEngagements from '../hooks/useMyEngagements';
-import useCards from '../hooks/useCards';
+import { supabase } from '../services/supabase';
+import useEntity from '../hooks/useEntity';
+import useMyEngagements, { type MyEngagement } from '../hooks/useMyEngagements';
 import EngagementCalendar from '../components/EngagementCalendar';
+import { notifyEngagementsChanged } from '../utils/engagement-refresh';
 import { ENGAGEMENT_KIND_LABEL, STATUS_LABEL, formatCents } from '../utils/format';
 import { formatForDisplay, formatRelativeDay, toDateKey } from '../datetime';
 import type { Engagement } from '../types/engagement';
@@ -20,16 +24,22 @@ import type { Engagement } from '../types/engagement';
 // scheduled_for. "Engagement" is the product noun per the 2026-07-24 STOP-0
 // amendment; MCP/protocol terms still never appear in user-facing strings.
 //
-// READS ONLY (STOP 5 ruling 7): complete_engagement and cancel_engagement
-// exist (0018, applied) but no Done/Cancel buttons ship in this stop — cancel
-// can return refund_due, and the webhook's charge.refunded finalizer does not
-// exist yet, so a cancel could strand a paid engagement with no finalizer.
-// Actions ship when the webhook side is whole.
+// ACTIONS (STOP 5 amendment, 2026-07-27 — supersedes the reads-only ruling):
+// Done SHIPS. complete_engagement (0018, applied) is seller-only, moves
+// accepted|paid → fulfilled, and touches no Stripe path — nothing can strand.
+// cancel_engagement STAYS OUT: its refund-due path makes NO state change and
+// returns refund_due, and the webhook's charge.refunded finalizer does not
+// exist yet, so a client cancel could strand a paid engagement with no
+// finalizer. The earlier reads-only ruling over-applied cancel's refund risk
+// to both RPCs — recorded here so it is not re-litigated. No Cancel button
+// ships anywhere until charge.refunded lands.
 //
 // Upcoming/Past is STATUS-based (ruling 4): Upcoming = accepted|paid,
 // Past = fulfilled|cancelled. A date-based split renders nothing today —
 // scheduled_for has no writer yet — so scheduled_for only REFINES sort where
 // present (dated rows first, soonest first; then undated, newest first).
+// The date line never substitutes created_at: an accept date is not a due
+// date, so undated rows read "No date set".
 
 type ViewMode = 'list' | 'calendar';
 
@@ -46,43 +56,151 @@ function sortPast(a: Engagement, b: Engagement): number {
   return bEnd.localeCompare(aEnd);
 }
 
-function EngagementRow({ engagement, cardTitle }: { engagement: Engagement; cardTitle: string | null }) {
+function EngagementRow({
+  engagement,
+  isSeller,
+  completing,
+  onOpen,
+  onDone,
+}: {
+  engagement: MyEngagement;
+  isSeller: boolean;
+  completing: boolean;
+  onOpen: (e: MyEngagement) => void;
+  onDone: (e: MyEngagement) => void;
+}) {
   const cancelled = engagement.status === 'cancelled';
+  // Done: seller-side rows still in the needs-action set (badge ruling 5).
+  const canComplete =
+    isSeller && (engagement.status === 'accepted' || engagement.status === 'paid');
   return (
-    <View style={styles.row}>
+    <Pressable
+      style={styles.row}
+      onPress={() => onOpen(engagement)}
+      disabled={!engagement.thread_id}
+      accessibilityRole="button"
+    >
       <View style={styles.rowHeader}>
-        <Text style={styles.kindText}>{ENGAGEMENT_KIND_LABEL[engagement.kind]}</Text>
+        <Text style={styles.peerText} numberOfLines={1}>
+          {engagement.peerName ?? ENGAGEMENT_KIND_LABEL[engagement.kind]}
+        </Text>
         <View style={[styles.chip, cancelled && styles.chipCancelled]}>
           <Text style={[styles.chipText, cancelled && styles.chipTextCancelled]}>
             {STATUS_LABEL[engagement.status]}
           </Text>
         </View>
       </View>
-      {cardTitle ? <Text style={styles.titleText}>{cardTitle}</Text> : null}
+      {engagement.peerName ? (
+        <Text style={styles.kindText}>{ENGAGEMENT_KIND_LABEL[engagement.kind]}</Text>
+      ) : null}
+      {engagement.excerpt ? (
+        <Text style={styles.excerptText} numberOfLines={1}>
+          {engagement.excerpt}
+        </Text>
+      ) : null}
       <Text style={styles.amountText}>
         {engagement.agreed_price_cents !== null
           ? formatCents(engagement.agreed_price_cents, engagement.currency)
           : 'No charge'}
       </Text>
-      {engagement.scheduled_for ? (
-        <Text style={styles.scheduleText}>
-          {formatRelativeDay(toDateKey(engagement.scheduled_for))} ·{' '}
-          {formatForDisplay(engagement.scheduled_for, 'time')}
-        </Text>
+      <Text style={styles.scheduleText}>
+        {engagement.scheduled_for
+          ? `${formatRelativeDay(toDateKey(engagement.scheduled_for))} · ${formatForDisplay(
+              engagement.scheduled_for,
+              'time',
+            )}`
+          : 'No date set'}
+      </Text>
+      {canComplete ? (
+        <Pressable
+          style={[styles.doneBtn, completing && styles.btnDisabled]}
+          onPress={() => onDone(engagement)}
+          disabled={completing}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: completing }}
+        >
+          <Text style={styles.doneText}>{completing ? 'Marking done…' : 'Done'}</Text>
+        </Pressable>
       ) : null}
-    </View>
+    </Pressable>
   );
 }
 
 export default function EngagementScreen() {
-  const { engagements, isLoading, error } = useMyEngagements();
-  const { cards } = useCards();
+  const navigation = useNavigation<{ navigate: (screen: string, params?: object) => void }>();
+  const { entity } = useEntity();
+  const entityId = entity?.id ?? null;
+  const { engagements, isLoading, error, refresh } = useMyEngagements();
   const [mode, setMode] = useState<ViewMode>('list');
+  const [completingId, setCompletingId] = useState<string | null>(null);
 
-  // Own-card titles resolve for seller-side rows (the common case in a vendor
-  // app); buyer-side rows just omit the title line. Never a placeholder.
-  const titleFor = (e: Engagement): string | null =>
-    e.card_id ? (cards.find((c) => c.id === e.card_id)?.title ?? null) : null;
+  // Tap-through: the row opens its conversation — the same nested-Stack target
+  // IncomingScreen's accept lands on (PlexChat tab → Conversation screen).
+  const openThread = useCallback(
+    (e: MyEngagement) => {
+      if (!e.thread_id) return;
+      navigation.navigate('PlexChat', { screen: 'Conversation', params: { threadId: e.thread_id } });
+    },
+    [navigation],
+  );
+
+  const completeEngagement = useCallback(
+    async (e: MyEngagement) => {
+      setCompletingId(e.id);
+      const { error: rpcErr } = await supabase.rpc('complete_engagement', {
+        p_engagement_id: e.id,
+      });
+      setCompletingId(null);
+      if (rpcErr) {
+        // Surface the RPC error — never swallow.
+        console.warn('[EngagementScreen] complete_engagement failed', {
+          engagementId: e.id,
+          error: rpcErr.message,
+        });
+        Alert.alert('Couldn’t mark it done', rpcErr.message);
+        return;
+      }
+      // The realtime channel is dormant (BUG-009), so drive both surfaces
+      // explicitly: the badge via the in-app signal, the list via refresh.
+      notifyEngagementsChanged();
+      await refresh();
+    },
+    [refresh],
+  );
+
+  const confirmDone = useCallback(
+    (e: MyEngagement) => {
+      const noun = ENGAGEMENT_KIND_LABEL[e.kind].toLowerCase();
+      // Marking an unpaid priced row done is the vendor's call, but an
+      // informed one: say plainly that no payment has been recorded.
+      const unpaid = e.status === 'accepted' && e.agreed_price_cents !== null;
+      Alert.alert(
+        `Mark this ${noun} done?`,
+        unpaid
+          ? `No payment has been recorded for this ${noun}. Marking it done closes it without a payment.`
+          : 'It will move to your Past list.',
+        [
+          { text: 'Not yet', style: 'cancel' },
+          { text: 'Mark done', onPress: () => void completeEngagement(e) },
+        ],
+      );
+    },
+    [completeEngagement],
+  );
+
+  const renderRow = useCallback(
+    (e: MyEngagement) => (
+      <EngagementRow
+        key={e.id}
+        engagement={e}
+        isSeller={entityId !== null && e.seller_entity_id === entityId}
+        completing={completingId === e.id}
+        onOpen={openThread}
+        onDone={confirmDone}
+      />
+    ),
+    [entityId, completingId, openThread, confirmDone],
+  );
 
   const { upcoming, past } = useMemo(() => {
     const up = engagements
@@ -131,10 +249,7 @@ export default function EngagementScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {mode === 'calendar' ? (
-          <EngagementCalendar
-            engagements={engagements}
-            renderRow={(e) => <EngagementRow key={e.id} engagement={e} cardTitle={titleFor(e)} />}
-          />
+          <EngagementCalendar engagements={engagements} renderRow={renderRow} />
         ) : engagements.length === 0 ? (
           <View style={styles.centered}>
             <Text style={styles.title}>No engagements yet</Text>
@@ -148,15 +263,13 @@ export default function EngagementScreen() {
             {upcoming.length === 0 ? (
               <Text style={styles.sectionEmpty}>Nothing upcoming.</Text>
             ) : (
-              upcoming.map((e) => (
-                <EngagementRow key={e.id} engagement={e} cardTitle={titleFor(e)} />
-              ))
+              upcoming.map(renderRow)
             )}
             <Text style={styles.sectionHeader}>Past</Text>
             {past.length === 0 ? (
               <Text style={styles.sectionEmpty}>Nothing here yet.</Text>
             ) : (
-              past.map((e) => <EngagementRow key={e.id} engagement={e} cardTitle={titleFor(e)} />)
+              past.map(renderRow)
             )}
           </>
         )}
@@ -241,11 +354,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: theme.spacing.sm,
   },
-  kindText: {
+  peerText: {
     ...theme.typography.body,
     fontFamily: theme.fonts.semiBold,
     color: theme.colors.textPrimary,
+    flexShrink: 1,
+  },
+  kindText: {
+    ...theme.typography.caption,
+    fontFamily: theme.fonts.semiBold,
+    color: theme.colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   chip: {
     borderRadius: theme.borderRadius.pill,
@@ -264,7 +386,7 @@ const styles = StyleSheet.create({
   chipTextCancelled: {
     color: theme.colors.textMuted,
   },
-  titleText: {
+  excerptText: {
     ...theme.typography.bodyMuted,
     color: theme.colors.textSecondary,
   },
@@ -275,5 +397,23 @@ const styles = StyleSheet.create({
   scheduleText: {
     ...theme.typography.bodyMuted,
     color: theme.colors.textSecondary,
+  },
+  doneBtn: {
+    // Block shape (12px card radius) — the decision-control grammar from
+    // ThreadDecisionBanner, never the message-bubble pill.
+    borderRadius: theme.borderRadius.card,
+    backgroundColor: theme.colors.accent,
+    paddingVertical: theme.spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: theme.spacing.sm,
+  },
+  doneText: {
+    ...theme.typography.body,
+    fontFamily: theme.fonts.semiBold,
+    color: theme.colors.onAccent,
+  },
+  btnDisabled: {
+    opacity: 0.5,
   },
 });

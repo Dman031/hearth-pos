@@ -1,6 +1,6 @@
 # BUGS_AND_SOLUTIONS — Hearth POS
 
-*Last updated: 2026-05-26*
+*Last updated: 2026-07-27*
 
 This file is the canonical bug ledger for hearth-pos. The archive starts empty and grows as bugs are confirmed and resolved.
 
@@ -558,3 +558,58 @@ Confounds that cost diagnosis time — each is an adjacent trap on this surface:
 
 - Never create connected-account webhook endpoints in the Dashboard UI. CLI/API with explicit `connect=true`, always.
 - After ANY webhook endpoint change, run both checks before declaring it wired: the tell (`application` field via `stripe webhook_endpoints retrieve`) AND one live ping (`stripe accounts update <acct> -d "metadata[ping]=1"`) observed as a `POST` in the Supabase gateway-log query above.
+
+---
+
+## BUG-009: Engagement realtime channels are dead — engagements table never added to the supabase_realtime publication
+
+**Status:** OPEN (root cause diagnosed; DB fix is hearth-network scope; client mitigation shipped)
+**Date:** 2026-07-27
+**Severity:** Medium
+**Category:** supabase-realtime
+**Introduced-by:** claude-prompt
+**Related bugs:** none
+
+### Symptoms
+
+- No user-visible error. The Engagement tab badge and list subscribe to `postgres_changes` on `public.engagements` (`useEngagementActionCount.ts`, `useMyEngagements.ts`, `useThreadEngagements.ts`) and the channels subscribe successfully — but no event ever arrives for INSERT/UPDATE on engagements.
+- Consequences: the badge would never decrement after Done (STOP 5 amendment item 3), the tab doesn't gain rows live after an accept in PlexChat/Incoming, and a webhook `accepted → paid` transition doesn't update an open tab.
+
+### Root Cause
+
+Supabase realtime only streams tables in the `supabase_realtime` publication. Grep across all applied migrations: `grep -rln "supabase_realtime" hearth-network/migrations/` → only `0004_messages_plexchat.sql`, which added `inbound` and `messages`. Neither 0017 (engagements) nor 0018 (writers) adds `public.engagements` to the publication or sets its replica identity. All three engagement realtime subscriptions were written against a table that does not publish.
+
+### Solution
+
+- **Real fix (hearth-network, NOT applied — needs Derrick):** one migration/SQL-editor snippet in the 0004 idempotent style:
+  `alter table public.engagements replica identity full;`
+  `do $$ begin alter publication supabase_realtime add table public.engagements; exception when duplicate_object then null; end $$;`
+- **Client mitigation (this commit):** `src/utils/engagement-refresh.ts` — an in-app change signal. The Done action (`complete_engagement`) fires `notifyEngagementsChanged()`; `useEngagementActionCount` subscribes, so the badge decrements deterministically. The dormant realtime channels stay in place and go live the moment the publication gains the table.
+
+### Files Changed
+
+- `src/utils/engagement-refresh.ts` (new) — listener registry + notify.
+- `src/hooks/useEngagementActionCount.ts` — subscribes to the signal; comment documents the dormant channel.
+- `src/hooks/useMyEngagements.ts`, `src/screens/EngagementScreen.tsx` — comments reference this bug; screen refreshes explicitly after its own write.
+
+### Commits
+
+- Ships with the Day 21 STOP 5 amendment commit (Engagement tab actionable).
+
+### Verification
+
+- Ground truth is migrations (canon rule 1): no publication add exists for engagements in any applied migration. Not verifiable against the live DB from this session — if Derrick added the table via the Dashboard by hand, the channels are already live and the mitigation is harmless redundancy.
+- Post-fix check (network side): `select * from pg_publication_tables where pubname = 'supabase_realtime';` must list `engagements`.
+
+### Cross-check Performed
+
+- **Other engagements subscribers:** `grep -rn "table: 'engagements'" src/` → `useMyEngagements.ts`, `useEngagementActionCount.ts`, `useThreadEngagements.ts` (STOP 4 decision-slot chips). The banner's post-accept chip appearing today relies on its explicit `refresh()` + the inbound channel (inbound IS published), so it functions; its engagements channel is equally dormant. Out-of-scope-but-flagged: no code change needed there once the publication fix lands.
+- **Other tables subscribed in-app:** `inbound` (published, 0004), `messages` (published, 0004) — both fine. `threads` deliberately uses fetch-on-focus because it is NOT published (`useThreads.ts` comment) — the same discipline engagements code assumed incorrectly.
+
+### Prevention
+
+Before writing any `postgres_changes` subscription, verify the table is in the publication: `grep -rn "supabase_realtime" migrations/` in hearth-network (or `pg_publication_tables` live). A successfully-subscribed channel on an unpublished table is a silent no-op — the most expensive failure class (invisible until a stale badge/list is user-visible).
+
+### Prompt/Subagent Notes
+
+Introduced by the Day 21 STOP 5 build: the build prompt specified "realtime" badge/list behavior and the implementation subscribed to `engagements` without checking publication membership; the 0017 migration review focused on RLS and never asked whether the table publishes. Build prompts that specify realtime UI should require the publication grep as part of Step 1.

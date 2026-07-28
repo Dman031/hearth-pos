@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '../services/supabase';
 import useEntity from './useEntity';
+import { onEngagementsChanged } from '../utils/engagement-refresh';
 
 // useEngagementActionCount — the Engagement tab's badge source (Day 21 STOP 5
 // ruling 5): commitments needing the vendor's action = status IN
@@ -11,6 +12,12 @@ import useEntity from './useEntity';
 // useMyEngagements — postgres_changes cannot express the participant OR, and
 // the policy already scopes delivery); distinct channel name so the tab's data
 // hook and this badge hook never collide.
+//
+// BADGE CLEARANCE (STOP 5 amendment, 2026-07-27): the counted set now has an
+// in-app exit — Done calls complete_engagement (accepted|paid → fulfilled).
+// Because engagements is NOT in the realtime publication yet (BUG-009: the
+// channel below is dormant), the decrement is driven by the explicit
+// engagement-refresh signal fired after that write.
 
 /** Unwrap an unknown thrown/returned value into a context-prefixed Error. */
 function toError(value: unknown, context: string): Error {
@@ -83,6 +90,10 @@ export default function useEngagementActionCount(): UseEngagementActionCount {
       void supabase.removeChannel(channel);
     };
   }, [entityId, load]);
+
+  // In-app write signal — the badge's working decrement path while the
+  // realtime channel above stays dormant (see engagement-refresh.ts).
+  useEffect(() => onEngagementsChanged(() => void load()), [load]);
 
   return { count, error };
 }

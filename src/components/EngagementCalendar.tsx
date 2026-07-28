@@ -17,17 +17,23 @@ import type { Engagement } from '../types/engagement';
 
 const WEEKDAY_HEADERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
-interface EngagementCalendarProps {
-  engagements: Engagement[];
+// Generic over the row type so the screen can pass enriched rows (MyEngagement)
+// and get them back typed in renderRow — the grid itself only reads Engagement
+// fields (scheduled_for).
+interface EngagementCalendarProps<T extends Engagement> {
+  engagements: T[];
   /** Renders one engagement row in the selected-day list (shared with the list view). */
-  renderRow: (engagement: Engagement) => React.ReactElement;
+  renderRow: (engagement: T) => React.ReactElement;
 }
 
 function pad2(n: number): string {
   return n < 10 ? `0${n}` : String(n);
 }
 
-export default function EngagementCalendar({ engagements, renderRow }: EngagementCalendarProps) {
+export default function EngagementCalendar<T extends Engagement>({
+  engagements,
+  renderRow,
+}: EngagementCalendarProps<T>) {
   const todayKey = toDateKey(new Date());
   const [todayYear, todayMonth] = todayKey.split('-').map(Number);
 
@@ -38,7 +44,7 @@ export default function EngagementCalendar({ engagements, renderRow }: Engagemen
   // scheduled_for → display-day buckets. Unscheduled rows never appear here —
   // the LIST view carries them; the calendar only ever shows dated commitments.
   const byDay = useMemo(() => {
-    const map = new Map<string, Engagement[]>();
+    const map = new Map<string, T[]>();
     for (const e of engagements) {
       if (!e.scheduled_for) continue;
       const key = toDateKey(e.scheduled_for);
