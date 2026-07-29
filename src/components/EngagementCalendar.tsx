@@ -129,9 +129,12 @@ export default function EngagementCalendar<T extends Engagement>({
       </View>
 
       {!hasAnySchedule ? (
-        <Text style={styles.emptyLine}>
-          Nothing scheduled yet. Orders and bookings with a date will show up here.
-        </Text>
+        <View style={styles.emptyWrap}>
+          <Text style={styles.emptyTitle}>No delivery dates yet.</Text>
+          <Text style={styles.emptySub}>
+            Dates come from the order. When a buyer names a day, it lands here.
+          </Text>
+        </View>
       ) : selectedRows.length === 0 ? (
         <Text style={styles.emptyLine}>Nothing on this day.</Text>
       ) : (
@@ -210,6 +213,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: theme.spacing.xl,
     paddingHorizontal: theme.spacing.lg,
+  },
+  emptyWrap: {
+    marginTop: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.lg,
+    gap: theme.spacing.xs,
+  },
+  emptyTitle: {
+    ...theme.typography.body,
+    fontFamily: theme.fonts.semiBold,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+  },
+  emptySub: {
+    ...theme.typography.bodyMuted,
+    color: theme.colors.textMuted,
+    textAlign: 'center',
   },
   dayList: {
     marginTop: theme.spacing.lg,
