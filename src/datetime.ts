@@ -12,7 +12,7 @@
 
 const DEFAULT_TZ = 'America/Los_Angeles';
 
-export type DisplayStyle = 'date' | 'time' | 'datetime';
+export type DisplayStyle = 'date' | 'shortDate' | 'time' | 'datetime';
 
 /**
  * Parse a UTC/ISO timestamp string (Supabase timestamptz) into a Date.
@@ -37,9 +37,11 @@ export function formatForDisplay(
   const opts: Intl.DateTimeFormatOptions =
     style === 'date'
       ? { month: 'long', day: 'numeric', year: 'numeric' }
-      : style === 'time'
-        ? { hour: 'numeric', minute: '2-digit' }
-        : { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' };
+      : style === 'shortDate' // chip-scale surfaces ("Aug 3" — Day 22 decision-slot ruling 2)
+        ? { month: 'short', day: 'numeric' }
+        : style === 'time'
+          ? { hour: 'numeric', minute: '2-digit' }
+          : { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' };
   return new Intl.DateTimeFormat('en-US', { ...opts, timeZone: tz }).format(date);
 }
 

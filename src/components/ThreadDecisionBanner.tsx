@@ -3,10 +3,13 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { theme } from '../styles/theme';
 import { supabase } from '../services/supabase';
 import useCards from '../hooks/useCards';
+import useEntity from '../hooks/useEntity';
 import useThreadPendingInbound from '../hooks/useThreadPendingInbound';
 import useThreadEngagements from '../hooks/useThreadEngagements';
-import { formatAcceptLabel, formatCents, KIND_LABEL, STATUS_LABEL } from '../utils/format';
+import { formatAcceptLabel, formatCents, ENGAGEMENT_KIND_LABEL, KIND_LABEL } from '../utils/format';
+import { formatForDisplay } from '../datetime';
 import type { Inbound } from '../types/inbound';
+import type { Engagement } from '../types/engagement';
 
 // THE DECISION SLOT — "something in this conversation needs your decision",
 // pinned above the composer (Day 21 STOP 4, the Josh fix). This is a SLOT, not
@@ -16,8 +19,18 @@ import type { Inbound } from '../types/inbound';
 // other shape (a repeat order arriving as prose creates no inbound row, so
 // nothing renders here). When the network-side repeat-order fix lands, that
 // source feeds this same slot; the slot's contract is "the union of decision
-// sources on this thread", not "the inbound table". After a decision, the same
-// slot carries the commitment status chips (Accepted → Paid → Done).
+// sources on this thread", not "the inbound table".
+//
+// CHIPS (Day 22 ruling, 2026-07-30 — the 621e521a pile-up fix): only
+// engagements with status 'accepted' render, as role-labeled chips — the
+// seller reads "Awaiting payment", the buyer reads "Payment due" (same row,
+// different next actor; role derived from seller_entity_id against the
+// signed-in entity). paid/fulfilled/cancelled never render here — the
+// Engagement tab owns history; the slot is what needs someone NOW, and an
+// empty slot is correct. The chip names kind · date · amount — the status
+// word is gone (only one status renders) and the date is what distinguishes
+// two otherwise-identical orders. No buyer actions yet: cancel is Day 22
+// build item 5, blocked on the charge.refunded handler.
 //
 // WHY IT LOOKS THE WAY IT DOES (root cause of the Day-19/07-24 failures): the
 // outgoing message bubble is a content-hugging moss pill on the right. The
@@ -92,8 +105,10 @@ function DecisionPanel({
 
 export default function ThreadDecisionBanner({ threadId }: { threadId: string }) {
   const { pending, refresh } = useThreadPendingInbound(threadId);
-  const { engagements } = useThreadEngagements(threadId);
+  const { engagements } = useThreadEngagements(threadId); // accepted-only (ruling 1)
   const { cards } = useCards();
+  const { entity } = useEntity();
+  const myEntityId = entity?.id ?? null;
   const [busyById, setBusyById] = useState<Record<string, Busy | undefined>>({});
   const [errorById, setErrorById] = useState<Record<string, string | undefined>>({});
 
@@ -130,6 +145,30 @@ export default function ThreadDecisionBanner({ threadId }: { threadId: string })
   const handleAccept = useCallback((item: Inbound) => void decide(item, 'accepted'), [decide]);
   const handleDecline = useCallback((item: Inbound) => void decide(item, 'passed'), [decide]);
 
+  // Ruling 2: kind noun · date · amount. The status word is gone (only
+  // 'accepted' renders) and the date is what tells two $12.50 orders apart.
+  // Commitment noun (ENGAGEMENT_KIND_LABEL) per the Day 21 STOP-0 vocabulary:
+  // engagement rows show the commitment noun, same as the Engagement tab.
+  const chipLabel = (e: Engagement) => {
+    const parts = [ENGAGEMENT_KIND_LABEL[e.kind]];
+    if (e.scheduled_for) parts.push(formatForDisplay(e.scheduled_for, 'shortDate'));
+    if (e.agreed_price_cents !== null) parts.push(formatCents(e.agreed_price_cents, e.currency));
+    return parts.join(' · ');
+  };
+  const renderChip = (e: Engagement) => (
+    <View key={e.id} style={styles.chip}>
+      <Text style={styles.chipText}>{chipLabel(e)}</Text>
+    </View>
+  );
+
+  // Ruling 3: the same accepted-unpaid row means "Awaiting payment" to its
+  // seller and "Payment due" to its buyer. RLS guarantees the viewer is a
+  // participant on every row, so seller-or-not is a complete split; both
+  // groups can be non-empty at once when the pair trades in both directions.
+  const sellerChips = myEntityId ? engagements.filter((e) => e.seller_entity_id === myEntityId) : [];
+  const buyerChips = myEntityId ? engagements.filter((e) => e.seller_entity_id !== myEntityId) : [];
+  const unknownRoleChips = myEntityId ? [] : engagements;
+
   if (pending.length === 0 && engagements.length === 0) return null;
 
   return (
@@ -151,21 +190,22 @@ export default function ThreadDecisionBanner({ threadId }: { threadId: string })
           />
         );
       })}
-      {engagements.length > 0 ? (
-        <View style={styles.chipRow}>
-          {engagements.map((e) => {
-            const cancelled = e.status === 'cancelled';
-            const label =
-              `${KIND_LABEL[e.kind]}` +
-              (e.agreed_price_cents !== null ? ` ${formatCents(e.agreed_price_cents, e.currency)}` : '') +
-              ` · ${STATUS_LABEL[e.status]}`;
-            return (
-              <View key={e.id} style={[styles.chip, cancelled && styles.chipCancelled]}>
-                <Text style={[styles.chipText, cancelled && styles.chipTextCancelled]}>{label}</Text>
-              </View>
-            );
-          })}
+      {sellerChips.length > 0 ? (
+        <View style={styles.chipGroup}>
+          <Text style={styles.sectionLabel}>Awaiting payment</Text>
+          <View style={styles.chipRow}>{sellerChips.map(renderChip)}</View>
         </View>
+      ) : null}
+      {buyerChips.length > 0 ? (
+        <View style={styles.chipGroup}>
+          {/* Labels only in this stop — the buyer's cancel is Day 22 item 5. */}
+          <Text style={styles.sectionLabel}>Payment due</Text>
+          <View style={styles.chipRow}>{buyerChips.map(renderChip)}</View>
+        </View>
+      ) : null}
+      {unknownRoleChips.length > 0 ? (
+        // Entity still loading — chips without a role label beat a wrong label.
+        <View style={styles.chipRow}>{unknownRoleChips.map(renderChip)}</View>
       ) : null}
     </View>
   );
@@ -256,6 +296,16 @@ const styles = StyleSheet.create({
     ...theme.typography.caption,
     color: theme.colors.danger,
   },
+  chipGroup: {
+    gap: theme.spacing.xs,
+  },
+  sectionLabel: {
+    ...theme.typography.caption,
+    fontFamily: theme.fonts.semiBold,
+    color: theme.colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -267,15 +317,9 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.xs,
     paddingHorizontal: theme.spacing.md,
   },
-  chipCancelled: {
-    backgroundColor: theme.colors.surfaceInset,
-  },
   chipText: {
     ...theme.typography.caption,
     fontFamily: theme.fonts.semiBold,
     color: theme.colors.accent,
-  },
-  chipTextCancelled: {
-    color: theme.colors.textMuted,
   },
 });

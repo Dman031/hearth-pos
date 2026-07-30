@@ -3,13 +3,14 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '../services/supabase';
 import type { Engagement } from '../types/engagement';
 
-// The commitments on ONE thread, kept live: the accept that mints a row
-// (respond_to_inbound v3, 0017) and the webhook's accepted → paid advance both
-// land within seconds, so the decision slot's status chips move without a
-// refetch. Read-only — every write goes through the network's RPCs. RLS
-// (engagements_select_participant, 0017) scopes both the query and the stream
-// to the caller's own rows, so the thread filter is a narrowing, not a trust
-// boundary.
+// The ACCEPTED-UNPAID commitments on ONE thread, kept live (Day 22 decision-
+// slot ruling 1): the slot shows only what still needs someone — a pending
+// knock or an accepted engagement awaiting payment. paid/fulfilled/cancelled
+// drop out here (the reload on their status-change event no longer matches);
+// the Engagement tab owns finished history. Read-only — every write goes
+// through the network's RPCs. RLS (engagements_select_participant, 0017)
+// scopes both the query and the stream to the caller's own rows, so the
+// thread filter is a narrowing, not a trust boundary.
 
 const ENGAGEMENT_SELECT =
   'id, inbound_id, kind, buyer_entity_id, seller_entity_id, card_id, thread_id, ' +
@@ -45,6 +46,8 @@ export default function useThreadEngagements(threadId: string | null): UseThread
         .from('engagements')
         .select(ENGAGEMENT_SELECT)
         .eq('thread_id', threadId)
+        // Ruling 1: the slot is "needs a decision/action now" — accepted only.
+        .eq('status', 'accepted')
         // Newest first — the most recent commitment is the one the slot leads
         // with. An ARRAY, never a single row: one conversation can carry
         // multiple independently-tracked commitments (Day 21 STEP 0 ruling a).
