@@ -853,6 +853,11 @@ NOT treat list order as build order, do NOT issue a build prompt from this list)
 - Actor-split cancel: successor migration to 0018 (decision 6).
 - Buyer-side cancel surface in hearth-pos — none exists; the Engagement tab's only
   action today is the seller-only Done.
+- Seller-side cancel surface in hearth-pos — decision 5 makes seller-cancel the
+  only date-change mechanism and decision 6 makes it the only in-window refund
+  path, but no surface exists: the Engagement tab's seller rows have Done only.
+  Seller rows gain Cancel beside Done, confirm copy per the seller cases
+  (always-refund), same RPC, same refresh chain.
 - Paid-requires-date guard: decision 4's invariant (scheduled_for cannot be null
   on a paid engagement) is enforceable only at payment time. A null-scheduled_for
   refusal belongs alongside guard 3 in payment-guards.ts. Not built.

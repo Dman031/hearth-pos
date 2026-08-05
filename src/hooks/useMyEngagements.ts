@@ -44,6 +44,13 @@ const ENGAGEMENT_SELECT =
 export type MyEngagement = Engagement & {
   peerName: string | null;
   excerpt: string | null;
+  /** LEDGER truth via get_my_engagement_settlement (0023): true = a succeeded
+   *  charge stands; false = none; null = UNKNOWN (helper call failed, or the
+   *  id was absent from its result). Null is never coerced to false — the
+   *  cancel confirm refuses to guess on null instead of promising a free
+   *  cancel on a paid row. Same predicate as cancel_engagement (0022), so the
+   *  confirm and the RPC cannot disagree on paid-ness. */
+  settled: boolean | null;
 };
 
 /** Raw select shape: the table row plus the embedded inbound (null when the
@@ -114,7 +121,34 @@ export default function useMyEngagements(): UseMyEngagements {
       );
       // Cast through unknown: a concatenated select() column string defeats
       // supabase-js row-type inference (same pattern as CardContext).
-      const next = ((rowsRes.data ?? []) as unknown as EngagementRowRaw[]).map(
+      const rows = (rowsRes.data ?? []) as unknown as EngagementRowRaw[];
+
+      // LEDGER truth (Day 22 item 5): ONE batched call to the 0023 helper with
+      // exactly the ids just loaded — never per-row. On failure, settled stays
+      // null on every row (unknown), never false: transactions is sealed to
+      // the client, so a failed/empty read is NOT evidence of "unpaid".
+      let settledById: Map<string, boolean> | null = null;
+      if (rows.length === 0) {
+        settledById = new Map();
+      } else {
+        const settleRes = await supabase.rpc('get_my_engagement_settlement', {
+          p_engagement_ids: rows.map((r) => r.id),
+        });
+        if (opts?.signal?.aborted) return;
+        if (settleRes.error) {
+          console.warn('[useMyEngagements] get_my_engagement_settlement failed', {
+            error: settleRes.error.message,
+          });
+        } else {
+          settledById = new Map(
+            ((settleRes.data ?? []) as { engagement_id: string; settled: boolean }[]).map(
+              (r) => [r.engagement_id, r.settled],
+            ),
+          );
+        }
+      }
+
+      const next = rows.map(
         ({ inbound, ...engagement }): MyEngagement => {
           const peer = engagement.thread_id ? peerByThread.get(engagement.thread_id) : undefined;
           const oneLine = inbound?.message?.replace(/\s+/g, ' ').trim() ?? '';
@@ -122,6 +156,9 @@ export default function useMyEngagements(): UseMyEngagements {
             ...engagement,
             peerName: peer ? peerLabel(peer) : null,
             excerpt: oneLine.length > 0 ? oneLine : null,
+            // Absent from the helper's result = not-yours-or-nonexistent, NOT
+            // unsettled — those ids stay null (unknown), same as a failed call.
+            settled: settledById ? (settledById.get(engagement.id) ?? null) : null,
           };
         },
       );

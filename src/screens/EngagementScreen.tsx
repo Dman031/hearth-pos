@@ -16,7 +16,7 @@ import useMyEngagements, { type MyEngagement } from '../hooks/useMyEngagements';
 import EngagementCalendar from '../components/EngagementCalendar';
 import { notifyEngagementsChanged } from '../utils/engagement-refresh';
 import { ENGAGEMENT_KIND_LABEL, STATUS_LABEL, formatCents } from '../utils/format';
-import { formatForDisplay, formatRelativeDay, toDateKey } from '../datetime';
+import { formatForDisplay, formatRelativeDay, parseUTCTimestamp, toDateKey } from '../datetime';
 import type { Engagement } from '../types/engagement';
 
 // EngagementScreen — the Engagement tab (Day 21 STOP 5): the entity's
@@ -24,15 +24,19 @@ import type { Engagement } from '../types/engagement';
 // scheduled_for. "Engagement" is the product noun per the 2026-07-24 STOP-0
 // amendment; MCP/protocol terms still never appear in user-facing strings.
 //
-// ACTIONS (STOP 5 amendment, 2026-07-27 — supersedes the reads-only ruling):
-// Done SHIPS. complete_engagement (0018, applied) is seller-only, moves
-// accepted|paid → fulfilled, and touches no Stripe path — nothing can strand.
-// cancel_engagement STAYS OUT: its refund-due path makes NO state change and
-// returns refund_due, and the webhook's charge.refunded finalizer does not
-// exist yet, so a client cancel could strand a paid engagement with no
-// finalizer. The earlier reads-only ruling over-applied cancel's refund risk
-// to both RPCs — recorded here so it is not re-litigated. No Cancel button
-// ships anywhere until charge.refunded lands.
+// ACTIONS (Day 22 item 5, 2026-08-04 — supersedes the STOP 5 amendment's
+// cancel exclusion): Done AND Cancel both ship, both roles, this row only.
+// Cancel's exclusion was blocked on the charge.refunded finalizer; that
+// handler is live and verified (2026-08-02), so the refund-due path finalizes
+// and nothing strands. Confirm copy is chosen from LEDGER truth (settled, via
+// the 0023 helper — never engagement.status, which lags the ledger in the
+// webhook window; settled null means UNKNOWN and the confirm refuses to
+// guess). The 14-day boundary here is ADVISORY — the server decides at call
+// time (0022:140-142); post-call state renders from the RETURN's refund_due,
+// never from the predicted case. A refund-due cancel makes NO server state
+// change (refund is issued by hand; charge.refunded finalizes later): the row
+// keeps reading Paid until then — announced in the alert, remembered only in
+// transient refundPendingIds (residual is a DEFERRED entry).
 //
 // Upcoming/Past is STATUS-based (ruling 4): Upcoming = accepted|paid,
 // Past = fulfilled|cancelled. A date-based split renders nothing today —
@@ -42,6 +46,10 @@ import type { Engagement } from '../types/engagement';
 // date, so undated rows read "No date set".
 
 type ViewMode = 'list' | 'calendar';
+
+// ADVISORY ONLY — picks confirm copy; the server re-evaluates at call time
+// (0022:140-142, timestamptz vs timestamptz, UTC interim).
+const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
 
 function sortUpcoming(a: Engagement, b: Engagement): number {
   if (a.scheduled_for && b.scheduled_for) return a.scheduled_for.localeCompare(b.scheduled_for);
@@ -60,19 +68,34 @@ function EngagementRow({
   engagement,
   isSeller,
   completing,
+  cancelling,
+  refundPending,
   onOpen,
   onDone,
+  onCancel,
 }: {
   engagement: MyEngagement;
   isSeller: boolean;
   completing: boolean;
+  cancelling: boolean;
+  refundPending: boolean;
   onOpen: (e: MyEngagement) => void;
   onDone: (e: MyEngagement) => void;
+  onCancel: (e: MyEngagement) => void;
 }) {
   const cancelled = engagement.status === 'cancelled';
-  // Done: seller-side rows still in the needs-action set (badge ruling 5).
-  const canComplete =
-    isSeller && (engagement.status === 'accepted' || engagement.status === 'paid');
+  const active = engagement.status === 'accepted' || engagement.status === 'paid';
+  const busy = completing || cancelling;
+  const noun = ENGAGEMENT_KIND_LABEL[engagement.kind].toLowerCase();
+  // CASE 4 (buyer + paid + undated): NO tap — guidance only, mirroring the
+  // server's refusal (0022:184). settled is ledger truth; null (unknown)
+  // does NOT land here — it gets the tap, and the confirm refuses honestly.
+  const buyerUndatedPaid =
+    !isSeller && active && engagement.settled === true && !engagement.scheduled_for;
+  // A refund-pending row hides both controls: the cancel already happened
+  // (re-tapping would re-request), and Done must not regress a cancelling row.
+  const canComplete = isSeller && active && !refundPending;
+  const canCancel = active && !refundPending && !buyerUndatedPaid;
   return (
     <Pressable
       style={styles.row}
@@ -111,16 +134,46 @@ function EngagementRow({
             )}`
           : 'No date set'}
       </Text>
-      {canComplete ? (
-        <Pressable
-          style={[styles.doneBtn, completing && styles.btnDisabled]}
-          onPress={() => onDone(engagement)}
-          disabled={completing}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: completing }}
-        >
-          <Text style={styles.doneText}>{completing ? 'Marking done…' : 'Done'}</Text>
-        </Pressable>
+      {refundPending ? (
+        // RULING 6: transient marker only — the server made no state change,
+        // so this is session memory, not data. Dies on restart (DEFERRED).
+        <Text style={styles.refundPendingText}>
+          Cancellation received — refund on the way. This will move to your Past list once it
+          goes through.
+        </Text>
+      ) : null}
+      {buyerUndatedPaid ? (
+        <Text style={styles.noCancelText}>
+          {`This ${noun} has no date, so it can’t be cancelled from your side. Ask ${
+            engagement.peerName ?? 'the seller'
+          } to cancel — a seller cancellation always refunds.`}
+        </Text>
+      ) : null}
+      {canComplete || canCancel ? (
+        <View style={styles.actionRow}>
+          {canCancel ? (
+            <Pressable
+              style={[styles.cancelBtn, busy && styles.btnDisabled]}
+              onPress={() => onCancel(engagement)}
+              disabled={busy}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: busy }}
+            >
+              <Text style={styles.cancelText}>{cancelling ? 'Cancelling…' : 'Cancel'}</Text>
+            </Pressable>
+          ) : null}
+          {canComplete ? (
+            <Pressable
+              style={[styles.doneBtn, busy && styles.btnDisabled]}
+              onPress={() => onDone(engagement)}
+              disabled={busy}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: busy }}
+            >
+              <Text style={styles.doneText}>{completing ? 'Marking done…' : 'Done'}</Text>
+            </Pressable>
+          ) : null}
+        </View>
       ) : null}
     </Pressable>
   );
@@ -133,6 +186,11 @@ export default function EngagementScreen() {
   const { engagements, isLoading, error, refresh } = useMyEngagements();
   const [mode, setMode] = useState<ViewMode>('list');
   const [completingId, setCompletingId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  // RULING 6: the app's ONLY record of "cancel requested, refund pending" —
+  // the server changes nothing on that path. Transient by ruling; the
+  // restart residual is a DEFERRED entry, not a bug.
+  const [refundPendingIds, setRefundPendingIds] = useState<Set<string>>(new Set());
 
   // Tap-through: the row opens its conversation — the same nested-Stack target
   // IncomingScreen's accept lands on (PlexChat tab → Conversation screen).
@@ -168,6 +226,168 @@ export default function EngagementScreen() {
     [refresh],
   );
 
+  const cancelEngagement = useCallback(
+    async (e: MyEngagement, isSeller: boolean, predictedRefund: boolean) => {
+      setCancellingId(e.id);
+      const { data, error: rpcErr } = await supabase.rpc('cancel_engagement', {
+        p_engagement_id: e.id,
+      });
+      setCancellingId(null);
+      if (rpcErr) {
+        // Surface the RPC error — never swallow (Done pattern).
+        console.warn('[EngagementScreen] cancel_engagement failed', {
+          engagementId: e.id,
+          error: rpcErr.message,
+        });
+        Alert.alert('Couldn’t cancel it', rpcErr.message);
+        return;
+      }
+      // RULING 5 ENFORCED HERE: what happens next is decided by the RETURN's
+      // refund_due, never by the case the confirm predicted — near the 14-day
+      // line the server's call-time evaluation wins.
+      const result = (data ?? {}) as { refund_due?: boolean; transaction_id?: string | null };
+      const refundDue = result.refund_due === true;
+      if (refundDue) {
+        setRefundPendingIds((prev) => {
+          const next = new Set(prev);
+          next.add(e.id);
+          return next;
+        });
+        const noun = ENGAGEMENT_KIND_LABEL[e.kind].toLowerCase();
+        const amount =
+          e.agreed_price_cents !== null ? formatCents(e.agreed_price_cents, e.currency) : null;
+        // RULING 6: announce the discrepancy — the row will KEEP reading Paid
+        // until the by-hand refund lands; say so before the user finds it.
+        Alert.alert(
+          'Cancellation received',
+          isSeller
+            ? `${e.peerName ?? 'The buyer'} will get ${
+                amount !== null ? `their ${amount} back` : 'their money back'
+              }. Refunds are processed manually, not instantly — this ${noun} will still show as Paid until the refund goes through, then it will move to your Past list.`
+            : `${
+                amount !== null ? `Your ${amount} refund` : 'Your refund'
+              } is on its way. Refunds are processed manually, not instantly — this ${noun} will still show as Paid until the refund goes through, then it will move to your Past list.`,
+        );
+      } else if (predictedRefund && !isSeller && result.transaction_id) {
+        // NEAR-BOUNDARY FLIP: the confirm promised case 2 (refund) but the
+        // server's call-time boundary landed case 3 — the return carries a
+        // standing transaction and refund_due false. The stale promise must
+        // not be the last thing the buyer heard; render the return, plainly.
+        // (No ask-the-seller advice here: the row is already cancelled, so a
+        // seller cancel can no longer refund it.)
+        const noun = ENGAGEMENT_KIND_LABEL[e.kind].toLowerCase();
+        const amount =
+          e.agreed_price_cents !== null ? formatCents(e.agreed_price_cents, e.currency) : null;
+        Alert.alert(
+          'Cancelled — without a refund',
+          `By the time this went through, the date was less than 14 days away, so ${
+            amount !== null ? `your ${amount}` : 'your payment'
+          } wasn’t refunded. The ${noun} has moved to your Past list. If this seems wrong, message ${
+            e.peerName ?? 'the seller'
+          } about it.`,
+        );
+      }
+      notifyEngagementsChanged();
+      await refresh();
+    },
+    [refresh],
+  );
+
+  // The six confirm cases (Day 22 item 5, accepted draft, unchanged). Copy is
+  // chosen from LEDGER truth (settled) — never engagement.status (RULING 3);
+  // null settled refuses instead of guessing; unpriced rows are knowably
+  // unpaid (nothing chargeable exists), helper or no helper.
+  const confirmCancel = useCallback(
+    (e: MyEngagement) => {
+      const isSeller = entityId !== null && e.seller_entity_id === entityId;
+      const noun = ENGAGEMENT_KIND_LABEL[e.kind].toLowerCase();
+      const peer = e.peerName ?? (isSeller ? 'the buyer' : 'the seller');
+      const peerStart = e.peerName ?? 'The buyer';
+      const amount =
+        e.agreed_price_cents !== null
+          ? formatCents(e.agreed_price_cents, e.currency)
+          : null;
+      const paid = e.agreed_price_cents === null ? false : e.settled;
+      // predictedRefund feeds ONLY the near-boundary mismatch alert — the
+      // outcome itself always comes from the return (ruling 5).
+      const run = (predictedRefund: boolean) => () =>
+        void cancelEngagement(e, isSeller, predictedRefund);
+
+      if (paid === null) {
+        // UNKNOWN is not unpaid: refuse to guess rather than promise a free
+        // cancel on a possibly-paid row.
+        Alert.alert(
+          'Can’t cancel right now',
+          `Couldn’t check whether this ${noun} has been paid, so nothing was changed. Try again in a moment.`,
+        );
+        return;
+      }
+      if (!paid) {
+        // Cases 1 (buyer) and 5 (seller) — free cancel.
+        Alert.alert(
+          `Cancel this ${noun}?`,
+          isSeller
+            ? `${peerStart} hasn’t paid, so nothing is refunded. It will move to your Past list.`
+            : 'You haven’t paid for it, so there’s nothing to refund. It will move to your Past list.',
+          [
+            { text: 'Keep it', style: 'cancel' },
+            { text: 'Yes, cancel', onPress: run(false) },
+          ],
+        );
+        return;
+      }
+      if (isSeller) {
+        // Case 6 — seller cancel always refunds, any time, dated or not.
+        Alert.alert(
+          `Cancel and refund ${peer}?`,
+          `${peerStart} paid ${amount ?? 'for this'}. Cancelling means their full payment is refunded — the 14-day rule doesn’t apply when you cancel. The ${noun} will show Paid until the refund goes through.`,
+          [
+            { text: 'Keep it', style: 'cancel' },
+            { text: 'Cancel and refund', onPress: run(true) },
+          ],
+        );
+        return;
+      }
+      if (!e.scheduled_for) {
+        // Case 4 — the row offers no tap for this state; defensive mirror of
+        // the server's refusal in case it is ever reached.
+        Alert.alert(
+          `This ${noun} can’t be cancelled from your side`,
+          `It has no date. Ask ${peer} to cancel — a seller cancellation always refunds.`,
+        );
+        return;
+      }
+      const outside14 =
+        parseUTCTimestamp(e.scheduled_for).getTime() - Date.now() > FOURTEEN_DAYS_MS;
+      if (outside14) {
+        // Case 2 — buyer, paid, more than 14 days out: refund due.
+        Alert.alert(
+          'Cancel and get refunded?',
+          `You’ll get your ${amount ?? 'payment'} back — the date is more than 14 days away. The refund is processed for you; this ${noun} will show Paid until it goes through, then move to your Past list.`,
+          [
+            { text: 'Keep it', style: 'cancel' },
+            { text: 'Yes, cancel', onPress: run(true) },
+          ],
+        );
+      } else {
+        // Case 3 — buyer, paid, inside 14 days: NO refund. Never generic —
+        // the forfeit AND the ask-the-seller alternative, before the tap.
+        const dateLabel = formatRelativeDay(toDateKey(e.scheduled_for));
+        Alert.alert(
+          'Cancel without a refund?',
+          `${dateLabel} is less than 14 days away, so cancelling now means your ${
+            amount ?? 'payment'
+          } is NOT refunded. If you need your money back, ask ${peer} to cancel instead — when the seller cancels, you’re always refunded in full.`,
+          [
+            { text: 'Keep it', style: 'cancel' },
+            { text: 'Cancel — no refund', style: 'destructive', onPress: run(false) },
+          ],
+        );
+      }
+    },
+    [entityId, cancelEngagement],
+  );
+
   const confirmDone = useCallback(
     (e: MyEngagement) => {
       const noun = ENGAGEMENT_KIND_LABEL[e.kind].toLowerCase();
@@ -195,11 +415,14 @@ export default function EngagementScreen() {
         engagement={e}
         isSeller={entityId !== null && e.seller_entity_id === entityId}
         completing={completingId === e.id}
+        cancelling={cancellingId === e.id}
+        refundPending={refundPendingIds.has(e.id)}
         onOpen={openThread}
         onDone={confirmDone}
+        onCancel={confirmCancel}
       />
     ),
-    [entityId, completingId, openThread, confirmDone],
+    [entityId, completingId, cancellingId, refundPendingIds, openThread, confirmDone, confirmCancel],
   );
 
   const { upcoming, past } = useMemo(() => {
@@ -398,20 +621,50 @@ const styles = StyleSheet.create({
     ...theme.typography.bodyMuted,
     color: theme.colors.textSecondary,
   },
+  actionRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.sm,
+  },
   doneBtn: {
     // Block shape (12px card radius) — the decision-control grammar from
     // ThreadDecisionBanner, never the message-bubble pill.
+    flex: 1,
     borderRadius: theme.borderRadius.card,
     backgroundColor: theme.colors.accent,
     paddingVertical: theme.spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: theme.spacing.sm,
   },
   doneText: {
     ...theme.typography.body,
     fontFamily: theme.fonts.semiBold,
     color: theme.colors.onAccent,
+  },
+  cancelBtn: {
+    // Outline block — ThreadDecisionBanner's decline grammar: bordered
+    // surface, block shape, never the accent fill and never a pill.
+    flex: 1,
+    borderRadius: theme.borderRadius.card,
+    borderWidth: 1,
+    borderColor: theme.colors.textMuted,
+    paddingVertical: theme.spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelText: {
+    ...theme.typography.body,
+    fontFamily: theme.fonts.semiBold,
+    color: theme.colors.textSecondary,
+  },
+  refundPendingText: {
+    ...theme.typography.caption,
+    fontFamily: theme.fonts.semiBold,
+    color: theme.colors.accent2Deep,
+  },
+  noCancelText: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
   },
   btnDisabled: {
     opacity: 0.5,

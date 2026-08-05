@@ -164,6 +164,18 @@ fold into the DAY 30 polish pass, but logged here so it isn't lost before then).
 - **Separate Stripe accounts for Harvest Once vs Teleoplexy** → BEFORE LIVE MODE — they share one
   Stripe account today; must be separated before live mode / diligence.
 
+### Refund-pending cancel is invisible after restart  → NETWORK READ SURFACE (no roadmap day yet)
+Shipped with Day 22 item 5 (engagement-ui): a refund-due cancel makes NO server state
+change — the refund is issued by hand in Stripe and the charge.refunded webhook finalizes
+the row to cancelled later. In that window the app's only record of "cancellation
+received, refund pending" is transient client state (`EngagementScreen` refundPendingIds)
+plus the alert that announces it. After an app restart the row silently reads Paid again
+with no sign a cancel was ever requested. Ruled 2026-08-04 (item-5 re-run, ruling 6):
+transient-only SHIPS; the app gets NO audit_log read path. Closing the residual needs a
+network-side read surface for the pending-cancel fact (the cancel_requested_refund_due
+imprint, or a flag the app can read) — a network-repo stop, not a pos patch.
+**Trigger: the first refund-due cancel that is not Derrick's.**
+
 ---
 
 ## Pre-launch architecture decisions (locked)
