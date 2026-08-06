@@ -210,6 +210,23 @@ Display-side default timezone is `America/Los_Angeles`. Hearth-pos is multi-time
 
 For every ledger entry, the Cross-check Performed section is mandatory regardless of category. List adjacent paths (other platforms for `expo-rn` bugs, other templates for `template-system` bugs, other Stripe Connect flows for `stripe` bugs, other AI invocation surfaces for `ai-tool-calling` bugs, other files matching the same anti-pattern grep). For each: either fix it in the same commit, or explicitly mark it out-of-scope-but-flagged. Silence in the cross-check section is not acceptable — empty cross-check sections fail review.
 
+**MIGRATION FUNCTION GRANT BLOCK — MANDATORY**
+
+Every migration that creates a function — new name, new signature, or DROP + recreate; anything that mints a fresh ACL — MUST carry the full grant block, internal helpers included, never just the client-facing RPCs:
+
+```sql
+revoke all     on function public.f(...) from public;
+revoke execute on function public.f(...) from anon;
+grant  execute on function public.f(...) to authenticated;
+-- (+ service_role only where a service-role actor arm exists)
+```
+
+WHY the anon line is not redundant — never drop it: PUBLIC is a pseudo-role, and revoking it removes only the PUBLIC ACL entry. anon holds a DIRECT grant minted at CREATE time by the database's default privileges — `pg_default_acl` carries TWO `defaclobjtype='f'` rows (owners `postgres` and `supabase_admin`), both granting anon EXECUTE — so every future CREATE FUNCTION re-mints the direct anon grant regardless of which role runs the migration, and revoking PUBLIC never touches it. Same-signature CREATE OR REPLACE preserves the existing ACL (no re-mint); a DROP + recreate or a new signature re-mints and needs the block again. Sweep: `grep -rn -iE "create (or replace )?function" --include='*.sql' --exclude-dir=node_modules .` — every hit's migration must also contain the matching `from public` and `from anon` revoke lines. Origin: hearth-network BUG-009 (anon/PUBLIC EXECUTE on all fifteen RPCs; closed by 0025, applied 2026-08-05; one-time sweep of both repos performed the same day — hearth-network via 0025's in-transaction assertion plus the 0019 pre-apply edit, hearth-pos 0001 verified already compliant).
+
+**MIGRATION TABLE RLS — MANDATORY**
+
+RLS on, every time: every CREATE TABLE ships `alter table public.t enable row level security;` in the same migration, before commit — enable first (default-deny), policies after. The same default-privilege mechanism makes this load-bearing: `pg_default_acl`'s `defaclobjtype='r'` rows grant anon `arwdDxtm` (ALL) on every new table, so a table created without RLS is fully readable AND writable by anon the moment it exists. RLS enabled with no policy is default-deny — the correct failure mode; RLS forgotten is an open table. Sweep: `grep -rn -iE "create table" --include='*.sql' --exclude-dir=node_modules .` cross-checked per migration against `grep -rn -iE "enable row level security" --include='*.sql' --exclude-dir=node_modules .` (swept 2026-08-05: hearth-network and hearth-pos both reconcile).
+
 ## Awareness Patterns
 
 These are not mandatory promoted rules but should inform code review and design choices. They originate from bugs in adjacent Hearth-family repos and apply here as priors.
