@@ -861,6 +861,25 @@ NOT treat list order as build order, do NOT issue a build prompt from this list)
 - Paid-requires-date guard: decision 4's invariant (scheduled_for cannot be null
   on a paid engagement) is enforceable only at payment time. A null-scheduled_for
   refusal belongs alongside guard 3 in payment-guards.ts. Not built.
+- Positive service-role assertion in the dual-actor writers — the open half of
+  BUG-009, which 0025 mitigated but did not fix. post_message (0004:183),
+  respond_to_inbound (0009:50), and cancel_engagement (0024:86) decide "this is
+  the Worker" by testing auth.uid() is null. That is an inference from absence,
+  and the anon role satisfies it too — which is how BUG-009 became a live
+  impersonation path: an anon caller supplying p_from_entity_id could act as any
+  entity. 0025 revoked anon EXECUTE, so nothing anonymous can reach these
+  functions today, but the bodies still trust a null uid, and default privileges
+  re-mint anon on every CREATE. The system is safe by one grant, not by design.
+  Fix: assert the service-role identity positively in the else-branch —
+  current_setting('request.jwt.claim.role', true) = 'service_role', or an
+  equivalent that PROVES the caller rather than inferring it — instead of
+  accepting any caller with no session. One successor migration covering all
+  three functions in one file, so the three cannot drift apart. Not built.
+  Trigger: before Day 28's pilot vendor, or before any non-Derrick user,
+  whichever first. BUG-009's mitigation is a grant, and grants are re-minted by
+  default privileges on every new function — the standing CLAUDE.md grant-block
+  rule is what holds the mitigation, and this item is what removes the
+  dependency.
 
 ---
 
