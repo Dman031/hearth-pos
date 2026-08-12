@@ -258,3 +258,12 @@ If/when voice or TTS is added to hearth-pos, text rendering treats voice as addi
 Deliberate, scoped gaps that are wired to be completed later. Each must carry a `TODO(<tag>)` at the seam in code so the follow-up is greppable.
 
 - **TODO(SMS) — phone verification deferred.** Entity creation (`EntitySetupScreen` → `EntityContext.createEntity`) collects and stores `entities.phone` as TEXT but does **not** verify it; phone is stored unverified and phone-confirmation is **not** required for the entity to be created or for signup to complete. No SMS provider is configured (prod auth SMS lives in the Supabase dashboard; `supabase/config.toml` Twilio block is local-only and disabled). When SMS is enabled, wire **Supabase phone OTP** at the `TODO(SMS)` seam (send code → `verifyOtp`) and treat **`auth.users.phone_confirmed_at` as the source of truth** (Decision 1A) — do **not** add a phone-verified column to `entities` (the network reads that table; its shape is frozen). Grep: `grep -rn "TODO(SMS)" src`.
+
+## Token planes — hearth-network Worker (standing fact, ruled 2026-08-12 · Day 22B correction)
+
+The Worker at mcp.hearth.network accepts exactly TWO token planes. Adding a third is a ruling, not a diff.
+
+1. **MCP OAuth — `/mcp` only.** `Authorization: Bearer` validated by SHA-256 hash against `mcp_oauth_tokens` (hearth-network `src/middleware/auth.ts`). Agent-facing. Never accepts a Supabase session token.
+2. **App Supabase session — `/money/*` only.** The iOS app forwards its EXISTING Supabase access token as `Authorization: Bearer`. The Worker validates it with `auth.getUser(jwt)` — the sanctioned anon-key auth-plane call — and binds the entity server-side via the unique `entities.user_id` (the consent page's binding, hearth-network `src/oauth/handler.ts:185-203`, applied to a forwarded session instead of typed credentials). App-facing. Never accepts an MCP OAuth token.
+
+The planes never cross. The settled ledger is deliberately NOT a Worker endpoint: the app calls `public.get_my_settled_payments` (migration 0027, granted to `authenticated`) directly with its own session — `current_entity_id()` does the scoping. A Worker settled proxy would be a second read path beside 0027 and is forbidden.
