@@ -5,6 +5,7 @@ import useEntity from '../hooks/useEntity';
 import { theme } from '../styles/theme';
 import IdentityPanel from './IdentityPanel';
 import ContactsPanel from './ContactsPanel';
+import MoneyPanel from './MoneyPanel';
 import SignOutButton from './SignOutButton';
 
 // AccountChip — the account affordance behind the user's name, present on ALL
@@ -13,18 +14,20 @@ import SignOutButton from './SignOutButton';
 //
 // The chip (the entity's initial) opens a bottom-sheet Modal it owns entirely —
 // no NavigationContainer/App changes. The sheet has three states:
-//   - 'menu':     My ID / Contacts / Settings (placeholder) / Money (placeholder) /
+//   - 'menu':     My ID / Contacts / Settings (placeholder) / Money /
 //                 Sign Out (separated at the bottom, reusing <SignOutButton inline/>).
 //   - 'identity': the "My ID" panel (IdentityPanel) with a back affordance.
 //   - 'contacts': the private rolodex (ContactsPanel) — the top-corner home of
 //                 Contacts since Day 21 STOP 5 replaced its tab with Engagement.
-// "Money" is the ENTRY ONLY (STOP 5 ruling 3, honestly marked "Soon"): Day 22
-// builds the surface content against the empty scaffolding files
-// (useEarnings / EarningsCard / TransactionCounter / paywall).
+//   - 'money':    balance + settled ledger (MoneyPanel, Day 22B) — the "Soon"
+//                 placeholder made real. (The Day 22 earnings/paywall
+//                 scaffolds — useEarnings / EarningsCard / TransactionCounter —
+//                 stay empty: the ruled Money surface is thinner than the
+//                 shape they anticipated.)
 // One <AccountChip/> instance is dropped into each header (TabNavigator's
 // ShellHeader + PlexChatStack's headerRight); only one header is visible at once.
 
-type SheetView = 'menu' | 'identity' | 'contacts';
+type SheetView = 'menu' | 'identity' | 'contacts' | 'money';
 
 /** First letter of the display name, upper-cased; '·' when unknown. */
 function initialOf(name: string | null | undefined): string {
@@ -108,7 +111,15 @@ export default function AccountChip() {
                 </Pressable>
 
                 <PlaceholderRow label="Settings" />
-                <PlaceholderRow label="Money" />
+
+                <Pressable
+                  style={styles.row}
+                  onPress={() => setView('money')}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.rowLabel}>Money</Text>
+                  <Text style={styles.chevron}>›</Text>
+                </Pressable>
 
                 {/* Sign Out — separated at the bottom; reuses SignOutButton. */}
                 <View style={styles.divider} />
@@ -125,9 +136,15 @@ export default function AccountChip() {
                   <Text style={styles.back}>‹ Account</Text>
                 </Pressable>
                 <Text style={styles.sheetTitle}>
-                  {view === 'identity' ? 'My ID' : 'Contacts'}
+                  {view === 'identity' ? 'My ID' : view === 'contacts' ? 'Contacts' : 'Money'}
                 </Text>
-                {view === 'identity' ? <IdentityPanel /> : <ContactsPanel />}
+                {view === 'identity' ? (
+                  <IdentityPanel />
+                ) : view === 'contacts' ? (
+                  <ContactsPanel />
+                ) : (
+                  <MoneyPanel />
+                )}
               </>
             )}
           </Pressable>
