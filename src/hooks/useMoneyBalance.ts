@@ -7,12 +7,17 @@ import { getMoneyBalance, type MoneyBalance, type BalanceFailure } from '../serv
 // carried through untouched so the panel can tell "session expired" (sign
 // in again) apart from "balance unavailable" (money error) — the Worker's
 // 401 is an auth outcome, not a money outcome.
+//
+// refresh() RETURNS the fresh balance (not just void) so callers can act on
+// it in-handler — the connect button uses this to skip launching onboarding
+// when the webhook verified us since the panel loaded (the card editor's
+// refresh-first habit, CardEditorSheet.tsx:213-216).
 
 export interface UseMoneyBalance {
   balance: MoneyBalance | null;
   isLoading: boolean;
   failure: BalanceFailure | null;
-  refresh: () => Promise<void>;
+  refresh: () => Promise<MoneyBalance | null>;
 }
 
 export default function useMoneyBalance(): UseMoneyBalance {
@@ -20,16 +25,19 @@ export default function useMoneyBalance(): UseMoneyBalance {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [failure, setFailure] = useState<BalanceFailure | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<MoneyBalance | null> => {
     setIsLoading(true);
     const result = await getMoneyBalance();
+    let fresh: MoneyBalance | null = null;
     if (result.ok) {
+      fresh = result.balance;
       setBalance(result.balance);
       setFailure(null);
     } else {
       setFailure(result.reason);
     }
     setIsLoading(false);
+    return fresh;
   }, []);
 
   useEffect(() => {

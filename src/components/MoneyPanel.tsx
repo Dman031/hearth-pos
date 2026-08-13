@@ -16,6 +16,7 @@ import type { SettledPayment } from '../types/settled-payment';
 import useMoneyBalance from '../hooks/useMoneyBalance';
 import useSettledPayments from '../hooks/useSettledPayments';
 import { refundPayment } from '../services/money';
+import { startBusinessVerification } from '../services/stripe';
 
 // MoneyPanel — the Money surface as an EMBEDDED sheet panel (Day 22B),
 // following the ContactsPanel pattern (navigation-free, lives inside
@@ -73,7 +74,36 @@ function amountsLabel(entries: { amount_cents: number; currency: string }[]): st
 // ---------------------------------------------------------------------------
 
 function BalanceSection() {
-  const { balance, isLoading, failure } = useMoneyBalance();
+  const { balance, isLoading, failure, refresh } = useMoneyBalance();
+  const [launchingConnect, setLaunchingConnect] = useState(false);
+  const [connectHint, setConnectHint] = useState<string | null>(null);
+  const [connectError, setConnectError] = useState<string | null>(null);
+
+  // The Money-panel connect entry (the card editor's Day 18 flow, lifted —
+  // Connect is ENTITY-scoped: startBusinessVerification takes no card and
+  // create-connect-account keys the Express account by entity). Refresh the
+  // balance first: payments_ready flips when the webhook verifies us, and a
+  // fresh true means there is nothing to launch (CardEditorSheet.tsx:213-216
+  // habit). The verdict stays webhook-owned; nothing here flips state.
+  const onSetUpPayments = async (): Promise<void> => {
+    setLaunchingConnect(true);
+    setConnectHint(null);
+    setConnectError(null);
+    try {
+      const fresh = await refresh();
+      if (fresh && fresh.payments_ready) return; // verified since load — section re-renders
+      const result = await startBusinessVerification();
+      if (result.ok) {
+        setConnectHint('Finish payment setup in the browser, then come back.');
+      } else if (result.reason === 'cannot_open_browser') {
+        setConnectError('Couldn’t open the browser for payment setup.');
+      } else {
+        setConnectError('Couldn’t start payment setup. Try again?');
+      }
+    } finally {
+      setLaunchingConnect(false);
+    }
+  };
 
   let body: React.ReactElement;
   if (isLoading) {
@@ -89,10 +119,26 @@ function BalanceSection() {
     body = <Text style={styles.muted}>Couldn’t load your balance right now.</Text>;
   } else if (balance && !balance.payments_ready) {
     body = (
-      <Text style={styles.muted}>
-        Payments aren’t set up yet. Turn on selling from one of your cards to
-        finish setup.
-      </Text>
+      <>
+        <Text style={styles.muted}>
+          Payments aren’t set up yet. Connect a payment account to get paid
+          here.
+        </Text>
+        <Pressable
+          style={[styles.connectButton, launchingConnect && styles.connectButtonBusy]}
+          onPress={() => void onSetUpPayments()}
+          disabled={launchingConnect}
+          accessibilityRole="button"
+        >
+          {launchingConnect ? (
+            <ActivityIndicator color={theme.colors.accent} />
+          ) : (
+            <Text style={styles.connectButtonLabel}>Set up payments</Text>
+          )}
+        </Pressable>
+        {connectHint ? <Text style={styles.connectHint}>{connectHint}</Text> : null}
+        {connectError ? <Text style={styles.connectError}>{connectError}</Text> : null}
+      </>
     );
   } else if (balance) {
     const payoutLine = balance.next_payout_date
@@ -456,5 +502,31 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: theme.colors.danger,
     fontFamily: theme.fonts.semiBold,
+  },
+  connectButton: {
+    marginTop: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
+    alignItems: 'center',
+    borderRadius: theme.borderRadius.card,
+    borderWidth: 1,
+    borderColor: theme.colors.accent,
+  },
+  connectButtonBusy: {
+    opacity: 0.7,
+  },
+  connectButtonLabel: {
+    ...theme.typography.body,
+    color: theme.colors.accent,
+    fontFamily: theme.fonts.semiBold,
+  },
+  connectHint: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.sm,
+  },
+  connectError: {
+    ...theme.typography.caption,
+    color: theme.colors.danger,
+    marginTop: theme.spacing.sm,
   },
 });
