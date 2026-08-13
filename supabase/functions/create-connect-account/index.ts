@@ -34,9 +34,9 @@ const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY');
 // scheme exists yet (same caveat as Identity), so these are plain https returns;
 // the webhook is the source of truth regardless of where the redirect lands.
 const CONNECT_RETURN_URL =
-  Deno.env.get('CONNECT_RETURN_URL') ?? 'https://hearth.network/connect/return';
+  Deno.env.get('CONNECT_RETURN_URL') ?? 'https://mcp.teleoplexy.ai/connect/return';
 const CONNECT_REFRESH_URL =
-  Deno.env.get('CONNECT_REFRESH_URL') ?? 'https://hearth.network/connect/refresh';
+  Deno.env.get('CONNECT_REFRESH_URL') ?? 'https://mcp.teleoplexy.ai/connect/refresh';
 
 if (!STRIPE_SECRET_KEY) {
   throw new Error(

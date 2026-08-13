@@ -23,9 +23,9 @@
 
 import { supabase } from './supabase';
 
-/** hearth-network Worker base. Infrastructure, not brand (CLAUDE.md). */
+/** hearth-network Worker base — the final domain, live (swapped 2026-08-13). */
 const NETWORK_URL =
-  process.env.EXPO_PUBLIC_NETWORK_URL ?? 'https://mcp.hearth.network';
+  process.env.EXPO_PUBLIC_NETWORK_URL ?? 'https://mcp.teleoplexy.ai';
 
 export interface MoneyAmount {
   amount_cents: number;

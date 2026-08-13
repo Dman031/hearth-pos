@@ -10,7 +10,7 @@ The vendor-facing mobile app. Vendors download from App Store, fill conversation
 - Supabase backend (auth, database, storage)
 - Stripe Connect Express for vendor payments
 - Anthropic API (Opus, model: claude-opus-4-8) for onboarding and classification
-- Hearth Network (mcp.hearth.network) is a separate service this app does NOT call directly. POS writes vendor data to Supabase. The Network reads from Supabase.
+- Hearth Network (mcp.teleoplexy.ai) is a separate service this app does NOT call directly. POS writes vendor data to Supabase. The Network reads from Supabase.
 
 ## Template system
 - Templates loaded at runtime from pos_templates table in Supabase
@@ -53,7 +53,7 @@ Process rules:
 - ALWAYS track completed_transaction_count for paywall trigger
 - ALWAYS use Opus (claude-opus-4-8), never Haiku
 - One app, one codebase, infinite business types via templates
-- The user-facing app name comes from a SINGLE `APP_NAME` constant (`src/constants/app.ts`) — NEVER hardcode the brand string per screen; derived labels ("{APP_NAME} ID") too. Renamed Deus → **Teleoplexy** 2026-07-14. USER-FACING STRINGS ONLY: infrastructure is not brand — hearth-* repo names and worker URLs (hearth-network.hearthnet.workers.dev is LIVE), package/bundle ids, the `hearth-pos` slug, Supabase refs, edge function names, the `deus_id` column + `deus-id.ts` service, and code identifiers like `HearthOrb` all keep their names. A future rename must also regenerate the lockup SVG (wordmark is baked into vector paths — see `src/constants/brand.ts`).
+- The user-facing app name comes from a SINGLE `APP_NAME` constant (`src/constants/app.ts`) — NEVER hardcode the brand string per screen; derived labels ("{APP_NAME} ID") too. Renamed Deus → **Teleoplexy** 2026-07-14. USER-FACING STRINGS ONLY: infrastructure is not brand — hearth-* repo names, package/bundle ids, the `hearth-pos` slug, Supabase refs, edge function names, the `deus_id` column + `deus-id.ts` service, and code identifiers like `HearthOrb` all keep their names. EXCEPTION (2026-08-13): the Worker's PUBLIC domain is brand-final — **mcp.teleoplexy.ai is LIVE** (Cloudflare custom domain on the hearth-network worker); no workers.dev or hearth.network URL remains in this repo. A future rename must also regenerate the lockup SVG (wordmark is baked into vector paths — see `src/constants/brand.ts`).
 
 ## Revenue logic
 - Free until vendor completes 10 transactions
@@ -261,7 +261,7 @@ Deliberate, scoped gaps that are wired to be completed later. Each must carry a 
 
 ## Token planes — hearth-network Worker (standing fact, ruled 2026-08-12 · Day 22B correction)
 
-The Worker at mcp.hearth.network accepts exactly TWO token planes. Adding a third is a ruling, not a diff.
+The Worker at mcp.teleoplexy.ai accepts exactly TWO token planes. Adding a third is a ruling, not a diff.
 
 1. **MCP OAuth — `/mcp` only.** `Authorization: Bearer` validated by SHA-256 hash against `mcp_oauth_tokens` (hearth-network `src/middleware/auth.ts`). Agent-facing. Never accepts a Supabase session token.
 2. **App Supabase session — `/money/*` only.** The iOS app forwards its EXISTING Supabase access token as `Authorization: Bearer`. The Worker validates it with `auth.getUser(jwt)` — the sanctioned anon-key auth-plane call — and binds the entity server-side via the unique `entities.user_id` (the consent page's binding, hearth-network `src/oauth/handler.ts:185-203`, applied to a forwarded session instead of typed credentials). App-facing. Never accepts an MCP OAuth token.
