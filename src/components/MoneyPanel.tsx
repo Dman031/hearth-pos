@@ -105,6 +105,30 @@ function BalanceSection() {
     }
   };
 
+  // The connect entry, shared by the not-ready AND balance-error states: a
+  // failed balance call must never make Stripe setup unreachable — connecting
+  // does not depend on the balance read succeeding. (Ready needs no entry;
+  // session-expired is an auth outcome where the connect call would fail the
+  // same way, so it stays button-less.)
+  const connectEntry = (
+    <>
+      <Pressable
+        style={[styles.connectButton, launchingConnect && styles.connectButtonBusy]}
+        onPress={() => void onSetUpPayments()}
+        disabled={launchingConnect}
+        accessibilityRole="button"
+      >
+        {launchingConnect ? (
+          <ActivityIndicator color={theme.colors.accent} />
+        ) : (
+          <Text style={styles.connectButtonLabel}>Set up payments</Text>
+        )}
+      </Pressable>
+      {connectHint ? <Text style={styles.connectHint}>{connectHint}</Text> : null}
+      {connectError ? <Text style={styles.connectError}>{connectError}</Text> : null}
+    </>
+  );
+
   let body: React.ReactElement;
   if (isLoading) {
     body = <ActivityIndicator color={theme.colors.accent} />;
@@ -116,7 +140,17 @@ function BalanceSection() {
       </Text>
     );
   } else if (failure) {
-    body = <Text style={styles.muted}>Couldn’t load your balance right now.</Text>;
+    // Balance failed — we do NOT know whether they're connected, so the copy
+    // claims nothing; the entry is just reachable.
+    body = (
+      <>
+        <Text style={styles.muted}>Couldn’t load your balance right now.</Text>
+        <Text style={styles.muted}>
+          If you haven’t set up payments yet, you can do that now.
+        </Text>
+        {connectEntry}
+      </>
+    );
   } else if (balance && !balance.payments_ready) {
     body = (
       <>
@@ -124,20 +158,7 @@ function BalanceSection() {
           Payments aren’t set up yet. Connect a payment account to get paid
           here.
         </Text>
-        <Pressable
-          style={[styles.connectButton, launchingConnect && styles.connectButtonBusy]}
-          onPress={() => void onSetUpPayments()}
-          disabled={launchingConnect}
-          accessibilityRole="button"
-        >
-          {launchingConnect ? (
-            <ActivityIndicator color={theme.colors.accent} />
-          ) : (
-            <Text style={styles.connectButtonLabel}>Set up payments</Text>
-          )}
-        </Pressable>
-        {connectHint ? <Text style={styles.connectHint}>{connectHint}</Text> : null}
-        {connectError ? <Text style={styles.connectError}>{connectError}</Text> : null}
+        {connectEntry}
       </>
     );
   } else if (balance) {
