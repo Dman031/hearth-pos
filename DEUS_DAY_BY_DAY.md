@@ -1095,3 +1095,29 @@ into a Week 6 — the slack is at Day 27 (integration wall) and Day 32 (on-devic
 Apple review (after Day 33). Start the vendor conversation the same day you start Day 3.
 
 *Deus · Day-by-Day with prompts · one chat per day · finish = App Store submission.*
+
+---
+---
+
+# REGISTRY SEEDS (parallel track)  [WRITTEN 2026-08-10]
+*Runs PARALLEL to the core build. Does not renumber or displace the Day sequence — Day 23
+(SMS gateway) remains the next core action.*
+
+**Thesis:** public government registries → Tier-1 cards. One entity per dataset, one card
+per record, keyed to the registry's native ID. Same pipeline as the Providence trials seed:
+pull → normalize → generate → migrate → backfill embeddings.
+
+- **Instance 1 — Providence clinical trials. ✅ DONE.** Entity 526982, 67 cards, live.
+- **Instance 2 — Grants.gov federal opportunities. IN PROGRESS.**
+  - New entity: deus_id 300200, display_name "Grants.gov", entity_type business, all
+    verification flags false.
+  - The entity insert lives IN the migration (0026) this time — not hand-typed.
+  - Pull posted + forecasted, no eligibility filter — filtering happens at query time.
+  - Zombie rule: empty-closeDate records get a self-describing stale status string, not
+    dropped.
+- **Instance 3 — SAM.gov federal contract opportunities. PLANNED.** Same pipeline, new
+  entity, new mapper.
+
+**Standing rule for this track:** each seed carries a forever-refresh obligation —
+scheduled re-pull → upsert by native ID → re-embed changed — or the cards go stale. A stale
+card is worse than no card.
