@@ -907,6 +907,68 @@ Commit locally.
 ---
 ---
 
+# DAY 22C — Step 5.6 · Display stack (CardView + three tiers)  [WRITTEN 2026-08-13]
+*Repo: hearth-network. Roadmap ruling from the 2026-08-13 display-stack investigation.
+Docs only — no code, no migration. Not built; the build prompt follows separately.*
+
+**THE PROBLEM IT SOLVES.** Card tool results today are JSON.stringify'd into a single
+text block (`src/tools/shared.ts:17-19`). The host must paraphrase to show a human
+anything. On 2026-07-24 an agent described Josh's Breakfast Menu in its own words and
+invented "$12 each, $96 food, $100 minimum" — none of it on the card. An authored text
+card removes the paraphrase step: the host cannot improvise facts it was handed verbatim.
+
+**THE MODEL — template once, project three ways.** One CardView object, three
+serializers, all shipped in every card-bearing result. The host renders the richest
+tier it supports.
+- **TIER 1 — MCP Apps sheet** (`ui://deus/card-sheet.html`), extending the Day 20
+  payment-sheet pattern: inline HTML, zero external origins, registered once and served
+  via `resources/read`. Per-result cost is a URI string, not the template.
+- **TIER 2 — structuredContent JSON:** the shape an agent reasons over.
+- **TIER 3 — the authored text card:** fixed format, written not improvised. This is
+  the anti-invention guarantee and it ships everywhere.
+
+**LOCKED DECISIONS**
+1. **Tier 1 on get_card_details ONLY.** `_meta.ui.resourceUri` binds per-tool, so a
+   query_cards sheet would be one sheet rendering a whole result list. Search results
+   get Tier 2 + Tier 3. The anti-invention guarantee comes from Tier 3, not the sheet.
+2. **Compact card excludes commerce.** query_cards returns no price. This preserves the
+   grounding contract — get_card_details is the price authority
+   (`src/capabilities/manifest.ts:49-53`), and a price in a search result is a price an
+   agent can quote without grounding.
+3. **The null-price string is load-bearing.** An unpriced card's text card says payment
+   cannot be started from it, explicitly. That sentence is the authored replacement for
+   the improvised "$100 minimum."
+4. **Host probe — logging first.** Add per-client logging on `resources/read`
+   (`src/routes/mcp.ts:222`). A host that never reads the card sheet URI is not
+   rendering it — a definitive negative from traffic already flowing. An in-sheet
+   beacon only if the logs are ambiguous. Known today: Claude honors resourceDomains
+   and connectDomains, NOT frameDomains, and blocks nested iframes (Day 20 probe).
+   Grok and ChatGPT: unknown, assumed nothing.
+5. **Golden files.** The serializers are pure functions; snapshot them plus the Tier 1
+   HTML template under `test/golden/`. CI fails on drift; intentional changes are
+   reviewable diffs.
+
+**SIZE — recorded because it reverses the obvious assumption.** Tier 1 ships once, not
+per result. Three compact cards with all tiers is ~2.2 KB against today's ~1.6 KB —
+1.4×, not 3×.
+
+**SCHEMA GAPS — record, do not solve:** no image or media column; no location column
+(query_cards accepts a `location` arg it does not apply); no card-level description;
+no line items. Tier 1 renders without avatar or photo tiles in v1.
+
+**CROSS-REFERENCE:** multi-item pricing stays deferred (DEFERRED.md, Day 20 close-out
+findings). An authored card makes the gap MORE visible — vendor-authored item prices
+render in fields while the commerce line says unpriced — which is the useful direction.
+The DEFERRED trigger is unchanged.
+
+**SECOND ITEM (recorded with this ruling; unrelated to the tiers).**
+PLEXMED_CARE_LOOP_BUILD.md and GROUP_THREADS_BUILD.md are build specs that exist only
+in project knowledge and are invisible to every agent working in the repo — same class
+as rulings living in chat. Either commit them to the repo or write their sessions into
+this roadmap. Not built.
+
+---
+
 # DAY 23 — Step 6.1 · SMS gateway core
 *Repo: hearth-network.*
 
