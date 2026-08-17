@@ -969,6 +969,84 @@ this roadmap. Not built.
 
 ---
 
+# DAY 22D — Step 5.7 · Order quantity  [WRITTEN 2026-08-17]
+*Repos: hearth-network (reach validation, respond_to_inbound successor, accept message) +
+hearth-pos (accept tile shows the computed total). Roadmap ruling.
+Docs only — no code, no migration. Not built; the build prompt follows separately.*
+
+**THE BUG, with evidence.** A card carries one `price_cents`; an order carries prose. An
+order for eight settles for the price of one.
+- 2026-07-24 — an agent invented "$12 each, $96 food, $100 minimum" for Josh's Breakfast
+  Menu. None of it was on the card.
+- 2026-08-13 — an eight-sandwich order accepted at $12.50. The accept message read
+  "$12.50 to book", which sounds like a deposit and is not: guard 3b
+  (`payment-guards.ts:465`) refuses any second charge, so paying it settles the
+  engagement in full and the vendor is owed the rest.
+
+Every layer is internally consistent and collectively wrong — the card is right about the
+card, the engagement is right about the card, and nothing knows the order was for eight.
+
+**THE RULING — quantity, not line items, not vendor-typed totals (locked 2026-08-17):**
+1. **inbound gains a `quantity` integer**, following scheduled_for's proven pipeline
+   exactly (0020): validated at reach, stored on inbound, copied to the engagement at
+   accept, enforced at payment. Positive integer, booking and order only, optional
+   (absent means one).
+2. **THE BUYER NEVER AUTHORS A PRICE.** They choose a count. The server computes
+   `agreed_price_cents = quantity × cards.price_cents` at accept, inside
+   respond_to_inbound's existing transaction. The snapshot stays vendor-authored, which
+   is the entire security property of the payment path — guard 3 validates the echo
+   against agreed_price_cents and needs NO change, because multi-item is an accept-time
+   problem, not a payment-time one.
+3. **THE POS ACCEPT TILE SHOWS THE COMPUTED TOTAL** for a one-tap confirm. The vendor
+   confirms without typing. Human arithmetic at accept is what option (c) would have
+   reintroduced and is explicitly rejected.
+4. **THE ACCEPT MESSAGE CHANGES IN THE SAME WINDOW.** It must name the multiplication
+   and the completeness — shaped like "Order accepted — 8 × Breakfast sandwich, $100.00
+   to book." Shipping a new total without the new message means the anti-invention
+   machinery authoritatively states a wrong amount, which is worse than the vagueness
+   it replaced.
+
+**REJECTED (recorded so they are not re-litigated):**
+- **(a) Line items** — buyer names items, server prices them. Rejected for now:
+  per-item prices do not exist. Blue Hour's "$5.25" is display text inside a value
+  string (`shared.ts:171-174` coerces every value to string). Pricing from that means
+  parsing dollars out of vendor prose, which breaks silently on "market price".
+  Structured item prices are a hearth-pos authoring change first.
+- **(c) Vendor types the total at accept** — rejected: it puts arithmetic and typos in
+  the exact place the generated message was built to remove, changes an auth-critical
+  RPC signature (re-minting the anon ACL, full grant block required), and leaves the
+  order entirely unstructured.
+
+**WHAT THIS DOES NOT SOLVE — recorded plainly.** Blue Hour stays unpayable. A four-item
+card genuinely has no single price, and its DEFERRED trigger stays fired-in-waiting.
+Deposits and partial payment do not exist — agreed_price_cents settles once. Modifiers,
+delivery fees, and tax are unaddressed.
+
+**THE HALFWAY TRAP — a warning to whoever builds this.** Quantity accepted at reach but
+not multiplied at accept reproduces the eight-sandwich failure with MORE confidence: the
+count is visible everywhere while the engagement still prices ×1. And a mispriced
+engagement has no in-band remedy — 3b blocks a second charge and dates cannot move, so
+it resolves only by cancel, refund, reorder. A halfway build manufactures refund
+traffic.
+
+**PLACEHOLDERS (recorded with this ruling; not built):**
+- **Media fields on the network side.** hearth-pos ships a full image pipeline
+  (card-media bucket, picker, camera, 12-image galleries) storing URLs in fields under
+  `media_url` and `gallery_image`. The MCP side neither renders nor filters them, so a
+  media-bearing card prints "- media_url: https://…" as a literal text row today. Two
+  halves: filter the reserved labels out of the text tiers, and render images in the
+  sheet — which requires declaring the storage origin in resourceDomains, ending the
+  zero-external-origins property, and an img-src probe (Day 20 proved script-src and
+  connect-src only).
+- **list_entity_cards.** No tool returns one entity's cards — get_card_details takes
+  one id, query_cards accepts an entity filter it never applies (`query-cards.ts:297`).
+  An entity's catalogue as a tile grid needs this tool plus its own grid resource. It
+  reverses NO locked decision: resourceUri binds per-tool, so a new tool gets its own
+  binding and Day 22C's decisions 1 and 2 stand untouched. Full CardViews keep prices
+  grounded the same way get_card_details does.
+
+---
+
 # DAY 23 — Step 6.1 · SMS gateway core
 *Repo: hearth-network.*
 
