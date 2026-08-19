@@ -176,6 +176,18 @@ network-side read surface for the pending-cancel fact (the cancel_requested_refu
 imprint, or a flag the app can read) — a network-repo stop, not a pos patch.
 **Trigger: the first refund-due cancel that is not Derrick's.**
 
+### In-app account deletion  → APP STORE SUBMISSION (hard blocker, not a nice-to-have)
+NO ACCOUNT DELETION EXISTS ANYWHERE (logged 2026-08-19, from the card delete/retire
+investigation). Grep across `src/`, `supabase/`, and this file returns zero hits; the
+only account exit is `useAuth().signOut()` (`SignOutButton`). Apple guideline 5.1.1(v)
+requires in-app account deletion for App Store approval. The entity cascade is wired in
+schema (`cards.entity_id on delete cascade`, hearth-network 0000:69; inbound/threads
+participants cascade off entities too) but no code path, no UI, and no Edge Function
+invokes it — and deleting an `entities` row still leaves the `auth.users` row
+(`entities.user_id` carries no declared FK; comment only, 0000:44). Card delete
+(Day 22E) is a strict subset of this. Not built.
+**Trigger: App Store submission — a hard blocker, not a nice-to-have.**
+
 ---
 
 ## Pre-launch architecture decisions (locked)

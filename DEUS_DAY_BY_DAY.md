@@ -1047,6 +1047,69 @@ traffic.
 
 ---
 
+# DAY 22E — Step 5.8 · Card retire + delete  [WRITTEN 2026-08-19]
+*Repos: hearth-network (retired_at migration + read-path filter sweep) + hearth-pos
+(editor controls, retired sheet, delete guard). Roadmap ruling.
+Docs only — no code, no migration. Not built; the build prompt follows separately.
+Evidence base: the 2026-08-19 card delete/retire investigation (accepted).*
+
+**THE GAP, recorded plainly.** Day 12 specced "⊕ add card; swipe-to-delete" and its
+verify line claimed "add + delete work." Delete was NEVER BUILT — **a verify line passed
+on unbuilt work.**
+- `ProfileScreen.tsx:287` still carries the `{/* TODO(Day 12+): swipe-to-delete lands
+  here. */}` seam; `CardContext`'s full API has no `deleteCard`; no
+  `.from('cards').delete()` exists anywhere in the app.
+- Logged 2026-06-16 (hearth-pos DEFERRED.md, commit `ebd1650`). The trigger re-fired
+  2026-08-19 when Derrick tried to remove a card and could not — a fired trigger left
+  fired for two months, against canon rule 4.
+
+**THE RULINGS (locked 2026-08-19):**
+1. **CARD-LEVEL DELETE, not item-level.** Day 12's spec sits under "⊕ add card"; the
+   DEFERRED entry's item-row framing is a different feature, and per-field Remove
+   already exists in the editor.
+2. **RETIRE IS A `retired_at timestamptz` COLUMN**, not the composite of
+   `see_perm='off'` + `commerce_enabled=false`. The composite destroys the card's
+   permission state — un-retiring cannot restore see_perm 'contacts' because the retire
+   overwrote it, so it needs a shadow column to remember, which is retired_at in
+   disguise. It also cannot distinguish retired from deliberately-private, which the
+   count and the list both depend on, and carries no date. Cost accepted: a migration
+   plus a network-side filter sweep. Every reader of cards excludes retired —
+   query_cards (semantic AND substring paths), get_card_details, card-view,
+   request_payment's title lookup. The app's own fetch KEEPS retired rows and
+   partitions them.
+3. **"PAST ORDERS" COUNTS ENGAGEMENTS, not settled transactions.** Readable today
+   through `engagements_select_participant` (0017:89-93) with no new helper. An order
+   placed is history whether or not it settled.
+4. **THE RETIRED LIST IS A SHEET, not a screen.** CardEditorSheet is already a
+   pageSheet Modal owned by ProfileScreen; a pushed screen would need a stack around
+   Profile, which does not exist.
+5. **PLACEMENT.** Retire sits in the editor header, opposite Save — both are exits from
+   the sheet, one keeps the card, one shelves it. Delete sits at the very bottom of the
+   editor body, red, past every field. Reversible actions live where you leave from;
+   irreversible ones live where you arrive deliberately. The editor has no footer today
+   — both controls are new, and both are edit-mode only, the same gate Commerce already
+   uses (CardEditorSheet.tsx:651).
+6. **RESTORE HAS NO CONFIRM.** Putting a card back is not destructive, and confirming
+   reversible actions trains people to tap through the irreversible ones.
+7. **DELETE REFUSES ON A CARD WITH ORDER HISTORY and points at Retire.** One meaning
+   per control — Delete never silently performs a retire.
+
+**RECORD, do not solve:**
+- **BUG-011** (inbound.card_id cascade → set null, migration 0029, applied 2026-08-19)
+  was the precondition for delete: before it, deleting a card cascade-destroyed its
+  inbound rows and nulled kind / scheduled_for / quantity out of the money history.
+  Retire does not depend on it; delete does.
+- **hearth-pos DEFERRED.md's swipe-to-delete entry is SUPERSEDED by rulings 1 and 5:**
+  no swipe, card-level not item-level. It moves to Done when this ships.
+
+**WHAT THIS DOES NOT SOLVE — recorded plainly.** NO ACCOUNT DELETION EXISTS ANYWHERE.
+The only account exit is signOut; Apple guideline 5.1.1(v) requires in-app account
+deletion for App Store approval, and card delete is a strict subset of it. Logged
+2026-08-19 as its own hearth-pos DEFERRED entry (trigger: App Store submission — a hard
+blocker).
+
+---
+
 # DAY 23 — Step 6.1 · SMS gateway core
 *Repo: hearth-network.*
 
