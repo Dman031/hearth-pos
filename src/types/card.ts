@@ -45,6 +45,10 @@ export interface Card {
   price_currency: string; // not null, default 'usd' (0014)
   commerce_terms: string | null; // free text (0014)
   display_order: number; // not null, default 0
+  // null = live. non-null = the UTC instant the owner retired the card — off
+  // the network (unfindable, unorderable; enforced in the network read paths),
+  // row preserved for order history. Un-retire = set null. (0030, Day 22E.)
+  retired_at: string | null;
   created_at: string; // timestamptz → ISO string
   updated_at: string; // timestamptz → ISO string
 }

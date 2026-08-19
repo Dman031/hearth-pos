@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -15,6 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { ActPerm, Card, CardKind, SeePerm } from '../types/card';
 import useCards from '../hooks/useCards';
+import { countPastOrders, HAS_ORDER_HISTORY } from '../context/CardContext';
 import useEntity from '../hooks/useEntity';
 import {
   fieldsToPersist,
@@ -104,7 +106,8 @@ export default function CardEditorSheet({
   onClose,
   createSeed,
 }: CardEditorSheetProps) {
-  const { createCard, updateCard, setCardCommerce } = useCards();
+  const { createCard, updateCard, setCardCommerce, retireCard, deleteCard } =
+    useCards();
   const { entity, refresh: refreshEntity } = useEntity();
   // Latest entity for reads AFTER an awaited refreshEntity() — the closure's
   // `entity` is stale by then; the ref is not.
@@ -125,6 +128,9 @@ export default function CardEditorSheet({
   const [seePerm, setSeePerm] = useState<SeePerm>(DEFAULT_SEE);
   const [actPerm, setActPerm] = useState<ActPerm>(DEFAULT_ACT);
   const [saving, setSaving] = useState(false);
+  // Day 22E — in-flight state for the two new exits (retire / delete).
+  const [retiring, setRetiring] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imageBroken, setImageBroken] = useState(false);
   // Day 18 — commerce (EDIT mode only: set_card_commerce needs a card id).
@@ -389,6 +395,108 @@ export default function CardEditorSheet({
 
   const trimmedMedia = mediaUrl.trim();
 
+  // Day 22E ruling 5 — RETIRE lives in the header, opposite Save: both are
+  // exits from the sheet, one keeps the card, one shelves it. Confirm states
+  // the consequence plainly; the write is reversible (restore has no confirm).
+  const confirmRetire = useCallback(() => {
+    if (!card) return;
+    Alert.alert(
+      'Retire this card?',
+      'It comes off the network — nobody can find it or order from it. ' +
+        'You can restore it anytime from your profile.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Retire',
+          onPress: () => {
+            void (async () => {
+              setRetiring(true);
+              try {
+                await retireCard(card.id);
+                onClose();
+              } catch (err) {
+                console.error('[CardEditorSheet] retire failed:', err);
+                Alert.alert('Retire', "Couldn't retire the card. Please try again.");
+              } finally {
+                setRetiring(false);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  }, [card, retireCard, onClose]);
+
+  // Day 22E ruling 7 — DELETE refuses on a card with order history and points
+  // at Retire; it NEVER silently retires. The count reads engagements through
+  // the participant-scoped policy (no helper); deleteCard re-enforces the
+  // refusal in code, so this UI check is the message, not the guarantee.
+  const handleDeletePress = useCallback(() => {
+    if (!card) return;
+    void (async () => {
+      setDeleting(true);
+      try {
+        const counts = await countPastOrders([card.id]);
+        const n = counts[card.id] ?? 0;
+        if (n > 0) {
+          Alert.alert(
+            'This card has order history',
+            `${n} past order${n === 1 ? '' : 's'} happened here — deleting the card ` +
+              'would erase that history. Retire it instead: it comes off the ' +
+              'network and the history stays.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Retire instead', onPress: confirmRetire },
+            ],
+          );
+          return;
+        }
+        Alert.alert(
+          'Delete this card for good?',
+          "The card comes off the network and anyone searching won't find it. " +
+            "This can't be undone.",
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Delete',
+              style: 'destructive',
+              onPress: () => {
+                void (async () => {
+                  setDeleting(true);
+                  try {
+                    await deleteCard(card.id);
+                    onClose();
+                  } catch (err) {
+                    console.error('[CardEditorSheet] delete failed:', err);
+                    const refused =
+                      err instanceof Error &&
+                      err.message.startsWith(HAS_ORDER_HISTORY);
+                    Alert.alert(
+                      'Delete',
+                      refused
+                        ? 'An order arrived on this card just now — retire it instead.'
+                        : "Couldn't delete the card. Please try again.",
+                    );
+                  } finally {
+                    setDeleting(false);
+                  }
+                })();
+              },
+            },
+          ],
+        );
+      } catch (err) {
+        console.error('[CardEditorSheet] order-history check failed:', err);
+        Alert.alert(
+          'Delete',
+          "Couldn't check this card's order history. Please try again.",
+        );
+      } finally {
+        setDeleting(false);
+      }
+    })();
+  }, [card, confirmRetire, deleteCard, onClose]);
+
   return (
     <Modal
       visible={visible}
@@ -399,9 +507,32 @@ export default function CardEditorSheet({
     >
       <SafeAreaView style={styles.safe}>
         <View style={styles.headerBar}>
-          <Pressable onPress={onClose} hitSlop={8} disabled={saving}>
-            <Text style={styles.cancel}>Cancel</Text>
-          </Pressable>
+          <View style={styles.headerLeft}>
+            <Pressable onPress={onClose} hitSlop={8} disabled={saving}>
+              <Text style={styles.cancel}>Cancel</Text>
+            </Pressable>
+            {/* Day 22E — Retire, opposite Save: both exit the sheet, one keeps
+                the card, one shelves it. Edit mode only (the Commerce gate);
+                hidden on an already-retired card. */}
+            {mode === 'edit' && card && !card.retired_at ? (
+              <Pressable
+                onPress={confirmRetire}
+                hitSlop={8}
+                disabled={saving || retiring || deleting}
+                accessibilityRole="button"
+                accessibilityLabel="Retire this card"
+              >
+                {retiring ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={theme.colors.textSecondary}
+                  />
+                ) : (
+                  <Text style={styles.retire}>Retire</Text>
+                )}
+              </Pressable>
+            ) : null}
+          </View>
           <Text style={styles.headerTitle}>
             {mode === 'create' ? 'New card' : 'Edit card'}
           </Text>
@@ -783,6 +914,25 @@ export default function CardEditorSheet({
             </Pressable>
 
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+            {/* Day 22E ruling 5 — DELETE at the very bottom, red, past every
+                field: irreversible actions live where you arrive deliberately.
+                Edit mode only. Refuses on order history (see handleDeletePress). */}
+            {mode === 'edit' && card ? (
+              <Pressable
+                style={styles.deleteRow}
+                onPress={handleDeletePress}
+                disabled={saving || retiring || deleting}
+                accessibilityRole="button"
+                accessibilityLabel="Delete this card"
+              >
+                {deleting ? (
+                  <ActivityIndicator size="small" color={theme.colors.danger} />
+                ) : (
+                  <Text style={styles.deleteLabel}>Delete card</Text>
+                )}
+              </Pressable>
+            ) : null}
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -815,6 +965,25 @@ const styles = StyleSheet.create({
   cancel: {
     ...theme.typography.body,
     color: theme.colors.textSecondary,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.lg,
+  },
+  retire: {
+    ...theme.typography.body,
+    color: theme.colors.textMuted,
+  },
+  deleteRow: {
+    marginTop: theme.spacing.xl,
+    paddingVertical: theme.spacing.md,
+    alignItems: 'center',
+  },
+  deleteLabel: {
+    ...theme.typography.body,
+    color: theme.colors.danger,
+    fontFamily: theme.fonts.semiBold,
   },
   save: {
     ...theme.typography.body,

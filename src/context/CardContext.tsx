@@ -22,7 +22,13 @@ import {
 import type { Card, CardDraft } from '../types/card';
 
 interface CardContextValue {
+  /** LIVE cards only (retired_at null) — every pre-22E consumer keeps its
+   *  meaning: the Profile list, onboarding seeds, display_order. */
   cards: Card[];
+  /** Retired cards (retired_at set), newest retirement first. The fetch KEEPS
+   *  these rows and partitions them here — they render behind the Profile
+   *  tab's RETIRED row, never in the main list. (Day 22E rulings 2/4.) */
+  retiredCards: Card[];
   // True during ANY card load, including background refreshes. Do NOT gate a
   // full-screen splash on this — mirror the EntityContext split and use
   // `isInitializing` for the app-level first-load gate.
@@ -78,6 +84,50 @@ interface CardContextValue {
   ) => Promise<Card>;
   completeOnboarding: () => void;
   refresh: () => Promise<void>;
+  // Day 22E — retire / restore / delete.
+  /** Shelves a card: sets retired_at, taking it off the network (the network
+   *  read paths exclude retired rows). Reversible; no re-embed (retire is not
+   *  text, and a retired card is unfindable regardless of its vector). */
+  retireCard: (id: string) => Promise<Card>;
+  /** Puts a retired card back: nulls retired_at. One tap, no confirm at the
+   *  call sites (ruling 6 — restoring is not destructive). */
+  restoreCard: (id: string) => Promise<Card>;
+  /** Deletes a card ROW for good. REFUSES (throws HAS_ORDER_HISTORY:<n>) when
+   *  any engagement references the card — the refusal is enforced HERE, in
+   *  code, not only in the confirm copy (prompt-code contract). Ruling 7:
+   *  one meaning per control — this never silently retires. */
+  deleteCard: (id: string) => Promise<void>;
+}
+
+/** deleteCard's typed refusal — message prefix checked by the editor UI. */
+export const HAS_ORDER_HISTORY = 'HAS_ORDER_HISTORY';
+
+/**
+ * Past orders for a set of cards, read through the participant-scoped
+ * engagements_select_participant policy (0017) — the owner is the seller on
+ * every engagement of their own card, so a plain select is fully scoped and
+ * NO new definer helper is needed (Day 22E ruling 3). Returns card_id → count;
+ * ids with no engagements are simply absent. Shared by the delete guard and
+ * the retired list's "{n} past orders" line.
+ */
+export async function countPastOrders(
+  cardIds: string[],
+): Promise<Record<string, number>> {
+  if (cardIds.length === 0) return {};
+  const { data, error } = await supabase
+    .from('engagements')
+    .select('card_id')
+    .in('card_id', cardIds);
+  if (error) {
+    // Callers treat a failed count as unknown, never as zero — a DB error must
+    // not unlock Delete on a card that actually has history.
+    throw toError(error, 'failed to count past orders');
+  }
+  const counts: Record<string, number> = {};
+  for (const row of (data as { card_id: string | null }[] | null) ?? []) {
+    if (row.card_id) counts[row.card_id] = (counts[row.card_id] ?? 0) + 1;
+  }
+  return counts;
 }
 
 const CardContext = createContext<CardContextValue | null>(null);
@@ -90,7 +140,7 @@ const CARD_COLUMNS =
   'id, entity_id, title, kind, fields, see_perm, act_perm, ' +
   'verification_required, verification_status, commerce_enabled, ' +
   'price_cents, price_currency, commerce_terms, ' +
-  'display_order, created_at, updated_at';
+  'display_order, retired_at, created_at, updated_at';
 
 // Fire-and-forget: embed a newly-created/edited card for semantic search via the
 // embed-card edge function (which holds the Cloudflare key server-side). NEVER
@@ -136,11 +186,27 @@ export function CardProvider({ children }: CardProviderProps) {
   const { entity } = useEntityContext();
   const entityId = entity?.id ?? null;
 
-  const [cards, setCards] = useState<Card[]>([]);
+  // ALL of the entity's card rows, live AND retired — the fetch keeps retired
+  // rows (Day 22E ruling: partition, don't filter). The exported `cards` /
+  // `retiredCards` are derived views below.
+  const [allCards, setAllCards] = useState<Card[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitializing, setIsInitializing] = useState(true);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+
+  // The partition (Day 22E): live in the list, retired behind the RETIRED row.
+  const cards = useMemo(
+    () => allCards.filter((c) => c.retired_at === null),
+    [allCards],
+  );
+  const retiredCards = useMemo(
+    () =>
+      allCards
+        .filter((c) => c.retired_at !== null)
+        .sort((a, b) => (a.retired_at! < b.retired_at! ? 1 : -1)),
+    [allCards],
+  );
 
   const activeController = useRef<AbortController | null>(null);
   // The entity id whose first load has resolved. Lets the load effect tell a
@@ -172,14 +238,14 @@ export function CardProvider({ children }: CardProviderProps) {
       if (queryError) {
         console.error('[CardProvider] failed to load cards:', queryError);
         setError(toError(queryError, 'failed to load cards'));
-        setCards([]);
+        setAllCards([]);
         return;
       }
 
       // Cast through unknown: a dynamic select() column string makes supabase-js
       // infer GenericStringError[] rather than the row type.
       const loaded = (data as unknown as Card[] | null) ?? [];
-      setCards(loaded);
+      setAllCards(loaded);
       // Latch the onboarding decision exactly once per entity, at first-load
       // resolution. A returning user with cards skips the helper for good.
       if (initializedEntityId.current !== id) {
@@ -191,7 +257,7 @@ export function CardProvider({ children }: CardProviderProps) {
       }
       console.error('[CardProvider] unexpected error loading cards:', err);
       setError(toError(err, 'unexpected error loading cards'));
-      setCards([]);
+      setAllCards([]);
     } finally {
       if (!controller.signal.aborted) {
         setIsLoading(false);
@@ -204,7 +270,7 @@ export function CardProvider({ children }: CardProviderProps) {
   useEffect(() => {
     if (!entityId) {
       // No entity yet (pre-setup) — nothing to load, and nothing to onboard.
-      setCards([]);
+      setAllCards([]);
       setError(null);
       setIsLoading(false);
       setIsInitializing(false);
@@ -229,7 +295,7 @@ export function CardProvider({ children }: CardProviderProps) {
   const refresh = useCallback(async (): Promise<void> => {
     if (!entityId) {
       activeController.current?.abort();
-      setCards([]);
+      setAllCards([]);
       setError(null);
       setIsLoading(false);
       setIsInitializing(false);
@@ -294,7 +360,7 @@ export function CardProvider({ children }: CardProviderProps) {
         }
 
         const created = data as unknown as Card;
-        setCards((prev) => [...prev, created]);
+        setAllCards((prev) => [...prev, created]);
         // Embed for semantic search out-of-band — never blocks the return.
         void triggerEmbedCard(created.id);
         return created;
@@ -351,7 +417,7 @@ export function CardProvider({ children }: CardProviderProps) {
         }
 
         const updated = data as unknown as Card;
-        setCards((prev) => prev.map((c) => (c.id === id ? updated : c)));
+        setAllCards((prev) => prev.map((c) => (c.id === id ? updated : c)));
         // Re-embed out-of-band so the edited card gets a fresh vector — never
         // blocks the save (mirrors createCard).
         void triggerEmbedCard(id);
@@ -401,8 +467,10 @@ export function CardProvider({ children }: CardProviderProps) {
       );
 
       // Optimistic: flip locally now (one-tap feel), revert if the write fails.
-      const prevCards = cards;
-      setCards((prev) =>
+      // Snapshot ALL rows — reverting with the live-only view would drop the
+      // retired partition.
+      const prevCards = allCards;
+      setAllCards((prev) =>
         prev.map((c) => (c.id === cardId ? { ...c, fields: nextFields } : c)),
       );
 
@@ -429,16 +497,16 @@ export function CardProvider({ children }: CardProviderProps) {
 
         // Reconcile with the authoritative row (e.g. updated_at).
         const updated = data as unknown as Card;
-        setCards((prev) => prev.map((c) => (c.id === cardId ? updated : c)));
+        setAllCards((prev) => prev.map((c) => (c.id === cardId ? updated : c)));
       } catch (err) {
         // Revert the optimistic flip and surface the error.
-        setCards(prevCards);
+        setAllCards(prevCards);
         const wrapped = toError(err, 'failed to set field availability');
         console.error('[CardProvider] setFieldAvailability failed:', wrapped);
         setError(wrapped);
       }
     },
-    [cards],
+    [cards, allCards],
   );
 
   const setCardCommerce = useCallback(
@@ -482,13 +550,103 @@ export function CardProvider({ children }: CardProviderProps) {
         }
 
         const updated = data as unknown as Card;
-        setCards((prev) => prev.map((c) => (c.id === cardId ? updated : c)));
+        setAllCards((prev) => prev.map((c) => (c.id === cardId ? updated : c)));
         return updated;
       } catch (err) {
         const wrapped = toError(err, 'failed to update card commerce');
         console.error('[CardProvider] setCardCommerce failed:', wrapped);
         setError(wrapped);
         throw wrapped;
+      }
+    },
+    [],
+  );
+
+  // Day 22E — the single retire/restore write. NO triggerEmbedCard: retiring
+  // is not text (mirrors the Day 13 guardrail), and the network's read paths
+  // exclude retired rows regardless of their vector. Explicit CARD_COLUMNS +
+  // .select().single() so a silent RLS zero-row block surfaces as failure
+  // (SUPABASE WRITE RULE).
+  const writeRetiredAt = useCallback(
+    async (id: string, retiredAt: string | null, context: string): Promise<Card> => {
+      setError(null);
+      try {
+        const { data, error: updateError } = await supabase
+          .from('cards')
+          .update({ retired_at: retiredAt })
+          .eq('id', id)
+          .select(CARD_COLUMNS)
+          .single();
+        if (updateError) {
+          throw toError(updateError, `${context} failed`);
+        }
+        if (!data) {
+          throw new Error(
+            `[CardProvider] ${context} returned no row (possible RLS block)`,
+          );
+        }
+        const updated = data as unknown as Card;
+        setAllCards((prev) => prev.map((c) => (c.id === id ? updated : c)));
+        return updated;
+      } catch (err) {
+        const wrapped = toError(err, `failed to ${context}`);
+        console.error(`[CardProvider] ${context} failed:`, wrapped);
+        setError(wrapped);
+        throw wrapped;
+      }
+    },
+    [],
+  );
+
+  const retireCard = useCallback(
+    (id: string) => writeRetiredAt(id, new Date().toISOString(), 'retire card'),
+    [writeRetiredAt],
+  );
+
+  const restoreCard = useCallback(
+    (id: string) => writeRetiredAt(id, null, 'restore card'),
+    [writeRetiredAt],
+  );
+
+  const deleteCard = useCallback(
+    async (id: string): Promise<void> => {
+      setError(null);
+      try {
+        // The refusal is enforced here, in code (prompt-code contract): any
+        // engagement on the card blocks the delete — the row is order history.
+        // countPastOrders throws on a DB error, so an unreadable count blocks
+        // too (unknown is never treated as zero).
+        const counts = await countPastOrders([id]);
+        const n = counts[id] ?? 0;
+        if (n > 0) {
+          throw new Error(`${HAS_ORDER_HISTORY}:${n}`);
+        }
+        // .select() so zero rows on a PK match (RLS/constraint silent block)
+        // is failure, not success (SUPABASE WRITE RULE).
+        const { data, error: deleteError } = await supabase
+          .from('cards')
+          .delete()
+          .eq('id', id)
+          .select('id');
+        if (deleteError) {
+          throw toError(deleteError, 'delete card failed');
+        }
+        if (!data || data.length === 0) {
+          throw new Error(
+            '[CardProvider] delete returned no row (possible RLS block)',
+          );
+        }
+        setAllCards((prev) => prev.filter((c) => c.id !== id));
+      } catch (err) {
+        const wrapped = toError(err, 'failed to delete card');
+        // The typed refusal passes through un-wrapped so the editor can read it.
+        const surfaced =
+          err instanceof Error && err.message.startsWith(HAS_ORDER_HISTORY)
+            ? err
+            : wrapped;
+        console.error('[CardProvider] deleteCard failed:', surfaced);
+        setError(surfaced);
+        throw surfaced;
       }
     },
     [],
@@ -501,6 +659,7 @@ export function CardProvider({ children }: CardProviderProps) {
   const value = useMemo<CardContextValue>(
     () => ({
       cards,
+      retiredCards,
       isLoading,
       isInitializing,
       error,
@@ -511,9 +670,13 @@ export function CardProvider({ children }: CardProviderProps) {
       setCardCommerce,
       completeOnboarding,
       refresh,
+      retireCard,
+      restoreCard,
+      deleteCard,
     }),
     [
       cards,
+      retiredCards,
       isLoading,
       isInitializing,
       error,
@@ -524,6 +687,9 @@ export function CardProvider({ children }: CardProviderProps) {
       setCardCommerce,
       completeOnboarding,
       refresh,
+      retireCard,
+      restoreCard,
+      deleteCard,
     ],
   );
 

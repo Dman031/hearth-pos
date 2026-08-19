@@ -17,6 +17,7 @@ import ProfileCard from '../components/ProfileCard';
 import CardEditorSheet, {
   type CardEditorSeed,
 } from '../components/CardEditorSheet';
+import RetiredCardsSheet from '../components/RetiredCardsSheet';
 import useMediaUpload from '../hooks/useMediaUpload';
 import { parseMenu } from '../services/menu-parse';
 import { startIdentityVerification } from '../services/stripe';
@@ -53,8 +54,10 @@ const VERIFY_ERROR_COPY: Record<string, string> = {
 
 export default function ProfileScreen() {
   const { entity, refresh } = useEntity();
-  const { cards, setFieldAvailability } = useCards();
+  const { cards, retiredCards, setFieldAvailability } = useCards();
   const [starting, setStarting] = useState(false);
+  // Day 22E — the retired list sheet (ruling 4: a sheet, not a screen).
+  const [showRetired, setShowRetired] = useState(false);
   // The card open in the editor sheet (null = not editing). Day 12: rename,
   // fields, flavor, permissions + verification lock, and content media.
   const [editingCard, setEditingCard] = useState<Card | null>(null);
@@ -284,8 +287,34 @@ export default function ProfileScreen() {
           )}
         </View>
 
-        {/* TODO(Day 12+): swipe-to-delete lands here. */}
+        {/* Day 22E — retired cards live behind this row (renders only when
+            something is retired), never in the list above. Delete itself lives
+            inside the card editor — deliberate, card-level, never a swipe. */}
+        {retiredCards.length > 0 ? (
+          <Pressable
+            style={styles.retiredRow}
+            onPress={() => setShowRetired(true)}
+            accessibilityRole="button"
+            accessibilityLabel={`Retired cards, ${retiredCards.length}`}
+          >
+            <Text style={styles.retiredRowLabel}>
+              RETIRED · {retiredCards.length}
+            </Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
+
+      <RetiredCardsSheet
+        visible={showRetired}
+        onClose={() => setShowRetired(false)}
+        onOpenCard={(card) => {
+          // Close the list first, then open the editor — sequential sheets,
+          // the same pageSheet pattern (no stacked modals).
+          setShowRetired(false);
+          setMenuSeed(null);
+          setEditingCard(card);
+        }}
+      />
 
       <CardEditorSheet
         mode={editorMode}
@@ -367,6 +396,15 @@ const styles = StyleSheet.create({
   cardsEmpty: {
     ...theme.typography.bodyMuted,
     color: theme.colors.textMuted,
+  },
+  retiredRow: {
+    marginTop: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+  },
+  retiredRowLabel: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    letterSpacing: 1,
   },
   name: {
     ...theme.typography.h1,
