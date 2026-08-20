@@ -61,6 +61,36 @@ Process rules:
 - 1.5% fee on all transactions (free tier and paid tier)
 - Vendor earns $5/mo referral kickback per household conversion, 12 months max
 
+## Build Discipline
+
+Mirrored from hearth-network CLAUDE.md (2026-08-20); the rules are family-wide.
+
+### PROOF-OF-WORK RULE (standing, 2026-08-20)
+
+Every completion report ends with a verification command **run at report time** and its
+raw pasted output, checking the artifact itself — never the narrative about it:
+
+- **code change:** `git log --oneline -1` AND a `grep -n` of the changed line from the
+  working tree
+- **migration:** the `pg_proc` / `information_schema` / `pg_constraint` query result
+- **deploy:** a fetch of the deployed artifact (`resources/read` via the MCP Inspector,
+  or `curl`) grepping for the change
+
+A report without pasted command output is not a report and must not be accepted (the proof-of-work rule applies to the report that ships this rule, too). Quoting
+from memory is not evidence: context goes stale the moment another session touches the
+tree. Origin: BUGS_AND_SOLUTIONS.md PROCESS-001 (a fabricated completion report was
+accepted, merged against, and deployed) and BUG-012 (a with-media proof shipped as a
+quoted string, not a rendered artifact); the Day 12 verify line that passed on unbuilt
+work (DEUS_DAY_BY_DAY.md Day 22E) is the same failure class — three instances, promoted.
+
+### One session per repo (canon, restated with teeth)
+
+Before any edit, run `git branch --show-current` and `git status --porcelain` and include
+both in the first message of the session. If the branch or the tree state does not match
+what the prompt assumes, **STOP and say so** rather than proceeding. A prompt that names a
+branch or commit that `git log --all` cannot find is a prompt built on a report that was
+never verified — treat it as PROCESS-001 until shown otherwise.
+
 ## MANDATORY: INVESTIGATE BEFORE IMPLEMENTING
 
 Every task follows this three-step protocol. No exceptions.
