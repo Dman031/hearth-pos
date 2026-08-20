@@ -1039,7 +1039,7 @@ traffic.
   zero-external-origins property, and an img-src probe (Day 20 proved script-src and
   connect-src only).
 - **list_entity_cards.** No tool returns one entity's cards — get_card_details takes
-  one id, query_cards accepts an entity filter it never applies (`query-cards.ts:297`).
+  one id, query_cards accepts an entity filter it never applies (`query-cards.ts:335`).
   An entity's catalogue as a tile grid needs this tool plus its own grid resource. It
   reverses NO locked decision: resourceUri binds per-tool, so a new tool gets its own
   binding and Day 22C's decisions 1 and 2 stand untouched. Full CardViews keep prices
