@@ -1038,6 +1038,29 @@ traffic.
   sheet — which requires declaring the storage origin in resourceDomains, ending the
   zero-external-origins property, and an img-src probe (Day 20 proved script-src and
   connect-src only).
+
+  **IMG-SRC VERDICT, 2026-08-20: LOADED.** Probed live on the card sheet with a Supabase
+  Storage object; Claude rendered it and the verdict line read LOADED. Day 20 proved
+  script-src and connect-src; this closes the third arm — the host honors
+  resourceDomains for img-src. The transport for card images exists.
+
+  Still open, and each is a ruling before any image build:
+  - **The public-bucket posture.** card-media is public by construction, so a
+    contacts-gated card's image is fetchable by anyone holding the URL (already ledgered
+    in hearth-pos DEFERRED). Rendering it makes the accepted exposure more visible, not
+    larger.
+  - **Bucket-only vs a proxy origin.** CSP origins are enumerated once at resource
+    registration, so an allowlist covers the storage bucket and nothing else —
+    vendor-pasted links (a live card carries a picsum.photos URL) would never render. A
+    proxy covers both at the cost of serving third-party bytes under our own origin,
+    which is a product posture, not just a security one.
+  - **Declaring any origin ends the zero-external-origins property** the sheets
+    currently audit on. That is deliberate, and the comment that makes it auditable must
+    change with it.
+
+  The probe branch (`probe/img-src`) was deployed, read, reverted, and deleted (was
+  `46755e8`); production returned to `03c984e`.
+
 - **list_entity_cards.** No tool returns one entity's cards — get_card_details takes
   one id, query_cards accepts an entity filter it never applies (`query-cards.ts:335`).
   An entity's catalogue as a tile grid needs this tool plus its own grid resource. It
