@@ -1397,3 +1397,26 @@ R1-CONFIRMED (2026-08-20, evening): all three v1 Oregon boards are
     Exact endpoint shapes to be captured in CRED S2 investigation (devtools
     network capture; quote method, URL pattern, response fields). Vendor
     remains post-sprint. Confirms R1 (line 1362); vendor still deferred.
+
+## RULINGS — 2026-08-21 (identity-flow amendment, approved for pos-0003)
+R3-AMENDED: Stripe gates verified_outputs.dob behind a restricted key with a
+    48-hour window after verification (IP-restricted keys lift the window;
+    our edge/Worker runtimes have no fixed egress IP, so that variant is
+    unavailable). The in-memory DOB read for OIG LEIE disambiguation works
+    only inside that window. Outside it, or when the session is redacted,
+    an ambiguous exclusion hit lands in manual_review — structurally: never
+    a guess, never an in-app DOB prompt. Name-only concordance (secret key,
+    no window) is unaffected.
+R2-ADDENDUM: We do NOT call the Identity redact endpoint. Unredacted
+    sessions are what make re-bind (listing by metadata.entity_id) and
+    re-verify possible. Post-concordance redaction is DEFERRED with the
+    re-bindability tradeoff noted (DEFERRED.md 2026-08-21).
+R-LEDGER: hearth-pos migrations receipt as 'pos-NNNN' in the shared
+    schema_migrations ledger (bare numeric ids are hearth-network's
+    sequence); pos-0001/pos-0002 catch-up rows ride in pos-0003. Rule text
+    lives in CLAUDE.md MIGRATION LEDGER (both repos).
+R-GAP: six id_verified=true entities predate the binding. Four with logins
+    re-bind via the one-time ops script (scripts/rebind-identity-sessions);
+    two without (deus_id 184203 Blue Hour, 100001 Derrick Wilson — hand-set
+    flags, no session ever existed) are reset to id_verified=false by the
+    script's guarded final step (R7: stamps mean a check happened).

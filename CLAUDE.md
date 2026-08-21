@@ -321,3 +321,4 @@ The planes never cross. The settled ledger is deliberately NOT a Worker endpoint
   - Row without file = applied, not committed → **BLOCKED**; the `.sql` must land in `migrations/` first.
   - Match = proceed.
   Never build through drift. (Known deliberate gap: `'0015'` has no ledger row and no file on `main` — it exists only on `day19-process-payment`; apply state unresolved.)
+- **POS SEQUENCE RULE (2026-08-21).** hearth-pos migrations live in `supabase/migrations/` and receipt into the SAME ledger as `'pos-NNNN'` (e.g. `insert into public.schema_migrations (id) values ('pos-0003');`) — bare numeric ids are hearth-network's sequence (seeded by its 0031) and must never be reused. Parity for this repo: `select id from public.schema_migrations where id like 'pos-%' order by id;` vs `ls supabase/migrations/`. Catch-up rows `pos-0001`/`pos-0002` ride in `pos-0003`.

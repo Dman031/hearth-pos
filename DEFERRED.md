@@ -200,6 +200,20 @@ invokes it — and deleting an `entities` row still leaves the `auth.users` row
   build MUST extend `RESERVED_EMBED_SKIP_LABELS` for its labels as part of its build prompt.**
   Standing discipline line — not a trigger, a rule for every seed from here on.
 
+### Post-concordance Identity redaction (logged 2026-08-21 — R2-ADDENDUM; pos-0003 on feat/identity-session)
+- **We do NOT call `POST /v1/identity/verification_sessions/{id}/redact`.** Stripe retains the
+  session (name, DOB, images) until redaction; that retention is what makes two things possible:
+  (1) **re-bind** — `entity_identity_sessions` can be rebuilt from Stripe by listing verified
+  sessions and matching `metadata.entity_id` (redaction erases metadata); (2) **re-verify /
+  re-concordance** — the verified name stays fetchable (secret key, no window) for any future
+  credential binding or rebinding. Redacting after the first concordance would close both.
+- **Tradeoff recorded:** privacy-minimal posture says redact once the SHA-256(normalised name)
+  sits on the `verifications` row; operational posture says keep the session so the boolean
+  stays re-provable. **Deferred until the `verifications` table exists and a re-bind has been
+  exercised once in prod.** When revisited: redact only sessions whose entity holds a
+  `verified` verifications row, and accept that those entities need a fresh ID check to ever
+  re-bind. Never redact an entity with no `verifications` row.
+
 ---
 
 ## Pre-launch architecture decisions (locked)
