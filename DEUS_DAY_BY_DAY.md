@@ -1388,3 +1388,12 @@ R7: Trials seed entity id_verified resets to false. No recorded origin;
 R8: Embedding assembly = DENYLIST + 400-char per-field cap (skip set +=
     eligibility, url, contact, cfda, opportunity id, opportunity number,
     nct id), NOT allowlist. Embed kind now to avoid a second re-backfill.
+R1-CONFIRMED (2026-08-20, evening): all three v1 Oregon boards are
+    electronically verifiable free of charge — OMB's public portal is
+    board-stated primary source verification (omb.oregon.gov/search;
+    legacy verification.aspx and daily-updated DocFinder as fallbacks);
+    OBLPCT and Board of Psychology both run on Thentia Cloud
+    (oblpct/obop.us.thentiacloud.net), public lookups are SPA-over-REST.
+    Exact endpoint shapes to be captured in CRED S2 investigation (devtools
+    network capture; quote method, URL pattern, response fields). Vendor
+    remains post-sprint. Confirms R1 (line 1362); vendor still deferred.
