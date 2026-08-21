@@ -11,9 +11,10 @@
 // An unsigned or mis-signed request is rejected with 400 and writes nothing.
 //
 // Privacy: the event payload for identity.verification_session.* contains only
-// status/metadata — never the document image or extracted PII (those require a
-// separate, explicit VerificationReport fetch we deliberately never make). We
-// read `metadata.entity_id` and the verified status, and write a single boolean.
+// status/metadata/ids — never the document image or extracted PII (those require
+// an explicit expand we never make here). We read `metadata.entity_id`, the
+// verified status, and the session/report IDS, and write the boolean plus those
+// ids (entity_identity_sessions, service-role only — R2). No name, no DOB.
 //
 // Idempotent: Stripe retries deliveries. Flipping id_verified=true repeatedly is
 // harmless; we update by primary key and treat zero-rows as a logged failure
@@ -22,7 +23,7 @@
 /// <reference lib="deno.ns" />
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import Stripe from 'https://esm.sh/stripe@17.5.0?target=deno';
+import Stripe from 'npm:stripe@17.5.0';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -53,6 +54,8 @@ const stripe = new Stripe(STRIPE_SECRET_KEY, {
   httpClient: Stripe.createFetchHttpClient(),
   apiVersion: '2024-12-18.acacia',
 });
+// constructEventAsync needs an explicit WebCrypto provider under npm:stripe (BUG-007).
+const cryptoProvider = Stripe.createSubtleCryptoProvider();
 
 function textResponse(body: string, status = 200): Response {
   return new Response(body, { status, headers: { 'content-type': 'text/plain' } });
@@ -65,13 +68,52 @@ function entityIdFromMetadata(metadata: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
+/** The Stripe ids we persist alongside the verdict — ids only, never PII. */
+interface VerifiedSessionRef {
+  sessionId: string;
+  reportId: string | null;
+  livemode: boolean;
+}
+
 /**
- * Flips id_verified=true for one entity via the service role. Chains .select()
- * so we can confirm a row was actually affected — zero rows on a PK match means
- * the entity_id is stale/missing and MUST be treated as failure, not success.
+ * Records the verdict for one entity via the service role, in this order:
+ *   1. upsert the session/report ids into entity_identity_sessions;
+ *   2. flip entities.id_verified = true.
+ * The binding lands FIRST so a verified entity is never left unbindable: if (1)
+ * fails we throw before the flag flips and Stripe's retry re-runs both
+ * (idempotent — upsert by entity_id, flag flip by PK). Chains .select() on both
+ * writes — zero rows is an RLS/FK silent-block signature and MUST be failure.
  */
-async function markEntityVerified(entityId: string): Promise<void> {
+async function markEntityVerified(
+  entityId: string,
+  ref: VerifiedSessionRef,
+): Promise<void> {
   const client = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+
+  const nowIso = new Date().toISOString();
+  const { data: bound, error: bindError } = await client
+    .from('entity_identity_sessions')
+    .upsert(
+      {
+        entity_id: entityId,
+        stripe_session_id: ref.sessionId,
+        stripe_report_id: ref.reportId,
+        livemode: ref.livemode,
+        verified_at: nowIso,
+        updated_at: nowIso,
+      },
+      { onConflict: 'entity_id' },
+    )
+    .select('entity_id');
+  if (bindError) {
+    throw new Error(`entity_identity_sessions upsert failed: ${bindError.message}`);
+  }
+  if (!bound || bound.length === 0) {
+    throw new Error(
+      `entity_identity_sessions upsert affected no rows for entity_id=${entityId}`,
+    );
+  }
+
   const { data, error } = await client
     .from('entities')
     .update({ id_verified: true })
@@ -87,7 +129,10 @@ async function markEntityVerified(entityId: string): Promise<void> {
         '(entity missing — verdict could not be recorded)',
     );
   }
-  console.log('[stripe-identity-webhook] id_verified=true for', entityId);
+  console.log('[stripe-identity-webhook] id_verified=true for', entityId, {
+    session_id: ref.sessionId,
+    report_id: ref.reportId,
+  });
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
@@ -111,6 +156,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
       rawBody,
       signature,
       STRIPE_IDENTITY_WEBHOOK_SECRET!,
+      undefined,
+      cryptoProvider,
     );
   } catch (err) {
     console.warn('[stripe-identity-webhook] signature verification failed:', err);
@@ -131,8 +178,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
       // Nothing to write, but ack so Stripe does not retry indefinitely.
       return textResponse('no_entity_metadata', 200);
     }
+    // last_verification_report is `string | VerificationReport | null` — a
+    // plain id in webhook payloads (unexpanded). Normalise defensively.
+    const report = sessionObj.last_verification_report;
+    const reportId = typeof report === 'string' ? report : report?.id ?? null;
     try {
-      await markEntityVerified(entityId);
+      await markEntityVerified(entityId, {
+        sessionId: sessionObj.id,
+        reportId,
+        livemode: sessionObj.livemode,
+      });
     } catch (err) {
       // Return 500 so Stripe retries — the verdict is real, the write failed.
       console.error('[stripe-identity-webhook] failed to record verdict:', err);
