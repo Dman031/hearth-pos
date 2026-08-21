@@ -297,3 +297,22 @@ The Worker at mcp.teleoplexy.ai accepts exactly TWO token planes. Adding a third
 2. **App Supabase session — `/money/*` only.** The iOS app forwards its EXISTING Supabase access token as `Authorization: Bearer`. The Worker validates it with `auth.getUser(jwt)` — the sanctioned anon-key auth-plane call — and binds the entity server-side via the unique `entities.user_id` (the consent page's binding, hearth-network `src/oauth/handler.ts:185-203`, applied to a forwarded session instead of typed credentials). App-facing. Never accepts an MCP OAuth token.
 
 The planes never cross. The settled ledger is deliberately NOT a Worker endpoint: the app calls `public.get_my_settled_payments` (migration 0027, granted to `authenticated`) directly with its own session — `current_entity_id()` does the scoping. A Worker settled proxy would be a second read path beside 0027 and is forbidden.
+
+<!-- Mirrored verbatim from hearth-network/CLAUDE.md on 2026-08-20 (docs-only sync
+     exception to one-session-per-repo; the ledger table and migrations/ live in
+     hearth-network — this copy exists so a hearth-pos session sees the same rule). -->
+## MIGRATION LEDGER (2026-08-20)
+
+`public.schema_migrations` (`id text primary key`, `applied_at timestamptz`; RLS enabled; anon/authenticated revoked — migration `0031`, hand-applied 2026-08-20) is the authoritative record of apply state. Two standing rules:
+
+- **RECEIPT RULE.** Every new migration file ends with its own receipt as the FINAL statement:
+  ```sql
+  insert into public.schema_migrations (id) values ('00XX');
+  ```
+  Applying the file in the SQL editor IS recording it — the ledger row and the schema change land in the same transaction. There is no separate "mark applied" step.
+- **PARITY RULE.** At session start, before naming any migration number or assuming any schema, run
+  `select id from public.schema_migrations order by id;` and compare against `ls migrations/`.
+  - File without row = written, not applied → **BLOCKED**; Derrick hand-applies.
+  - Row without file = applied, not committed → **BLOCKED**; the `.sql` must land in `migrations/` first.
+  - Match = proceed.
+  Never build through drift. (Known deliberate gap: `'0015'` has no ledger row and no file on `main` — it exists only on `day19-process-payment`; apply state unresolved.)

@@ -1085,6 +1085,7 @@ on unbuilt work.**
 - Logged 2026-06-16 (hearth-pos DEFERRED.md, commit `ebd1650`). The trigger re-fired
   2026-08-19 when Derrick tried to remove a card and could not — a fired trigger left
   fired for two months, against canon rule 4.
+- Promoted to CLAUDE.md rule on 2026-08-20 (PROCESS-001).
 
 **THE RULINGS (locked 2026-08-19):**
 1. **CARD-LEVEL DELETE, not item-level.** Day 12's spec sits under "⊕ add card"; the
@@ -1347,3 +1348,24 @@ pull → normalize → generate → migrate → backfill embeddings.
 **Standing rule for this track:** each seed carries a forever-refresh obligation —
 scheduled re-pull → upsert by native ID → re-embed changed — or the cards go stale. A stale
 card is worse than no card.
+
+---
+
+## LEDGER — 2026-08-20
+- 0030 card_retired_at: CONFIRMED APPLIED (column verified live; commit 0f14f75's
+  "NOT applied" is stale as of today).
+- 0031 schema_migrations: APPLIED by hand from strategy chat; repo file written same day
+  by Derrick (commit a923f26). Ledger is authoritative for apply state from this point
+  forward.
+
+## RULINGS — 2026-08-20 (retrieval hygiene, approved for 0032)
+R5: match_cards gains the kinds predicate AND retired_at filtering SQL-side (0030's
+    deferred follow-on ruling, now made). filterRetired dies on the semantic path.
+R6: Registry seed rows (0015 trials, 0026 grants) re-kind to 'content'.
+    Informational content, not capabilities; the seeding kind was the
+    error. No enum change.
+R7: Trials seed entity id_verified resets to false. No recorded origin;
+    no identity check ever ran. Stamps mean a check happened.
+R8: Embedding assembly = DENYLIST + 400-char per-field cap (skip set +=
+    eligibility, url, contact, cfda, opportunity id, opportunity number,
+    nct id), NOT allowlist. Embed kind now to avoid a second re-backfill.
