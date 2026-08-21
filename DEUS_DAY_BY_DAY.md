@@ -1358,6 +1358,25 @@ card is worse than no card.
   by Derrick (commit a923f26). Ledger is authoritative for apply state from this point
   forward.
 
+## RULINGS — 2026-08-20 (credential verification, pre-build)
+R1: PSV path v1 = direct sources: NPPES + Oregon board lookups + OIG
+    LEIE. No vendor. PSV vendor is a post-sprint upgrade; interface
+    unchanged (verifications.source / .method carry the distinction).
+R2: We never store legal name or DOB. Identity amendment stores the
+    Stripe Identity verification session id only (server-readable,
+    never client-readable). Verified name fetched server-side at
+    concordance time, compared in memory, discarded; persist only
+    outcome + SHA-256 of the normalized name.
+R3: Concordance v1 = normalized-name exact match, license number as
+    discriminator. DOB is not a concordance input on the direct-source
+    path (no source exposes it); DOB read in memory solely to
+    disambiguate OIG LEIE hits, persisted nowhere; DOB becomes a
+    concordance input only under source vendor:*.
+R4: One active verified row per registry_ref network-wide (partial
+    unique index: status='verified' and voided_at is null). Second
+    claimant on a bound license lands in manual_review, structurally.
+    No override path exists.
+
 ## RULINGS — 2026-08-20 (retrieval hygiene, approved for 0032)
 R5: match_cards gains the kinds predicate AND retired_at filtering SQL-side (0030's
     deferred follow-on ruling, now made). filterRetired dies on the semantic path.
