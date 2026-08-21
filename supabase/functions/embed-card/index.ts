@@ -88,7 +88,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   // keeps a signed-in user from triggering embeds on cards they don't own.
   const { data: card, error: loadErr } = await supabase
     .from('cards')
-    .select('id, title, fields, entities!inner(user_id)')
+    .select('id, title, kind, fields, entities!inner(user_id)')
     .eq('id', cardId)
     .maybeSingle();
 
@@ -107,7 +107,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   const ok = await embedAndStore(
     supabase,
-    { id: cardId, title: (card as { title: string }).title, fields: (card as { fields: unknown }).fields },
+    {
+      id: cardId,
+      title: (card as { title: string }).title,
+      kind: (card as { kind: string }).kind,
+      fields: (card as { fields: unknown }).fields,
+    },
     CF_ACCOUNT_ID!,
     CF_AI_API_TOKEN!,
   );

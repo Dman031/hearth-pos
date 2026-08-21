@@ -249,6 +249,11 @@ revoke all     on function public.f(...) from public;
 revoke execute on function public.f(...) from anon;
 grant  execute on function public.f(...) to authenticated;
 -- (+ service_role only where a service-role actor arm exists)
+-- For a function with NO app caller (service-role only — e.g. match_cards):
+--   revoke execute on function public.f(...) from authenticated;   -- instead of the grant above
+--   grant  execute on function public.f(...) to service_role;
+-- The default ACL mints authenticated EXECUTE at CREATE time exactly like anon's;
+-- revoking PUBLIC never touches it. (Approved 2026-08-20, hearth-network 0032:102.)
 ```
 
 WHY the anon line is not redundant — never drop it: PUBLIC is a pseudo-role, and revoking it removes only the PUBLIC ACL entry. anon holds a DIRECT grant minted at CREATE time by the database's default privileges — `pg_default_acl` carries TWO `defaclobjtype='f'` rows (owners `postgres` and `supabase_admin`), both granting anon EXECUTE — so every future CREATE FUNCTION re-mints the direct anon grant regardless of which role runs the migration, and revoking PUBLIC never touches it. Same-signature CREATE OR REPLACE preserves the existing ACL (no re-mint); a DROP + recreate or a new signature re-mints and needs the block again. Sweep: `grep -rn -iE "create (or replace )?function" --include='*.sql' --exclude-dir=node_modules .` — every hit's migration must also contain the matching `from public` and `from anon` revoke lines. Origin: hearth-network BUG-009 (anon/PUBLIC EXECUTE on all fifteen RPCs; closed by 0025, applied 2026-08-05; one-time sweep of both repos performed the same day — hearth-network via 0025's in-transaction assertion plus the 0019 pre-apply edit, hearth-pos 0001 verified already compliant).

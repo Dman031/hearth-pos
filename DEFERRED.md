@@ -188,6 +188,18 @@ invokes it — and deleting an `entities` row still leaves the `auth.users` row
 (Day 22E) is a strict subset of this. Not built.
 **Trigger: App Store submission — a hard blocker, not a nice-to-have.**
 
+### Retrieval hygiene follow-ons (logged 2026-08-20 — Session 1, hearth-network 0032 / 180f456; R8 here on feat/embed-hygiene)
+- **Expose `match_cards` distance as a per-card relevance score** in `query_cards`
+  `structuredContent` (asker-defined cutoff). **Sibling ruling: a server-side similarity
+  threshold is REJECTED permanently** — corpus-dependent, fails silently against legitimate
+  sparse matches.
+- **`filters.location` and all non-`kind` filter keys:** accepted by the schema, unapplied.
+  **Revisit at the Portland seed.**
+- **R8 denylist FAILS OPEN** (`supabase/functions/_shared/embed-core.ts`
+  `RESERVED_EMBED_SKIP_LABELS`): an unlisted label is embedded. **Every future registry seed
+  build MUST extend `RESERVED_EMBED_SKIP_LABELS` for its labels as part of its build prompt.**
+  Standing discipline line — not a trigger, a rule for every seed from here on.
+
 ---
 
 ## Pre-launch architecture decisions (locked)
