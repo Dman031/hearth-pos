@@ -13,10 +13,11 @@
 // FORCE-ALL mode ({ "force_all": true }): re-embeds EVERY card regardless of
 // existing vector, paged by an id cursor ({ "after_id": "<uuid>" } → response
 // { next_cursor }). Re-invoke with the returned next_cursor until it is null.
-// Needed when composeEmbeddingText changes (e.g. the Day 15 reserved-field
-// exclusion that drops media_url / gallery_image URLs from the embedded text):
-// already-embedded rows do NOT match the stale filter, so only a forced pass
-// rewrites their now-cleaner vectors.
+// Needed when composeEmbeddingText changes (the Day 15 reserved-field
+// exclusion; the 2026-08-20 R8 denylist + per-field cap + embedded kind):
+// already-embedded rows do NOT match the stale filter (EMBED_STAMP is
+// unchanged — same model/pooling/dims), so only a forced pass rewrites their
+// now-cleaner vectors.
 //
 // JWT-gated (an ops action, not public). Mirrors embed-card's env + auth.
 /// <reference lib="deno.ns" />
@@ -93,7 +94,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   // FORCE-ALL: every card, ordered by id, paged by the id cursor. Otherwise the
   // STALE set: no vector yet, or no stamp (write-failure / pre-column rows) — a
   // set that naturally shrinks as rows get embedded, so no cursor is needed.
-  let query = supabase.from('cards').select('id, title, fields');
+  let query = supabase.from('cards').select('id, title, kind, fields');
   if (forceAll) {
     query = query.order('id', { ascending: true });
     if (afterId) query = query.gt('id', afterId);

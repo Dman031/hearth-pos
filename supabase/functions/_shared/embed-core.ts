@@ -15,48 +15,77 @@ const CF_TIMEOUT_MS = 12_000;
 // surprises (rough ~4 chars/token).
 const MAX_EMBED_CHARS = 1800;
 
-// RESERVED field labels that carry MACHINE data (URLs), never describing text —
-// they MUST be excluded from the embedding so opaque Storage URLs don't pollute
-// semantic search (an LLM matches on what a card MEANS, not its image paths).
-//   • 'media_url'     — the single content-card image (Day 12.5 reserved field)
-//   • 'gallery_image' — one entry per gallery photo (Day 15 reserved field;
-//                       repeated, so a content card can hold N images)
-// CONTRACT MIRROR: these string literals are duplicated in src/utils/card-fields.ts
-// (MEDIA_FIELD_LABEL / GALLERY_FIELD_LABEL) — this edge module is Deno and cannot
-// import from the app bundle, exactly like embedding-config is mirrored cross-repo.
-// Changing a label here MUST change it there (and warrants a backfill re-embed).
-const RESERVED_EMBED_SKIP_LABELS = new Set(['media_url', 'gallery_image']);
+// Labels NEVER embedded — the DENYLIST (ruling R8, 2026-08-20):
+//   • machine data (URLs), never describing text — opaque Storage URLs must not
+//     pollute semantic search (an LLM matches on what a card MEANS):
+//       'media_url'     — the single content-card image (Day 12.5 reserved field)
+//       'gallery_image' — one entry per gallery photo (Day 15 reserved field)
+//   • registry boilerplate that is DISPLAY-ONLY: eligibility criteria, links,
+//     contacts, catalogue numbers and identifiers. Before R8 the trials/grants
+//     seeds' 1200-char eligibility text consumed most of the 1800-char budget
+//     and pulled unrelated queries ("dating") onto registry cards (hearth-network
+//     Session 1 investigation, 2026-08-20). The display tiers still show every
+//     field; only the embedded text drops them.
+// FAILS OPEN: an unlisted label IS embedded. Every future registry seed build
+// MUST extend this set for its own labels as part of its build prompt
+// (DEFERRED.md 2026-08-20, standing discipline line).
+// CONTRACT MIRROR: the media labels are duplicated in src/utils/card-fields.ts
+// (MEDIA_FIELD_LABEL / GALLERY_FIELD_LABEL) and in hearth-network
+// src/tools/card-view.ts — this edge module is Deno and cannot import from the
+// app bundle. Changing a label here MUST change it there (and warrants a
+// force-all backfill re-embed).
+const RESERVED_EMBED_SKIP_LABELS = new Set([
+  'media_url',
+  'gallery_image',
+  'eligibility',
+  'url',
+  'contact',
+  'cfda',
+  'opportunity id',
+  'opportunity number',
+  'nct id',
+]);
+// Per-field cap (R8): no single field — a 1200-char description, a long
+// condition list — may crowd the others out of the 1800-char budget.
+const MAX_FIELD_CHARS = 400;
 
 export interface EmbeddableCard {
   id: string;
   title: string;
+  kind: string;
   fields: unknown;
 }
 
 /**
  * Builds the text to embed from a card. Tolerant of BOTH field shapes seen in
  * the data: an array of {label,value} (the Day 11-12 structured shape) AND a
- * plain object like {note:"..."} (today's onboarding shape). Title always leads.
+ * plain object like {note:"..."} (today's onboarding shape). Title always
+ * leads, then the card kind (R8: embedded now so the Session 2 civic/content
+ * split does not need a second re-backfill), then the non-denylisted fields,
+ * each value capped at MAX_FIELD_CHARS.
  */
-export function composeEmbeddingText(title: string, fields: unknown): string {
+export function composeEmbeddingText(title: string, kind: string, fields: unknown): string {
   const parts: string[] = [];
   if (typeof title === 'string' && title.trim()) parts.push(title.trim());
+  if (typeof kind === 'string' && kind.trim()) parts.push(kind.trim());
 
   if (Array.isArray(fields)) {
     for (const f of fields) {
       if (f && typeof f === 'object') {
         const r = f as Record<string, unknown>;
         const label = typeof r.label === 'string' ? r.label.trim() : '';
-        // Skip reserved machine fields (image URLs) entirely — neither the label
-        // token nor the URL value belongs in the searchable text.
-        if (RESERVED_EMBED_SKIP_LABELS.has(label)) continue;
+        // Denylisted labels are skipped entirely — neither the label token nor
+        // the value belongs in the searchable text (case-insensitive on label).
+        if (RESERVED_EMBED_SKIP_LABELS.has(label.toLowerCase())) continue;
         if (label) parts.push(label);
-        if (typeof r.value === 'string' && r.value.trim()) parts.push(r.value.trim());
+        if (typeof r.value === 'string' && r.value.trim()) {
+          parts.push(r.value.trim().slice(0, MAX_FIELD_CHARS));
+        }
       }
     }
   } else if (fields && typeof fields === 'object') {
     for (const v of Object.values(fields as Record<string, unknown>)) {
-      if (typeof v === 'string' && v.trim()) parts.push(v.trim());
+      if (typeof v === 'string' && v.trim()) parts.push(v.trim().slice(0, MAX_FIELD_CHARS));
       else if (v !== null && v !== undefined && typeof v !== 'object') parts.push(String(v));
     }
   }
@@ -126,7 +155,7 @@ export async function embedAndStore(
   accountId: string,
   apiToken: string,
 ): Promise<boolean> {
-  const text = composeEmbeddingText(card.title, card.fields);
+  const text = composeEmbeddingText(card.title, card.kind, card.fields);
   const vector = await embedText(text, accountId, apiToken);
   if (!vector) return false;
 
