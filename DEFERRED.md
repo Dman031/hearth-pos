@@ -150,11 +150,10 @@ fold into the DAY 30 polish pass, but logged here so it isn't lost before then).
 
 ### Day 18 follow-ons (commerce toggle close-out, 2026-07-13)
 
-- **Identity edge functions still on esm.sh `?target=deno`** (`create-identity-session`,
-  `stripe-identity-webhook`) → NEXT IDENTITY TOUCH — will crash with the BUG-007 runMicrotasks
-  error on next redeploy; same one-line `npm:stripe@17.5.0` fix (+ crypto provider in the webhook).
-- **Pin `@supabase/supabase-js` in edge functions** → WITH THE IDENTITY FIX — currently floats to
-  2.110.x; source of the 6 pre-existing `deno check` type errors in `create-connect-account`.
+- **Pin `@supabase/supabase-js` in edge functions** → NEXT EDGE-FUNCTION TOUCH (re-triggered
+  2026-08-21: the identity fix shipped in `efca094` without the pin — out of that build's approved
+  scope) — currently floats to 2.110.x; source of the 6 pre-existing `deno check` type errors in
+  `create-connect-account`.
 - **`query_cards` does not return price fields** (hearth-network) → DAY 19 CANDIDATE — agents
   comparing prices across vendors must call `get_card_details` per card today.
 - **Per-field pricing for multi-item cards** → DAY 19 (forced there) — Blue Hour Menu has four
@@ -426,6 +425,12 @@ Cross-repo: spans hearth-pos (app download, caller verify, caller-as-new-owner) 
 
 ## Done (move items here with commit hash when built)
 
+- **Identity edge functions off esm.sh `?target=deno`** (Day 18 follow-on, BUG-007 identity
+  follow-up) — built in `efca094` on feat/identity-session: `create-identity-session` and
+  `stripe-identity-webhook` now import `npm:stripe@17.5.0`; the webhook passes
+  `Stripe.createSubtleCryptoProvider()` to `constructEventAsync`. Sweep grep
+  `grep -rn "esm.sh/stripe" supabase/functions` returns nothing. Shipped inside the identity-flow
+  amendment (pos-0003 `entity_identity_sessions` + session-id binding in the webhook).
 - **Day 15 / Step 4.6 — Stored-image gallery content cards** — built across `35836be` (search
   hygiene: reserved-field embed exclusion + force-all backfill; [[BUG-006]]), `eea6d9e` (gallery
   data model: `gallery_image` reserved-field helpers), `964859e` (multi-image pipeline:
