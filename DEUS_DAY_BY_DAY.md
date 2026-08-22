@@ -1469,3 +1469,47 @@ R8 (NEW 2026-08-22): FOLLOW-UP OFFER — guidance.ts gains one reviewed string,
     confirmed in S1 against src/tools/get-status.ts.
 R9: "Verified Clinician" is the user-facing designation constant; it lives in
     the same constants module as the governance lines and guidance strings.
+
+## RULINGS — 2026-08-22 (display stack S1 proposal, six decisions + one correction, approved for 1-BUILD)
+CORRECTION (binds R5/R9): display_kind NEVER derives from credential_verified.
+    `practice` maps ONLY from the future 'practice' enum kind (Day 7 / PLEXMED
+    S5); until it exists no card renders as practice — correct, none exist.
+    Mapping: civic→civic; content→listing; every other enum kind → business
+    when entity_type ∈ {business, organization}, else person. Stamps carry
+    verification; display_kind never does.
+S1-1 GOVERNANCE: the five drafted sentences approved EXCEPT practice — the
+    leading "Verified Clinician." is struck (a stamp claim inside a kind
+    sentence; the stamp row says it, and a lapsed license must not leave the
+    sentence lying). Practice line: "Booking through this card is a request
+    the clinician accepts or declines — nothing is charged until they accept."
+S1-2 SUMMARY: derivation approved (description field, else first two fields
+    as "label: value" joined by " · ", 140-char word-boundary cap with …).
+    Full-mode field rows render INSIDE the Tier 3 box between offer and chips.
+S1-3 GUIDANCE: care-seeking term list approved as drafted (false positives are
+    harmless — safe advice; civic-present triggers it anyway). R8 FOLLOW-UP
+    RULE sentence approved verbatim (text lives in guidance.ts). get_status
+    KEEPS its per-poll observe imprint — exempting it would create a silent
+    observation channel; ~192 rows/day per watcher is cheap honesty. get_status
+    is NOT widened to carry engagement_status: the poll-then-get_messages
+    handoff is correct v1 (DEFERRED, trigger "first host automation in
+    production").
+S1-4 CARD FACTS: option (a) — one batched cards select (id, act_perm,
+    commerce_enabled, price_cents, price_currency) by card id on the compact
+    path. No match_cards re-mint for this.
+S1-5 WITHDRAW: action is NONE when band = pending. The state band already says
+    "Request sent · awaiting their reply"; a tool-less action labeled "Request
+    sent" duplicates it and teaches agents that actions can be inert. The
+    withdraw-tool DEFERRED entry stands (trigger: first user asks to cancel a
+    pending request).
+S1-6 TWO MODULES: approved — src/capabilities/card-copy.ts (human copy:
+    governance lines, action/state labels, civic lines, VERIFIED_CLINICIAN,
+    display-kind map, chip-label sets) + src/capabilities/guidance.ts
+    (assistant directives: composer strings, FOLLOW_UP_OFFER). The import-graph
+    auditability argument wins.
+1-BUILD sequencing: branch feat/card-object; 0034 (inbound_from_entity_idx)
+    written to migrations/ and STOPPED for hand-apply before any code depends
+    on the band lookup; then CardView + serializers + envelope, the nine
+    per-pair sentences retired, goldens for all seven enum kinds × states incl.
+    the civic full card and the guidance-envelope cases (care-seeking →
+    civic-first line; neutral → no line, asserted); tsc clean; both verify
+    scripts pass. No push.
