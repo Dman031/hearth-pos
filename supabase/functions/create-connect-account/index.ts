@@ -19,7 +19,7 @@
 // not enough. See the checklist handed off with this change.
 /// <reference lib="deno.ns" />
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.105.4';
 // npm: specifier, NOT esm.sh ?target=deno — the esm.sh deno build polyfills
 // Node builtins via deno.land/std@0.177.1/node, which the current Edge runtime
 // removed (crashes with "Deno.core.runMicrotasks() is not supported").

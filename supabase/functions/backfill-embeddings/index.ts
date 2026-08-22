@@ -22,7 +22,7 @@
 // JWT-gated (an ops action, not public). Mirrors embed-card's env + auth.
 /// <reference lib="deno.ns" />
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.105.4';
 import { embedAndStore, type EmbeddableCard } from '../_shared/embed-core.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');

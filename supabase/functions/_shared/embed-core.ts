@@ -7,7 +7,7 @@
 // comparable. Used by both `embed-card` (one card) and `backfill-embeddings`.
 /// <reference lib="deno.ns" />
 
-import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.105.4';
 import { EMBED_MODEL, EMBED_POOLING, EMBED_STAMP } from './embedding-config.ts';
 
 const CF_TIMEOUT_MS = 12_000;

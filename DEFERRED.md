@@ -150,11 +150,6 @@ fold into the DAY 30 polish pass, but logged here so it isn't lost before then).
 
 ### Day 18 follow-ons (commerce toggle close-out, 2026-07-13)
 
-- **Identity edge functions still on esm.sh `?target=deno`** (`create-identity-session`,
-  `stripe-identity-webhook`) → NEXT IDENTITY TOUCH — will crash with the BUG-007 runMicrotasks
-  error on next redeploy; same one-line `npm:stripe@17.5.0` fix (+ crypto provider in the webhook).
-- **Pin `@supabase/supabase-js` in edge functions** → WITH THE IDENTITY FIX — currently floats to
-  2.110.x; source of the 6 pre-existing `deno check` type errors in `create-connect-account`.
 - **`query_cards` does not return price fields** (hearth-network) → DAY 19 CANDIDATE — agents
   comparing prices across vendors must call `get_card_details` per card today.
 - **Per-field pricing for multi-item cards** → DAY 19 (forced there) — Blue Hour Menu has four
@@ -199,6 +194,20 @@ invokes it — and deleting an `entities` row still leaves the `auth.users` row
   `RESERVED_EMBED_SKIP_LABELS`): an unlisted label is embedded. **Every future registry seed
   build MUST extend `RESERVED_EMBED_SKIP_LABELS` for its labels as part of its build prompt.**
   Standing discipline line — not a trigger, a rule for every seed from here on.
+
+### Post-concordance Identity redaction (logged 2026-08-21 — R2-ADDENDUM; pos-0003 on feat/identity-session)
+- **We do NOT call `POST /v1/identity/verification_sessions/{id}/redact`.** Stripe retains the
+  session (name, DOB, images) until redaction; that retention is what makes two things possible:
+  (1) **re-bind** — `entity_identity_sessions` can be rebuilt from Stripe by listing verified
+  sessions and matching `metadata.entity_id` (redaction erases metadata); (2) **re-verify /
+  re-concordance** — the verified name stays fetchable (secret key, no window) for any future
+  credential binding or rebinding. Redacting after the first concordance would close both.
+- **Tradeoff recorded:** privacy-minimal posture says redact once the SHA-256(normalised name)
+  sits on the `verifications` row; operational posture says keep the session so the boolean
+  stays re-provable. **Deferred until the `verifications` table exists and a re-bind has been
+  exercised once in prod.** When revisited: redact only sessions whose entity holds a
+  `verified` verifications row, and accept that those entities need a fresh ID check to ever
+  re-bind. Never redact an entity with no `verifications` row.
 
 ---
 
@@ -412,6 +421,18 @@ Cross-repo: spans hearth-pos (app download, caller verify, caller-as-new-owner) 
 
 ## Done (move items here with commit hash when built)
 
+- **Pin `@supabase/supabase-js` in edge functions** (Day 18 follow-on) — built in `f82a5dc` on
+  feat/identity-session: all 10 import sites (9 functions + the type-only import in
+  `_shared/embed-core.ts`) pinned to `esm.sh/@supabase/supabase-js@2.105.4`, the app bundle's
+  version (one version family-wide; ruled 2026-08-21). Only the identity pair deploys with that
+  build — the other 8 functions carry an unverified pin until their next deploy. Sweep grep
+  `grep -rn "supabase-js@2'" supabase/functions --include='*.ts'` returns nothing.
+- **Identity edge functions off esm.sh `?target=deno`** (Day 18 follow-on, BUG-007 identity
+  follow-up) — built in `efca094` on feat/identity-session: `create-identity-session` and
+  `stripe-identity-webhook` now import `npm:stripe@17.5.0`; the webhook passes
+  `Stripe.createSubtleCryptoProvider()` to `constructEventAsync`. Sweep grep
+  `grep -rn "esm.sh/stripe" supabase/functions` returns nothing. Shipped inside the identity-flow
+  amendment (pos-0003 `entity_identity_sessions` + session-id binding in the webhook).
 - **Day 15 / Step 4.6 — Stored-image gallery content cards** — built across `35836be` (search
   hygiene: reserved-field embed exclusion + force-all backfill; [[BUG-006]]), `eea6d9e` (gallery
   data model: `gallery_image` reserved-field helpers), `964859e` (multi-image pipeline:
