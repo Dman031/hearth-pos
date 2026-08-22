@@ -41,7 +41,7 @@
 // handling (the schema guarantees shape, not cooperation or correctness).
 /// <reference lib="deno.ns" />
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.105.4';
 
 const MAX_TOKENS = 4096;
 const TIMEOUT_MS = 30_000;
