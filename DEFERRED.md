@@ -150,10 +150,6 @@ fold into the DAY 30 polish pass, but logged here so it isn't lost before then).
 
 ### Day 18 follow-ons (commerce toggle close-out, 2026-07-13)
 
-- **Pin `@supabase/supabase-js` in edge functions** → NEXT EDGE-FUNCTION TOUCH (re-triggered
-  2026-08-21: the identity fix shipped in `efca094` without the pin — out of that build's approved
-  scope) — currently floats to 2.110.x; source of the 6 pre-existing `deno check` type errors in
-  `create-connect-account`.
 - **`query_cards` does not return price fields** (hearth-network) → DAY 19 CANDIDATE — agents
   comparing prices across vendors must call `get_card_details` per card today.
 - **Per-field pricing for multi-item cards** → DAY 19 (forced there) — Blue Hour Menu has four
@@ -425,6 +421,12 @@ Cross-repo: spans hearth-pos (app download, caller verify, caller-as-new-owner) 
 
 ## Done (move items here with commit hash when built)
 
+- **Pin `@supabase/supabase-js` in edge functions** (Day 18 follow-on) — built in `f82a5dc` on
+  feat/identity-session: all 10 import sites (9 functions + the type-only import in
+  `_shared/embed-core.ts`) pinned to `esm.sh/@supabase/supabase-js@2.105.4`, the app bundle's
+  version (one version family-wide; ruled 2026-08-21). Only the identity pair deploys with that
+  build — the other 8 functions carry an unverified pin until their next deploy. Sweep grep
+  `grep -rn "supabase-js@2'" supabase/functions --include='*.ts'` returns nothing.
 - **Identity edge functions off esm.sh `?target=deno`** (Day 18 follow-on, BUG-007 identity
   follow-up) — built in `efca094` on feat/identity-session: `create-identity-session` and
   `stripe-identity-webhook` now import `npm:stripe@17.5.0`; the webhook passes
