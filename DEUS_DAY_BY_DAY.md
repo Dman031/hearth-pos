@@ -1420,3 +1420,52 @@ R-GAP: six id_verified=true entities predate the binding. Four with logins
     two without (deus_id 184203 Blue Hour, 100001 Derrick Wilson — hand-set
     flags, no session ever existed) are reset to id_verified=false by the
     script's guarded final step (R7: stamps mean a check happened).
+
+## RULINGS — 2026-08-22 (display stack: S0 collisions resolved + three amendments, approved for S1)
+Source: DISPLAY_STACK_BUILD.md Session 0 report (main @ 66f4162). "ALL RULINGS
+APPROVED" = the confirmation spec's direction wins each S0 collision below; the
+three amendments narrow R2/R7 and add R8. deus-card-spec-confirm.html is NOT in
+either repo (searched 2026-08-22): the S1 proposal drafts governance/kind text
+for approval and marks it DRAFT until the page is checked in beside this file.
+R1: Three tiers on EVERY card-bearing result. Day 22C locked decision 1 (Tier 1
+    on get_card_details only) lifts. HOW query_cards renders Tier 1 (one list
+    sheet vs per-card) is Session 2 item 3's proposal, not assumed here.
+R2 (AMENDED 2026-08-22): compact results DO carry a price chip for priced
+    cards, sourced from cards.price_cents — the same column as the full view,
+    so chip and snapshot cannot disagree. Day 22C locked decision 2 narrows to:
+    the engagement snapshot (engagements.agreed_price_cents) remains the
+    transactional price authority; display is no longer suppressed in lists.
+    Rationale: with several clinicians in one result set, price is a selection
+    criterion. Chip order: availability, price, modality; ≤4 total.
+R3: The action zone ships. The 2026-08-14 no-action-button ruling (card-sheet
+    header, src/capabilities/ui-resources.ts) lifts CONDITIONALLY: Session 2
+    must verify the ext-apps 2026-01-26 view→host tool-call bridge against the
+    spec text (ext-apps is not in node_modules) before any button promises a
+    tool; an unverified wiring renders the approved v1 fallback, never a dead
+    control.
+R4: The governance line is per-KIND verbatim text from a constants module, in
+    all three tiers. The per-permission-pair sentences (GOVERNANCE_SENTENCES,
+    nine templates, Tier 1 only) retire when the constants land — one source.
+R5: The seven card_kind enum values map onto the spec's display kinds through a
+    constants-module mapping proposed in S1; the enum does not change.
+R6: query_cards' structuredContent envelope key becomes `cards` (matching
+    list_entity_cards), wrapped as ResultEnvelope {guidance, cards}; `results`
+    retires. Agent-facing wire change, recorded as such.
+R7 (AMENDED 2026-08-22): the state band ships in COMPACT results too, batched —
+    ONE lookup across the result set's owner ids per call, never per card.
+    inbound.from_entity_id gains an index (0034, hand-applied by Derrick;
+    SQL proposed in S1). Measured 2026-08-22 on the dev DB (inbound = 18 rows):
+    batched lookup 60–122 ms across three runs, the same order as the
+    contacts-gate subrequest query_cards already pays (71 ms) — not material.
+    Re-measure if inbound passes ~10k rows. Per-owner vs per-card semantics:
+    S1 proposes and argues; evidence rules.
+R8 (NEW 2026-08-22): FOLLOW-UP OFFER — guidance.ts gains one reviewed string,
+    shipped in SERVER_INSTRUCTIONS: after a booking or order is submitted the
+    assistant tells the person they can be notified when its status changes
+    and offers a scheduled follow-up check where the host supports automations
+    (e.g. scheduled tasks polling get_status); hosts without the feature simply
+    won't act on it. Exact sentence drafted in S1 for approval. get_status must
+    remain polling-safe — one read, honest pending states, no side effects —
+    confirmed in S1 against src/tools/get-status.ts.
+R9: "Verified Clinician" is the user-facing designation constant; it lives in
+    the same constants module as the governance lines and guidance strings.
