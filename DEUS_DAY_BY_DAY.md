@@ -1513,3 +1513,38 @@ S1-6 TWO MODULES: approved — src/capabilities/card-copy.ts (human copy:
     the civic full card and the guidance-envelope cases (care-seeking →
     civic-first line; neutral → no line, asserted); tsc clean; both verify
     scripts pass. No push.
+
+## RULINGS — 2026-08-22 (credential S2 proposal, seven flags ruled, approved for 2-BUILD)
+Source: CREDENTIAL S2-INVESTIGATE report (main @ 3ac7eef); endpoint capture recorded in
+docs/CRED_S2_CAPTURE.md (netlog-evidenced; UNOBSERVED items marked there, never inferred).
+F1 CEREMONY TRIGGER: cron drain. No /credential route, no index.ts route touch, no token-
+    plane change. A Cloudflare Cron Trigger drains verifications.status='pending' every
+    minute; the app polls get_my_verifications(). (Plane 2 stays "/money/* only".)
+F2 SOURCE ACCESS: browser User-Agent v1 on the Thentia REST calls (403 otherwise) and the
+    Referer + session cookie + md5(fields+s) ceremony on OMB. Honest-access inquiries to OMB
+    (their advertised bulk-data channel) and OBLPCT/OBOP are Derrick's errand this week.
+    DEFERRED: per-board switch to a `Deus-PSV/1.0` UA as each board grants it.
+F3 DISCIPLINE PARSE: safe default — discipline.observed = null (OMB HTML parse failure, or
+    any unseen Thentia publicNotices shape) → manual_review. Derrick owes two captures in
+    parallel (an OMB VerificationDetails.aspx with board actions; a Thentia registrant/get
+    with populated publicNotices); the parser hardens when they land.
+F4 SCHEMA: `pending` is the fourth credential_verification_status (the ceremony is
+    asynchronous to the RPC; no pg_net/http extension exists in either repo), and
+    verifications.registry_ref for type='license' is board-qualified
+    ('<ST>:<board>:<number as issued>') so R4's single-column partial unique index is
+    unambiguous across boards and, later, states. Approved as proposed.
+F5 OVERRIDE PATH: pos-0004 drops approve_credential_request() and the
+    credential_verification_requests queue (hearth-pos 0001) and repoints the app's submit
+    path to request_credential_verification. Separate hearth-pos session; MUST precede
+    CRED S4 (proof-standard assertion 3 cannot pass while the function exists).
+F6 LEIE: ingest script approved (scripts/ingest-leie.ts, service role), Derrick-run,
+    monthly, into public.oig_leie; check_exclusions reads the mirror only — never
+    oig.hhs.gov at query time.
+F7 DOB: the Stripe Identity restricted key (R3-AMENDED window) is deferred to S3. S2
+    ships name-only concordance; an ambiguous LEIE name hit → manual_review.
+2-BUILD sequencing: docs commit first (this block + docs/CRED_S2_CAPTURE.md, mirrored
+    byte-identical to hearth-pos); branch feat/credential-verifications; 0035 written and
+    STOPPED for hand-apply; then src/credential/* (fetch, shape, ceremony, four sources,
+    vendor-md5), scripts/ingest-leie.ts, the cron drain, tsc clean, both verify scripts
+    pass, plus scripts/verify-credential covering NPPES hit, Thentia hit, OMB hit, R4
+    collision → manual_review, no-session-row → identity_not_verified. No push, no deploy.
