@@ -1623,3 +1623,31 @@ A3 PROOF ASSERTION 1 — the name-as-search-key resolution is approved: run ONE 
     docs/CRED_S2_CAPTURE.md) plus assertions 1 and 3 with all four force-approve failures;
     docs/CRED_S3_COLD_FLOW_SPEC.md emitted for the hearth-pos session; hearth-pos NOT touched;
     tsc clean; prior verify scripts pass. No push, no deploy.
+
+## RULINGS — 2026-08-23 (credential S3 close-out)
+S3-A1 ASSERTION 1 — do NOT pursue a live-mode identity verification for this proof; the real
+    clinician arrives with Film #3 in week 3. The check ruled in its place could not be performed
+    as premised: the network holds NO legal name for entity 225606, or for anyone. All five
+    entities with id_verified = true are bound to Stripe TEST-mode sessions, and every one of them
+    carries Stripe's fixture identity "Jenny Rosen" (verified by retrieval on 2026-08-23 for
+    225606, 746005 and 237698; entity_identity_sessions holds 5 rows, livemode=true on ZERO).
+    There is therefore no name to match against NPPES, and the already-proven fact stands that no
+    NPPES individual named Jenny Rosen exists (exact query, use_first_name_alias=false →
+    result_count 0) nor any such licensee at the three Oregon boards. Film #1 accordingly ships
+    with the MECHANISM demonstrated and the stamped end-state honestly captioned as awaiting a
+    real licensee. Nothing was invented and no dev-only override was written.
+S3-A2 CONSEQUENCE (new, needs its own ruling): entities.id_verified = true currently rests on a
+    test fixture for all five verified entities, and that flag is what CardView renders as the
+    `id` stamp. This is the R-GAP principle again — stamps mean a check happened. The A2 livemode
+    assertion built this session refuses such a session at CONCORDANCE time under a live key, but
+    it does not retroactively clear the flag. Options are the R-GAP treatment (reset to false
+    pending a real verification) or a live-mode re-verify; NOT decided here.
+S3-A3 UNACCENT — accepted as a real false-clear class. Fix as migration 0036 in the NEXT session:
+    unaccent (or an equivalent immutable fold) inside the oig_leie generated column expressions,
+    a full re-ingest so stored rows are recomputed, and a verify case on a real accented LEIE
+    surname. MUST land before Film #1, which asserts on camera that exclusions work. Logged in
+    DEFERRED.md with that trigger.
+S3-A4 INCIDENT (verify-credential wiped the loaded LEIE mirror on 2026-08-23) — accepted, closed.
+    Self-reported, restored by re-running scripts/ingest-leie.ts (83,842 rows, source
+    2026-08-10 — identical), and section G rewritten NON-DESTRUCTIVE (stubbed unfit branches,
+    read-only real-mirror fit path). No ledger entry required; no further action.
