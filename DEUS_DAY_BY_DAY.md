@@ -1548,3 +1548,78 @@ F7 DOB: the Stripe Identity restricted key (R3-AMENDED window) is deferred to S3
     vendor-md5), scripts/ingest-leie.ts, the cron drain, tsc clean, both verify scripts
     pass, plus scripts/verify-credential covering NPPES hit, Thentia hit, OMB hit, R4
     collision → manual_review, no-session-row → identity_not_verified. No push, no deploy.
+
+## RULINGS — 2026-08-23 (credential S3 proposal: binding algorithm, cold-flow copy, claim convergence, three amendments, approved for 3-BUILD)
+Source: CREDENTIAL S3-INVESTIGATE report (main @ 960e163). Binds CREDENTIAL_VERIFICATION_BUILD.md
+Session 3. Prior rulings unchanged: R2, R3-AMENDED, R4, F1, F3.
+S3-1 BINDING ALGORITHM — approved as specified, replacing the MINIMAL concordance S2 shipped
+    (src/credential/shape.ts namesConcord/normalizeNamePart). Normalization N1 Unicode fold
+    (NFKD + strip combining marks + uppercase); N2 explicit map for non-decomposing letters
+    (L-stroke, O-slash, D-stroke, Thorn, AE, OE, sharp-s) applied BEFORE N1; N3 apostrophes
+    deleted within a token; N4 hyphen/space/slash are TOKEN SEPARATORS (the S2 change — S2
+    deleted them and destroyed the structure); N5 residual punctuation dropped; N6 suffix and
+    credential-token strip, only if a token survives; N7 placeholder purge (N/A, --, UNKNOWN).
+    Surname comparison S1 equal-join, S2 particle tolerance, S3 component subset, S4 other[]
+    expansion (full join AND last token), S5 no cross-field match. Given-name comparison
+    F1 primary-token equality, F2 initials NEVER match, F3 NO nickname expansion
+    (JENNY != JENNIFER — the registries' own search is fuzzy, ours is not), F4 compound given
+    names by the same form-set rule, F5 middle name never required (Stripe verified_outputs has
+    no middle_name field — checked in the SDK type, so the source middle name is recorded for
+    the receipt and never compared). X missing data on either side -> manual_review.
+    S3's subset rule is deliberately coupled to F1/F3: a component-subset surname match is only
+    safe because the given name must match exactly. No scoring, no thresholds, no tie-breaks;
+    every ambiguity is manual_review. Persisted (R2): name_hash = sha256(surnameJoin|firstJoin),
+    nothing else; names never leave the ceremony's stack frame.
+S3-2 COLD-ARRIVAL COPY — approved VERBATIM, all states S0-S7c, including S7b: a collision
+    (R4, licence already bound elsewhere) renders copy IDENTICAL to S6 manual_review, so a
+    second claimant cannot learn that the licence is bound. S6 offers no retry button. Light
+    Field palette (hearth-pos src/styles/theme.ts). Discipline rule 7 holds: no protocol words,
+    no vendor names, "the Oregon licensing board" / "the U.S. provider registry".
+    The screens are a SEPARATE hearth-pos session; hearth-network emits the copy as
+    docs/CRED_S3_COLD_FLOW_SPEC.md for that session to consume.
+S3-3 CLAIM CONVERGENCE — invariant 2 approved: THE RECORD ENTITY SURVIVES. The deus number is
+    the record's public address and may already be seeded, printed or linked, so it never moves;
+    the claim transfers user_id + the entity_identity_sessions row onto the record entity and
+    deletes the claimant's provisional entity. The freshness guard stays STRICT: the merge is
+    permitted only if the provisional entity has zero cards, threads, inbound rows and
+    transactions — otherwise manual_review. Convergence requires a live verified license row
+    (no separate approval); the card flips record -> practice in the same transaction; idempotent.
+    card_kind gains 'record' and 'practice' in a future migration; displayKindFor already maps
+    practice (src/capabilities/card-copy.ts) and 'record' correctly falls through to person/
+    business until claimed.
+A1 MANUAL FALLBACK (phone binding) — approved in DESIGN ONLY. NOT built this session; it ships
+    with S5 (monitoring) and stays DRAFT until deus-credential-verification-v1-phone.html is
+    checked into the repo (it is in neither repo today). The recorded design: migration 0036 adds
+    credential_fallback_challenges(verification_id, nonce, phone_called, issued_at, echoed_at,
+    issued_by) and public.record_manual_fallback(p_verification_id, p_nonce, p_phone_called,
+    p_reviewer_entity), service_role ONLY, with five SQL-enforced guards — (a) the row's
+    snapshot.reasons[] must be a SUBSET of the identity-ambiguity set {name_mismatch,
+    identity_name_unavailable, exclusions_ambiguous, exclusions_unavailable}, so a row failing
+    for not_found / not_active / status_unknown / discipline_observed / R4 collision can NEVER be
+    fallback-verified; (b) p_phone_called must appear in that row's OWN stored snapshot (the
+    boards publish practice phones), anchoring even the manual path to primary-source data;
+    (c) the nonce must have been issued at least a minute earlier and echoed back; (d) the write
+    records method='manual_fallback' + reviewed_by + the challenge id, permanently
+    distinguishable from psv_api; (e) the R4 unique index still binds. Standing honesty: this is
+    not an approve button and there is none, but service_role bypasses RLS by design, so a hand
+    UPDATE at the SQL console remains possible and cannot be revoked without breaking the Worker
+    — the design constrains and audits the only legitimate use of it rather than pretending
+    otherwise.
+A2 LIVEMODE — fixed in the S3 build, not deferred. entity_identity_sessions.livemode has been
+    stored since pos-0003 and never read; dev and production share one Supabase project, so a
+    TEST-mode identity session is today indistinguishable to the ceremony from a live one and
+    could bind a real stamp. The ceremony now asserts the session's livemode matches the Stripe
+    key in use; a mismatch is manual_review with reason livemode_mismatch, and verify-credential
+    covers it.
+A3 PROOF ASSERTION 1 — the name-as-search-key resolution is approved: run ONE test-mode identity
+    session, read what verified_outputs actually contains, then find the REAL holder of that exact
+    name in NPPES or the three Oregon boards and submit their number, so both sides of the
+    concordance remain real facts. A dev-only name override is forbidden permanently — it would be
+    the override path this feature exists to refuse. If no exact holder exists, the build STOPS and
+    reports; that is Derrick's ruling to make, never an agent's workaround.
+3-BUILD sequencing: docs commit first (this block, roadmap synced to hearth-pos); branch
+    feat/credential-binding; shape.ts + ceremony.ts carry S3-1 and A2; verify-credential extends
+    to the full rule matrix (one case per rule, against the real licensees captured in
+    docs/CRED_S2_CAPTURE.md) plus assertions 1 and 3 with all four force-approve failures;
+    docs/CRED_S3_COLD_FLOW_SPEC.md emitted for the hearth-pos session; hearth-pos NOT touched;
+    tsc clean; prior verify scripts pass. No push, no deploy.
