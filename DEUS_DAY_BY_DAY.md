@@ -1651,11 +1651,51 @@ S3-A2 RULED — LAUNCH GATE (2026-08-23, resolves the "needs its own ruling" ite
     under a live key going forward, and this gate clears the stamps minted before it existed.
     Neither of the two options floated above is taken standalone — the reset is scoped to
     cutover (not now), and a live-mode re-verify is the entity's own path back to the stamp.
-S3-A3 UNACCENT — accepted as a real false-clear class. Fix as migration 0036 in the NEXT session:
-    unaccent (or an equivalent immutable fold) inside the oig_leie generated column expressions,
-    a full re-ingest so stored rows are recomputed, and a verify case on a real accented LEIE
-    surname. MUST land before Film #1, which asserts on camera that exclusions work. Logged in
-    DEFERRED.md with that trigger.
+S3-A3 UNACCENT — SUPERSEDED, see S3-A3 RE-RULED below. (Original text, kept for the record:
+    accepted as a real false-clear class. Fix as migration 0036 in the NEXT session: unaccent
+    (or an equivalent immutable fold) inside the oig_leie generated column expressions, a full
+    re-ingest so stored rows are recomputed, and a verify case on a real accented LEIE surname.
+    MUST land before Film #1, which asserts on camera that exclusions work. Logged in DEFERRED.md
+    with that trigger.)
+S3-A3 RE-RULED — MIGRATION 0036 DROPPED (2026-08-23, on evidence; the premise was wrong).
+    THE EVIDENCE, recorded here so the accent theory is never re-derived:
+      (a) The OIG source carries ZERO non-ASCII bytes. `LC_ALL=C grep -c $'[\x80-\xff]'` over
+          UPDATED.csv returns 0 across all 15,578,603 bytes / 83,842 rows (last-modified
+          2026-08-10, matching the mirror's stamp and its exact row count). OIG transliterates
+          at the source.
+      (b) The mirror agrees, under a POSITIVE-CONTROLLED filter: lastname / firstname / busname /
+          address `match [^ -~]` each return 0, while the controls `lastname match [^A-Z]` → 2,488
+          and `lastname match ^GONZ` → 268 prove the operator works. The zero is a real zero.
+      (c) The premise case DOES NOT REPRODUCE. Live lookup: "NÚÑEZ","JOSE" → lastname_n=NUNEZ →
+          2 hits, identical to "NUNEZ","JOSE" → 2 hits. normalizeNamePart's NFKD fold maps an
+          accented QUERY into exactly the ASCII form OIG already stores, so the asymmetry is
+          self-cancelling. unaccent on ASCII input is the identity function: 0036 as scoped was
+          a no-op against real data.
+    THE REAL BUG, found in the same investigation and live today: rule N2 was missing from
+    normalizeNamePart (src/credential/shape.ts). NFKD does not decompose Ø Æ Œ Ł Đ Þ Ħ Ŧ, so the
+    LOOKUP side DELETED them while OIG transliterates them. Demonstrated against real rows:
+    "SØRENSEN","VICKIE" → lastname_n=SRENSEN → 0 hits → CLEAR, against a stored VICKIE DAWN
+    SORENSEN, NPI 1366680761, 1128a2, excluded 2019-01-20 — a real excluded party with a real NPI,
+    cleared by a native-orthography spelling. Same for "ØSTERGAARD","MARY" (STERGAARD vs
+    OSTERGAARD) and "ŁUKASZEWICZ","GERARD" (UKASZEWICZ vs LUKASZEWICZ).
+    THE FIX (approved, built on feat/n2-lookup-fold): normalizeNamePart applies the EXISTING
+    NON_DECOMPOSING map before NFKD — rule N2, already ruled in the S3-1 binding algorithm and
+    already used by normalizeName. No migration. name_hash / canonicalNameKey are unaffected
+    (they call normalizeName, which already had N2), so no stored hash is invalidated.
+    WHY NO MIGRATION HARDENS THE STORED SIDE: on guaranteed-ASCII data a SQL fold adds nothing,
+    and it would create a second fold implementation in a second language whose lockstep with
+    shape.ts nothing can enforce — the exact drift the file's own comment warns about. Instead
+    scripts/ingest-leie.ts ENFORCES the invariant: any non-ASCII byte in the download refuses the
+    load loudly, before the first insert, leaving any previous complete mirror intact.
+    UNACCENT, for the record (not needed, but asked and answered): extension availability was NOT
+    confirmable from the session — PostgREST exposes only public / graphql_public (406 PGRST106 on
+    Accept-Profile: pg_catalog; 404 PGRST202 on rpc/unaccent), and there is no DB password or PAT.
+    unaccent(text) is STABLE, not IMMUTABLE, so a generated column would have required an
+    IMMUTABLE wrapper over the two-arg regdictionary form — an ASSERTED immutability that silently
+    stales stored values if the dictionary changes. Pre-PG17 a stored generated column's expression
+    cannot be altered: the route is DROP + re-ADD, whose table rewrite recomputes every existing
+    row automatically, so a re-ingest would NOT have been required for correctness; oig_leie_name_idx
+    drops with the column and must be recreated in the same migration.
 S3-A4 INCIDENT (verify-credential wiped the loaded LEIE mirror on 2026-08-23) — accepted, closed.
     Self-reported, restored by re-running scripts/ingest-leie.ts (83,842 rows, source
     2026-08-10 — identical), and section G rewritten NON-DESTRUCTIVE (stubbed unfit branches,
