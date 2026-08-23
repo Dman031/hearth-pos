@@ -1642,6 +1642,15 @@ S3-A2 CONSEQUENCE (new, needs its own ruling): entities.id_verified = true curre
     assertion built this session refuses such a session at CONCORDANCE time under a live key, but
     it does not retroactively clear the flag. Options are the R-GAP treatment (reset to false
     pending a real verification) or a live-mode re-verify; NOT decided here.
+S3-A2 RULED — LAUNCH GATE (2026-08-23, resolves the "needs its own ruling" item above).
+    At production cutover, every entity whose bound entity_identity_sessions row has
+    livemode = false must have id_verified reset to false before any live traffic. All five
+    current identity sessions are test-mode Stripe fixtures (Jenny Rosen); the flag truthfully
+    records a test-mode check and stays as-is on dev. This is the R-GAP principle applied at the
+    boundary rather than retroactively: the A2 concordance assertion refuses a test-mode session
+    under a live key going forward, and this gate clears the stamps minted before it existed.
+    Neither of the two options floated above is taken standalone — the reset is scoped to
+    cutover (not now), and a live-mode re-verify is the entity's own path back to the stamp.
 S3-A3 UNACCENT — accepted as a real false-clear class. Fix as migration 0036 in the NEXT session:
     unaccent (or an equivalent immutable fold) inside the oig_leie generated column expressions,
     a full re-ingest so stored rows are recomputed, and a verify case on a real accented LEIE
