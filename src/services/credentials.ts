@@ -1,93 +1,190 @@
 // src/services/credentials.ts
 //
-// Credential (license) verification — the SUBMIT side of the manual-verify
-// queue. A regulated vendor (doctor, etc.) submits a license; the row lands in
-// `credential_verification_requests` with status 'pending'. Approval is manual
-// and out-of-band: an admin calls the `approve_credential_request()` SQL
-// function (service role), which flips entities.credential_verified. There is
-// deliberately NO admin UI here and no client-side approval — a vendor can only
-// create a request, never approve their own (enforced by RLS + the function's
-// service-role-only EXECUTE grant).
+// Credential verification — the SUBMIT side of the ELECTRONIC ceremony.
 //
-// The verified VERDICT (credential_verified) is therefore never written by this
-// client — only the request is.
+// A vendor submits a registry number (an NPI, or an Oregon board licence).
+// The app calls request_credential_verification() (hearth-network migration
+// 0035), which mints a 'pending' row in public.verifications and returns a
+// status string. A scheduled drain then checks that number against the
+// primary source itself — the U.S. provider registry for an NPI, the Oregon
+// licensing board's own register for a licence, plus the federal exclusions
+// list — and compares the name on the record against the name on the
+// vendor's completed identity check. That takes about a minute. There is no
+// queue, no reviewer, and no approve button: pos-0004 dropped the last one.
+//
+// The VERDICT is never written by this client. entities.credential_verified
+// has exactly ONE writer — record_verification_outcome (0035, service role)
+// — which derives it from a live verified licence row. Ruling R4 means there
+// is no override path: nothing in the app can move a row to 'verified'.
+//
+// 'manual_review' means an AUTOMATED check was inconclusive (an unparseable
+// discipline record, an ambiguous exclusions name hit, or a number already
+// live-bound to another entity). It does NOT mean a human is reviewing it.
+// Do not describe it that way to a vendor.
+//
+// GATE (R-GAP): the RPC refuses unless the caller is id_verified AND has an
+// entity_identity_sessions row. The flag alone is insufficient — the
+// ceremony needs the Stripe session to fetch the verified name server-side.
+//
+// This module returns RAW STATUSES ONLY. Vendor-facing copy for every state
+// is ruled separately (S3-2 cold-arrival copy, docs/CRED_S3_COLD_FLOW_SPEC.md)
+// and belongs in the screens session — never here.
 
 import { supabase } from './supabase';
+import type { Verification } from '../types/verification';
+
+/** The Oregon boards the ceremony can reach today (0035:190). */
+export const SUPPORTED_BOARDS = ['omb', 'oblpct', 'obop'] as const;
+export type CredentialBoard = (typeof SUPPORTED_BOARDS)[number];
+
+/** The credential kinds a vendor may submit (0035:184-200). */
+export type CredentialSubmitType = 'npi' | 'license';
 
 export interface CredentialRequestInput {
-  /** e.g. 'medical_license', 'cosmetology_license' — free text for now. */
-  licenseType: string;
-  /** The license/registration number as issued. */
-  licenseNumber: string;
+  type: CredentialSubmitType;
+  /** The registry number: 10 NPI digits, or the licence number as issued. */
+  number: string;
+  /** Required iff type === 'license'; must be null/omitted for 'npi'. */
+  board?: CredentialBoard | null;
 }
 
+/**
+ * What the RPC reports back. 'pending' — the ceremony is queued (a repeat tap
+ * while one is in flight is a server-side no-op and also returns 'pending').
+ * 'manual_review' — an R4 collision was pre-detected at request time.
+ */
+export type CredentialRequestStatus = 'pending' | 'manual_review';
+
 export type CredentialRequestResult =
-  | { ok: true; requestId: string }
+  | { ok: true; status: CredentialRequestStatus }
   | { ok: false; reason: CredentialRequestFailure };
 
 export type CredentialRequestFailure =
-  | 'unauthenticated' // no signed-in vendor
-  | 'entity_not_found' // signed in but no entity row to attach the request to
-  | 'invalid_input' // empty license type/number
-  | 'insert_failed'; // RLS block, constraint, or other write failure
+  | 'unauthenticated' // no signed-in vendor / no usable session
+  | 'identity_not_verified' // R-GAP: needs id_verified AND an identity session
+  | 'invalid_input' // bad type, bad number format, missing/unknown board
+  | 'request_failed'; // network, RLS, or any unclassified server failure
+
+const NPI_PATTERN = /^[0-9]{10}$/;
+const LICENSE_PATTERN = /^[A-Za-z0-9-]{1,20}$/;
+
+/** Unwrap an unknown thrown/returned value into a context-prefixed Error. */
+function toError(value: unknown, context: string): Error {
+  if (value instanceof Error) return new Error(`${context}: ${value.message}`);
+  if (value && typeof value === 'object' && 'message' in value) {
+    return new Error(`${context}: ${String((value as { message: unknown }).message)}`);
+  }
+  return new Error(`${context}: ${String(value)}`);
+}
+
+function isBoard(value: unknown): value is CredentialBoard {
+  return (
+    typeof value === 'string' && (SUPPORTED_BOARDS as readonly string[]).includes(value)
+  );
+}
 
 /**
- * Submits a license for manual credential verification. Resolves the caller's
- * entity, inserts a pending request, and returns its id. Never throws.
+ * Classify a PostgREST/Postgres error into a caller-facing failure reason.
+ *
+ * The RPC raises with explicit SQLSTATEs (0035:171-199), but P0001 is also
+ * Postgres's DEFAULT raise code — so identity_not_verified is matched on the
+ * MESSAGE, never on the code alone, or a future unrelated P0001 would be
+ * misreported as an identity problem.
  */
-export async function submitCredentialRequest(
+function classifyRpcError(err: unknown): CredentialRequestFailure {
+  const code = typeof (err as { code?: unknown })?.code === 'string'
+    ? String((err as { code: string }).code)
+    : '';
+  const message = typeof (err as { message?: unknown })?.message === 'string'
+    ? String((err as { message: string }).message)
+    : '';
+
+  if (message.includes('identity_not_verified')) return 'identity_not_verified';
+  if (code === '28000' || message.includes('unauthenticated')) return 'unauthenticated';
+  // No/expired JWT is rejected by PostgREST before the function ever runs.
+  if (code === 'PGRST301' || code === '401' || /\bJWT\b/i.test(message)) {
+    return 'unauthenticated';
+  }
+  if (code === '22023') return 'invalid_input';
+  return 'request_failed';
+}
+
+/**
+ * Submits a registry number for electronic verification. Resolves nothing
+ * client-side — current_entity_id() derives the entity server-side from the
+ * session. Returns the ceremony's status, never a row id and never a
+ * snapshot. Never throws.
+ *
+ * The format checks below mirror the RPC's own regexes for fast feedback.
+ * The RPC remains authoritative: it re-checks everything server-side
+ * (PROMPT-CODE CONTRACT — code is the guarantee, not the client).
+ */
+export async function requestCredentialVerification(
   input: CredentialRequestInput,
 ): Promise<CredentialRequestResult> {
-  const licenseType = input.licenseType.trim();
-  const licenseNumber = input.licenseNumber.trim();
-  if (licenseType.length === 0 || licenseNumber.length === 0) {
+  const number = input.number.trim();
+
+  if (input.type !== 'npi' && input.type !== 'license') {
     return { ok: false, reason: 'invalid_input' };
   }
 
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError || !userData.user) {
-    if (userError) console.warn('[credentials] getUser failed:', userError);
-    return { ok: false, reason: 'unauthenticated' };
+  let board: CredentialBoard | null = null;
+  if (input.type === 'npi') {
+    if (!NPI_PATTERN.test(number)) return { ok: false, reason: 'invalid_input' };
+  } else {
+    if (!isBoard(input.board)) return { ok: false, reason: 'invalid_input' };
+    if (!LICENSE_PATTERN.test(number)) return { ok: false, reason: 'invalid_input' };
+    board = input.board;
   }
 
-  // Resolve the entity this request attaches to. RLS also enforces ownership on
-  // insert, but resolving here gives a precise failure and the entity_id value.
-  const { data: entity, error: entityError } = await supabase
-    .from('entities')
-    .select('id')
-    .eq('user_id', userData.user.id)
-    .maybeSingle();
-  if (entityError) {
-    console.warn('[credentials] entity lookup failed:', entityError);
-    return { ok: false, reason: 'entity_not_found' };
-  }
-  if (!entity || typeof entity.id !== 'string') {
-    return { ok: false, reason: 'entity_not_found' };
-  }
-
-  // Insert + .select() so a zero-row RLS silent block is caught as failure
-  // (per the SUPABASE WRITE RULE).
-  const { data: inserted, error: insertError } = await supabase
-    .from('credential_verification_requests')
-    .insert({
-      entity_id: entity.id,
-      license_type: licenseType,
-      license_number: licenseNumber,
-    })
-    .select('id')
-    .single();
-
-  if (insertError) {
-    console.warn('[credentials] request insert failed:', insertError);
-    return { ok: false, reason: 'insert_failed' };
-  }
-  if (!inserted || typeof inserted.id !== 'string') {
-    console.warn('[credentials] request insert returned no row (possible RLS block)');
-    return { ok: false, reason: 'insert_failed' };
-  }
-
-  console.log('[credentials] submitted credential request', {
-    requestId: inserted.id,
+  const { data, error } = await supabase.rpc('request_credential_verification', {
+    p_type: input.type,
+    p_number: number,
+    p_board: board,
   });
-  return { ok: true, requestId: inserted.id };
+
+  if (error) {
+    const reason = classifyRpcError(error);
+    console.warn('[credentials] request_credential_verification failed:', {
+      reason,
+      type: input.type,
+      board,
+      error,
+    });
+    return { ok: false, reason };
+  }
+
+  // The RPC's contract is a status string and nothing else. Anything outside
+  // the two documented values means the contract moved — fail loudly rather
+  // than casting a surprise into a success.
+  if (data !== 'pending' && data !== 'manual_review') {
+    console.warn(
+      '[credentials] request_credential_verification returned an unexpected value:',
+      data,
+    );
+    return { ok: false, reason: 'request_failed' };
+  }
+
+  console.log('[credentials] credential verification requested', {
+    type: input.type,
+    board,
+    status: data,
+  });
+  return { ok: true, status: data };
+}
+
+/**
+ * Reads the owner's verification receipts via get_my_verifications() (0035),
+ * newest first. Status columns only — scoped server-side to
+ * current_entity_id(). Returns an Error rather than throwing so the polling
+ * hook can surface it without unmounting.
+ */
+export async function fetchMyVerifications(): Promise<
+  { ok: true; verifications: Verification[] } | { ok: false; error: Error }
+> {
+  const { data, error } = await supabase.rpc('get_my_verifications');
+  if (error) {
+    return { ok: false, error: toError(error, 'load verifications') };
+  }
+  return { ok: true, verifications: (data ?? []) as Verification[] };
 }
