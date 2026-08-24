@@ -1700,3 +1700,41 @@ S3-A4 INCIDENT (verify-credential wiped the loaded LEIE mirror on 2026-08-23) �
     Self-reported, restored by re-running scripts/ingest-leie.ts (83,842 rows, source
     2026-08-10 — identical), and section G rewritten NON-DESTRUCTIVE (stubbed unfit branches,
     read-only real-mirror fit path). No ledger entry required; no further action.
+
+## RULINGS — 2026-08-23 (credential S4 proposal, six ruled) — BUILT
+S4-1 DERIVED STAMPS — approved as proposed. id/biz keep the entity flags (identity lives in
+    entity_identity_sessions, not verifications — R-GAP; no verifications type exists for
+    business); lic/npi derive from LIVE verified rows only. fetchStampDetails is a third
+    batched read keyed by owner, sibling to fetchCardFacts and fetchBands — one subrequest
+    per 50 owners, never per card. Assertion 4 is structural, not promised: the read filters
+    status='verified' AND voided_at IS NULL, so a voided row stops matching and the stamp is
+    gone on the next query with no read-path change.
+S4-2 VOID PATH — option (a): voiding goes THROUGH record_verification_outcome so
+    entities.credential_verified recomputes in the same call. The assertion-4 demo voids the
+    way production voids. STANDING FOR S5: its auto-voider uses the same writer.
+S4-3 MONITORING COPY — enrollment-only, approved verbatim. S5 CHECKLIST ITEM: upgrade
+    'Enrolled for re-checks' to 'Re-checked {checked}' when monitoring ships. Until then
+    'Re-checked monthly' would be a false claim — the no-plausible-placeholder rule applies
+    to sentences, not only to numbers.
+S4-4 HONORIFIC — option (a): ONE sanitizer in shared.ts (renderDisplayName) applied at EVERY
+    display-name render, not card-view only. A stripped honorific on the card and an
+    unstripped one on the pay page would teach that the gate is cosmetic. 'Dr.' survives only
+    where a live verified licence row is classified doctoral. The classifier keys on
+    (source, category), NEVER on the board alone — OBOP licenses both 'Psychologist'
+    (doctoral) and 'Psychologist Associate' (not), and the Oregon Medical Board licenses
+    physician assistants and acupuncturists beside its MDs. NPPES never classifies: its
+    credential field is provider-attested at enumeration, which is the very kind of
+    self-assertion this gate exists to stop honouring.
+S4-5 RECEIPT WORDING — approved verbatim EXCEPT receipt 3's manual_review line. 'Names did
+    not match' names a cause that may be false (an ambiguous exclusion, an unreadable
+    discipline section and an R4 collision all land in manual_review too). Replaced with
+    "This didn't settle automatically" / "Nothing is stamped until it does."
+S4-6 MIGRATION — one migration, 0036, section-commented, full grant block on both functions,
+    receipt as the final statement. Applied 2026-08-23; record_verification_outcome verified
+    as exactly one function, pronargs 9.
+S4-BUILD NOTE (2026-08-23): the Tier 3 stamp line takes the VERTICAL form (one stamp per
+    line) whenever any stamp carries detail. ' · ' separates stamps from each other AND the
+    parts within one stamp's detail, so a single joined line became unreadable the moment
+    dates arrived. Bare stamps keep the compact joined line. This is the layout the S4
+    proposal showed; it is recorded here because it was not called out as a decision.
+
