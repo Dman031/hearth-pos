@@ -258,9 +258,10 @@ STOP after proposal.
 
 ### Prompt 5-BUILD: implement as approved; branch feat/credential-monitoring;
 prove assertion 5 (simulated lapse auto-voids; owner notice lands; stamp gone
-network-wide). Run the FULL proof standard 1–5 end to end and film it — that
-recording is the verification demo for anchors and the deck. tsc clean.
-Do not push. STOP.
+network-wide). Run the FULL proof standard 1–5 end to end and REPORT it as a
+single block — that report, saved as docs/CRED_PROOF_STANDARD.md, is the
+verification artifact for anchors and the deck (amended 2026-08-24: was "and
+film it"; both films moved post-sprint). tsc clean. Do not push. STOP.
 
 ---
 
@@ -275,8 +276,17 @@ Do not push. STOP.
   professionals + businesses only).
 
 ## DEFINITION OF DONE
-The five-assertion proof standard passes end to end on dev and is filmed once:
-a cold stranger becomes a receipt-stamped, continuously-monitored, revocable
-verified clinician in minutes, electronically — and a forged attempt dies in
-manual_review on camera. That film unblocks the Portland seed, the trials
-demo, and every sentence containing "verified clinician."
+**AMENDED 2026-08-24 — "and filmed once" became "run and reported once."**
+
+The five-assertion proof standard passes end to end on dev and is RUN AND
+REPORTED once: a cold stranger becomes a receipt-stamped, continuously-
+monitored, revocable verified clinician in minutes, electronically — and a
+forged attempt dies in manual_review. **`docs/CRED_PROOF_STANDARD.md` is the
+artifact of record**, carrying the full transcript, the tally, and the standing
+gaps. That report unblocks the Portland seed, the trials demo, and every
+sentence containing "verified clinician."
+
+Film #1 and Film #3 both moved to a single post-sprint production session
+against the finished system (roadmap: SPRINT AMENDMENT — 2026-08-24). Filming
+against a half-built stack produces footage that gets reshot anyway. The
+footage is no longer what makes this done; the report is.

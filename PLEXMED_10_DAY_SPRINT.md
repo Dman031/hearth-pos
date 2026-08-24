@@ -102,14 +102,15 @@
   friction; mismatch dies in manual_review (attempt the force-approve; show
   it fail).
 
-### DAY 6 — STAMPS + RECEIPTS + MONITORING-LITE → FILM #1
+### DAY 6 — STAMPS + RECEIPTS + MONITORING-LITE
 - 8am: paste **CREDENTIAL S4-INVESTIGATE** → approve → **S4-BUILD** (stamps
   into CardView + receipts view, "Verified Clinician" header).
 - Afternoon: **CREDENTIAL S5** scoped to monitoring-LITE for the sprint:
   scheduled cron re-check + auto-void + owner notice (vendor webhooks are
   the post-contract upgrade). Run the five-assertion proof standard.
-- Evening: **FILM #1** — cold stranger → Verified Clinician in minutes;
-  forged attempt dies on camera; simulated lapse auto-voids.
+- Evening: **RUN AND REPORT the proof standard** — the artifact is
+  `docs/CRED_PROOF_STANDARD.md`. **FILM #1 MOVED POST-SPRINT** (amendment
+  2026-08-24, see below).
 
 ### DAY 7 — CLINICIAN CARD + AVAILABILITY
 - 8am: paste **PLEXMED S5-INVESTIGATE** → approve → **S5-BUILD** (practice
@@ -129,19 +130,48 @@
   (private-notes pane → post-sprint). 
 - EOD: paste **PLEXMED S10-INVESTIGATE** (Canvas push mapping table).
 
-### DAY 10 — CANVAS PUSH → FILM #3
+### DAY 10 — CANVAS PUSH
 - 8am: approve the FHIR mapping → **S10-BUILD** (wrap → one-tap push to the
   Canvas sandbox; MedPlum rig optional post-sprint; failed push never blocks
   wrap — PDF export is the fallback).
-- Afternoon: dress rehearsal, then **FILM #3, one take:** Biggie's ask in
-  Claude → guidance renders 988-first → Verified Clinician card → knock →
-  Ask-first → Accept → engagement $95 snapshot → Today → Daily room visit →
-  90-second wrap → PAID ✓ in thread → superbill PDF → encounter visible in
-  Canvas.
-- Evening: pour something. Send Film #1 + #3 to the first three warm
-  conversations.
+- Afternoon: **walk the full path end to end as a dress rehearsal, and report
+  it** — Biggie's ask in Claude → guidance renders 988-first → Verified
+  Clinician card → knock → Ask-first → Accept → engagement $95 snapshot →
+  Today → Daily room visit → 90-second wrap → PAID ✓ in thread → superbill
+  PDF → encounter visible in Canvas. **FILM #3 MOVED POST-SPRINT** (amendment
+  2026-08-24, see below); this walk is what the post-sprint session films.
+- Evening: pour something. The warm conversations get the written proof now
+  and the footage after the production session.
 
 ---
+
+## SPRINT AMENDMENT — 2026-08-24: both films move post-sprint
+
+**Film #1 and Film #3 both move to a single post-sprint production session against
+the finished system.** The sprint's Day 6 and Day 10 evening slots become RUN AND
+REPORT, not shoot.
+
+**Reason:** filming against a half-built stack produces footage that gets reshot
+anyway. Day 6's Film #1 would have been shot before the clinician card, the
+availability chip, Ask-first, the wrap, and the superbill existed — every one of
+which appears on screen in Film #3's path. Shooting twice against two different
+half-systems costs a day of the sprint and yields nothing that survives.
+
+**What replaces the "and filmed" clause:** the five-assertion proof standard is
+**run and reported**, and `docs/CRED_PROOF_STANDARD.md` is the **artifact of
+record**. It carries the full transcript, the tally, and the standing gaps —
+including the two the film could not have hidden anyway (assertion 1 is not
+covered per ruling S3-A1, and the HTTP+OAuth layer is unexercised on the
+`.dev.vars` gap).
+
+**What this does NOT change:** the build order, the scope of any session, or what
+has to be true before the Portland seed. The system still has to work; the claim
+"verified clinician" still rests on the proof standard passing. Only the moment
+the camera runs moved.
+
+**Consequence for the CUT LIST below:** its parenthetical "nothing here blocks the
+films" now reads against a post-sprint shoot, which is later — so items parked
+there have MORE slack, not less. Nothing needs pulling forward on account of this.
 
 ## THE CUT LIST (deliberately out of the ten days — nothing here blocks the films)
 Tier 1 interactive sheet · records seed + funnel experiment (next sprint —

@@ -1775,3 +1775,27 @@ S5-BUILD NOTE (2026-08-24): APPLY SHAPE. The two-block-in-one-file migration doe
     hand-split at apply time and the repo now matches: 0037a (the enum line) + 0037b
     (begin->commit, receipt final), sharing one ledger id '0037'. Promoted to the CLAUDE.md
     SPLIT-ENUM RULE; 0004 and 0033 are grandfathered with reasons.
+
+## SPRINT AMENDMENT — 2026-08-24 (both films move post-sprint)
+FILM-1 FILM #1 and FILM #3 both move to a SINGLE post-sprint production session against the
+    finished system. The sprint's Day 6 and Day 10 evening slots become RUN AND REPORT, not
+    shoot. Recorded in PLEXMED_10_DAY_SPRINT.md (Day 6, Day 10, and its own amendment block).
+FILM-2 REASON — filming against a half-built stack produces footage that gets reshot anyway.
+    Film #1 on Day 6 would have been shot before the clinician card, the availability chip,
+    Ask-first, the wrap and the superbill existed, every one of which appears on screen in
+    Film #3's path. Two shoots against two different half-systems cost a sprint day and yield
+    nothing that survives.
+FILM-3 THE PROOF STANDARD'S "AND FILMED" CLAUSE BECOMES "RUN AND REPORTED".
+    docs/CRED_PROOF_STANDARD.md is the ARTIFACT OF RECORD — full transcript, tally, and the
+    standing gaps stated in the artifact rather than in a chat message. Amended in
+    CREDENTIAL_VERIFICATION_BUILD.md's DEFINITION OF DONE and its Prompt 5-BUILD line, which
+    is where the clause actually lived (neither file named in the amendment prompt — flagged
+    and edited, because leaving "film it" in the build doc would have contradicted this).
+FILM-4 UNCHANGED — build order, session scope, and what must be true before the Portland
+    seed. The system still has to work and "verified clinician" still rests on the proof
+    standard passing. Only the moment the camera runs moved.
+FILM-5 TRIGGER HYGIENE — DEFERRED carried "BEFORE Film #1" on the N2 lookup fold + ingest
+    ASCII guard + SØRENSEN verify case. That work SHIPPED (BUG-014, merge 0e5be5e) before this
+    amendment, so the trigger fired and was satisfied; the entry moved to DEFERRED's Done
+    section with its hash rather than being left pointing at an event that has moved. No other
+    DEFERRED entry references a film.
