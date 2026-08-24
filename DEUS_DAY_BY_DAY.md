@@ -1746,9 +1746,7 @@ S5-1 ADVERSE-ONLY VOIDING — confirmed. Expired, not-active, board action obser
     "We could not check" is not "it is not true" — the false-VOID inverse of BUG-014, and
     worse, because it takes credentials from people who still hold them.
 S5-2 NEWLY-AMBIGUOUS EXCLUSIONS — leave-and-log, never downgrade to manual_review. A stamp
-    earned on evidence is not revoked by a later ambiguity. Surfaced in the sweep report;
-    checked_at is NOT bumped, so the row stays at the head of the queue and is seen every
-    tick rather than once.
+    earned on evidence is not revoked by a later ambiguity. Surfaced in the sweep report.
 S5-3 EXCLUSION HIT — voids the LICENSE row with reason exclusion_match; the exclusions row
     records the finding.
 S5-4 SCHEDULING — one handler, pending-first, 2 rows/tick. No wrangler.jsonc change. A
@@ -1764,6 +1762,14 @@ S5-8 NOTICE COPY — all four variants approved verbatim. "This is what the boar
     network being read as the authority that took the stamp away.
 S5-9 monitor_checked_at — confirmed as the receipt's truth condition. Closes the S4-3
     checklist item.
+S5-BUILD NOTE (2026-08-24, AGENT'S MECHANISM — NOT RULED): how S5-2's "surfaced in the
+    sweep report" is implemented. An ambiguous re-check does NOT bump checked_at, so the row
+    stays at the head of the queue and is seen every tick rather than once. The ruling said
+    leave-and-log and surface it; choosing queue position as the surfacing mechanism was a
+    build decision. It first appeared inside the S5-2 ruling text, which was wrong — a
+    mechanism is not a ruling — and was moved here on correction. It carries a cost, logged
+    in DEFERRED: inconclusive rows behave the same way and MONITOR_BUDGET is 2, so two stuck
+    rows occupy the entire monitoring queue.
 S5-BUILD NOTE (2026-08-24): APPLY SHAPE. The two-block-in-one-file migration does not
     survive the Supabase SQL editor, which wraps a paste in one transaction. 0037 was
     hand-split at apply time and the repo now matches: 0037a (the enum line) + 0037b
