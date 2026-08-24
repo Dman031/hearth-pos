@@ -1799,3 +1799,76 @@ FILM-5 TRIGGER HYGIENE — DEFERRED carried "BEFORE Film #1" on the N2 lookup fo
     amendment, so the trigger fired and was satisfied; the entry moved to DEFERRED's Done
     section with its hash rather than being left pointing at an event that has moved. No other
     DEFERRED entry references a film.
+
+## RULINGS — 2026-08-25 (visit lifecycle, PLEXMED S5) — approved for 5-BUILD
+Source: PLEXMED S5-INVESTIGATE report (main @ baed6bc), which found these five rulings
+ABSENT FROM CANON — they had been ruled in strategy chat and never written down, and the
+soft hold contradicted a locked block. That is the failure the canon hierarchy exists to
+catch ("A RULING IS NOT A RULING UNTIL IT IS IN THE ROADMAP"), caught by the agent rather
+than by a build that shipped against a fiction. Written here before 5-BUILD is issued.
+Binds PLEXMED_CARE_LOOP_BUILD.md Session 5.
+
+VL-1 SOFT HOLD. A booking request on a practice-kind slot claims it atomically, held until
+    min(24h from request, slot start − 60min). This SUPERSEDES Day 22 ruling 3
+    (roadmap:795-798) NARROWLY: a hold is not a reservation — it is a bounded exclusivity
+    window on a practice-kind slot, expiring by predicate (held_until <= now()), with no
+    scheduler, no cron, and no background state write. Day 22's deferral trigger ("until a
+    real seller reports a held-slot problem") is FIRED by clinical booking, where a patient
+    losing a requested time minutes before it starts is a product failure. Day 22 ruling 3
+    STANDS UNCHANGED for every non-practice kind.
+VL-2 LEAD TIME. Nothing books inside 60 minutes of slot start.
+VL-3 SETTLE ON ACCEPT — CONFIRMS Day 22 decisions 1-2, not new: a request moves no money;
+    acceptance settles payment. A lapsed hold therefore never touches refunds.
+VL-4 EXPLICIT ZONE. All times stored UTC; every rendered time carries an explicit zone;
+    each party reads their own wall clock. The server NEVER emits relative time — "today"
+    is a client rendering, which is also what Session 5 already said ("derives client-side
+    from slots", PLEXMED_CARE_LOOP_BUILD.md:319-320) and what the DATE/TIME rule requires.
+VL-5 ATOMIC CLAIM. One UPDATE with the hold conditions in the WHERE. Zero rows = refused
+    (the SUPABASE WRITE RULE already classes that as failure). Never SELECT FOR UPDATE
+    then write.
+
+S5-1 CANCEL DOES NOT AUTO-REOPEN. A cancelled visit's time does not return to the card by
+    itself — it may not be re-offerable, and that is the clinician's call. The open-times
+    board offers "Re-open this time".
+S5-2 set_engagement_schedule (0019) IS REFUSED on a slot-bound engagement. A seller moving
+    scheduled_for underneath a bound slot would desynchronise the row from the contract
+    term. The board is the reschedule surface.
+S5-3 BOOKINGS PAUSE WHEN THE STAMP VOIDS. The card stays kind 'practice' — the kind never
+    rewrites history, the card IS the offer — but its slots stop being eligible while the
+    owner has no live verified licence row. The offer survives; bookability tracks
+    licensure. Routes into the same auto-pause path as an empty board: no new state, no
+    new copy. (The lic stamp stays the OWNER's; the card is the offer.)
+S5-4 ZERO CLAIMABLE SLOTS → ACTION NONE. "Auto-pause knocks when empty" is literal. The
+    compact chip reads "No open times" and no booking action renders. Degrading to
+    ask_connect was rejected: a practice card with no times is paused, not converted into
+    a message surface.
+S5-5 QUANTITY IS REFUSED on a practice booking — refused, never silently dropped (mirrors
+    the existing scheduled_for refusal, reach-entity.ts:188). A REAL DEFECT found in
+    S5-INVESTIGATE: the accept branch snapshots price_cents × coalesce(quantity,1)
+    (0028/0033), so a quantity on a practice booking would mint "2 × $95" against ONE
+    slot. Ledger it if it is ever observed in the wild; here it is closed before it can be.
+S5-6 'record' KIND DEFERRED to the claim-convergence build. S3-3 (roadmap:1587) says
+    card_kind gains 'record' AND 'practice'; 0038a adds only 'practice'. Deliberate scope,
+    not a half-executed ruling. The convergence flip record→practice composes with S5-8's
+    trigger — convergence already requires a live verified licence row.
+S5-7 DOUBLE-HOLD IS ALLOWED in v1. A patient holding two times while deciding is
+    reasonable, and the clinician sees both on their board. DEFERRED entry with the
+    trigger "first clinician reports a serial holder".
+S5-8 LICENSED STATES ARE READ-ONLY, derived from live verified rows only. A self-asserted
+    state list sitting inches from a stamp that says "verified" is a plausible placeholder
+    in sentence form (ruling 3 of CRED S5 already settled that the rule covers sentences).
+S5-9 THE PRACTICE-KIND CREATION GATE IS A TRIGGER, NOT AN RPC. hearth-pos writes cards
+    directly under RLS with a client-supplied kind (CardContext.tsx:346,403), so an
+    RPC-only gate is bypassable by the same client that already writes the column. This
+    governs who may SET the kind — an authoring permission. It does NOT make display_kind
+    derive from verification: the 2026-08-22 CORRECTION stands, display_kind maps from the
+    enum alone.
+
+5-BUILD sequencing: docs commit first (this block, roadmap synced to hearth-pos, DEFERRED
+timezone entry re-homed); branch feat/practice-card; 0038a (the enum value alone, no
+receipt) + 0038b (card_slots, entities.timezone, the claim/release/read RPCs, the clinician
+RPCs, the practice trigger, respond_to_inbound v8, receipt '0038' as the final statement)
+written to migrations/ and STOPPED for hand-apply — two whole files, pasted each in one
+go, no hand-splitting at the console (SPLIT-ENUM RULE). Then the Worker code, the authoring
+spec into docs/, and scripts/verify-slots.mjs proving concurrent-claim, expiry, accept-binds,
+decline-releases and the expired band. tsc clean, proof standard still green. No push.
