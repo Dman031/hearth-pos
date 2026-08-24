@@ -1738,3 +1738,34 @@ S4-BUILD NOTE (2026-08-23): the Tier 3 stamp line takes the VERTICAL form (one s
     dates arrived. Bare stamps keep the compact joined line. This is the layout the S4
     proposal showed; it is recorded here because it was not called out as a decision.
 
+
+## RULINGS — 2026-08-24 (credential S5 proposal, nine ruled) — BUILT
+S5-1 ADVERSE-ONLY VOIDING — confirmed. Expired, not-active, board action observed, exclusion
+    hit void. Unreachable source, unknown status vocabulary, unreadable discipline section,
+    unfit mirror and unparseable stored dates NEVER void: they keep the stamp, log, retry.
+    "We could not check" is not "it is not true" — the false-VOID inverse of BUG-014, and
+    worse, because it takes credentials from people who still hold them.
+S5-2 NEWLY-AMBIGUOUS EXCLUSIONS — leave-and-log, never downgrade to manual_review. A stamp
+    earned on evidence is not revoked by a later ambiguity. Surfaced in the sweep report;
+    checked_at is NOT bumped, so the row stays at the head of the queue and is seen every
+    tick rather than once.
+S5-3 EXCLUSION HIT — voids the LICENSE row with reason exclusion_match; the exclusions row
+    records the finding.
+S5-4 SCHEDULING — one handler, pending-first, 2 rows/tick. No wrangler.jsonc change. A
+    second cron expression was rejected: it would concentrate board load into a burst,
+    where a trickle is the politer thing to point at a state board.
+S5-5 CADENCE — 30 days, matching the LEIE's monthly publication and the YYYY-MM the card shows.
+S5-6 name_hash COALESCE in 0037 — yes. Logged as BUG-015: the 0036 writer force-wrote it, so
+    the first passing re-check would have erased a live stamp's R2 fingerprint silently.
+S5-7 catch_me_up BLINDNESS — accepted for lite; DEFERRED entry with the trigger "first owner
+    reports missing a void notice".
+S5-8 NOTICE COPY — all four variants approved verbatim. "This is what the board publishes,
+    not a decision made here" is NOT to be softened: it is the sentence that stops the
+    network being read as the authority that took the stamp away.
+S5-9 monitor_checked_at — confirmed as the receipt's truth condition. Closes the S4-3
+    checklist item.
+S5-BUILD NOTE (2026-08-24): APPLY SHAPE. The two-block-in-one-file migration does not
+    survive the Supabase SQL editor, which wraps a paste in one transaction. 0037 was
+    hand-split at apply time and the repo now matches: 0037a (the enum line) + 0037b
+    (begin->commit, receipt final), sharing one ledger id '0037'. Promoted to the CLAUDE.md
+    SPLIT-ENUM RULE; 0004 and 0033 are grandfathered with reasons.
