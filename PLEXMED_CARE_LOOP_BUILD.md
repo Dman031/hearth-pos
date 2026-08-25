@@ -332,8 +332,12 @@ INVESTIGATION ONLY. Extend the Incoming knock tile (Session 0 report, hearth-pos
 component) for practice-card knocks:
 1. Chips: IDENTITY ✓ / {STATE} RESIDENT ✓ (from entity data we actually hold — if we
    cannot verify residency v1, the chip must not exist; report what we can honestly claim)
-   / NON-ACUTE · SELF-DESCRIBED (always, verbatim — this chip states what the system did
-   NOT verify) / FIRST CONTACT.
+   / NOT TRIAGED · IN THEIR OWN WORDS (always, unconditional — this chip states what the
+   system did NOT verify) / FIRST CONTACT.
+   [SUPERSEDED 2026-08-25 — ruling S6-1. This item read "NON-ACUTE · SELF-DESCRIBED
+   (always, verbatim)". A bare clinical adjective in the leading position reads as a
+   determination the network never made, and a trailing qualifier is the shape S1-1 struck.
+   The wording above is the ruled one; the roadmap block carries the reasoning.]
 2. Third action "Ask first": a pre-accept question — propose the minimal thread state
    (e.g. a thread in state "inquiry" that does not open an engagement and does not
    reveal contact tiers) using the existing thread model. Quote the state machine you'd

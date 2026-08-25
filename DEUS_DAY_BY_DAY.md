@@ -1900,3 +1900,62 @@ written to migrations/ and STOPPED for hand-apply — two whole files, pasted ea
 go, no hand-splitting at the console (SPLIT-ENUM RULE). Then the Worker code, the authoring
 spec into docs/, and scripts/verify-slots.mjs proving concurrent-claim, expiry, accept-binds,
 decline-releases and the expired band. tsc clean, proof standard still green. No push.
+
+## RULINGS — 2026-08-25 (PLEXMED S6 proposal, clinical incoming — six ruled, approved for 6-BUILD)
+Source: PLEXMED S6-INVESTIGATE report (main @ 105b417). Binds PLEXMED_CARE_LOOP_BUILD.md
+Session 6. Prior rulings unchanged: CRISIS_RULE / SYMPTOM_RULE / ROUTING_RULE, VL-1..VL-5,
+S5-10, S1-3 (get_status is not widened).
+
+S6-1 THE DISCLAIMER CHIP READS "NOT TRIAGED · IN THEIR OWN WORDS", unconditional on every
+    practice request. THIS SUPERSEDES the build doc's "NON-ACUTE · SELF-DESCRIBED (always,
+    verbatim)" — PLEXMED_CARE_LOOP_BUILD.md Session 6 item 1, edited in the same commit so
+    the doc cannot keep calling superseded copy verbatim.
+    WHY: "NON-ACUTE" is a bare clinical adjective in the LEADING position. A clinician
+    scanning a queue reads it as a determination and may deprioritize — a verdict this
+    network never made, on the one axis where being wrong costs most. "SELF-DESCRIBED" was
+    meant to defuse it, but a qualifier trailing a verdict is exactly the shape S1-1 already
+    struck when "Verified Clinician." came off the practice governance line: a claim inside a
+    sentence, outliving its truth. The replacement asserts only what is true — nobody
+    assessed urgency, and the words are the patient's own.
+    UNCONDITIONAL, and that is load-bearing: this chip is a disclaimer about the NETWORK, not
+    a fact about the person. A disclaimer that renders sometimes is a verdict by another name.
+    Standing note: assistants are instructed to route crises to 988 instead of booking
+    (CRISIS_RULE), and that instruction is NOT a check. No copy anywhere may imply it is.
+S6-2 NO RESIDENCY CHIP, AND NOTHING REPLACES IT. Its impossibility is proven, not assumed:
+    entity_identity_sessions stores session id, report id, livemode and timestamps and
+    nothing else (hearth-pos 0003_identity_session.sql:35-45, "Never store name/DOB here"),
+    which is R2; and R3-AMENDED gates Stripe's verified_outputs behind a 48-hour restricted-key
+    window that an Incoming tile renders long outside. A "location not checked" chip is also
+    REFUSED: a second disclaimer beside S6-1 dilutes the one that matters.
+S6-3 THE HISTORY CHIP IS NETWORK-SCOPED AND SAYS SO. Expanded text must contain "on this
+    network" and must never imply a care relationship. "New patient" appears NOWHERE:
+    new-versus-established is a billing distinction (CPT) the network cannot make, and S7's
+    wrap will surface new/follow-up from the clinician, who can. Derivation is
+    threads.established_at on the pair thread, which flips after ANY accepted reach and not
+    only after a visit — stated in the copy rather than left to inference.
+S6-4 ASK-FIRST IS THE ABSENCE OF A STATE. inbound.status stays 'pending', card_slots is not
+    touched, and the hold therefore keeps running with no code saying so. No thread_state
+    value is added: S1-3 already ruled the poll-then-get_messages handoff correct, and it
+    carries ask-first unchanged. THE GATE IS ASYMMETRIC — the RECIPIENT of a pending request
+    may write; the SENDER may write only once the recipient has. Consent flows from the
+    question, so a stranger cannot talk their way in pre-accept. Bound: the sender may not
+    post twice in a row (one EXISTS on the last message's author).
+S6-5 A QUESTION DOES NOT EXTEND THE HOLD. VL-1's window exists because a patient losing a
+    requested time minutes before it starts is a product failure — THE HOLD PROTECTS THE
+    PATIENT. Extending it on the clinician's question converts a patient protection into
+    clinician optionality, paid for by the patient waiting and by everyone else who cannot
+    have that time. A lapse mid-conversation is therefore a real state and not an edge case:
+    the conversation survives, nothing can be booked through it, the band reads 'expired', and
+    the resolution is the patient asking again — possibly for the same time, if it is still
+    open, on a fresh hold.
+S6-6 THE CHIPS READ RETURNS EXACTLY THREE FLAGS per pending request — sender identity
+    verified, first contact, question asked — and nothing else. No display_name, no deus_id,
+    no other verification flag. PRE-ACCEPT ANONYMITY IS 0007'S DESIGN AND IT HOLDS:
+    get_my_thread_peers requires established_at, so a clinician answering a knock does not
+    learn who is knocking, and a chip surface grows to fit whatever its read returns.
+6-BUILD sequencing: docs commit first (this block + the Session 6 edit, both synced to
+hearth-pos); branch feat/clinical-incoming; 0040 written to migrations/ and STOPPED for
+hand-apply. Then the RPCs, respond_thread's fallback branch, the chips read, the copy into
+docs/PLEXMED_S6_INCOMING_SPEC.md (carrying the useInbound scheduled_for gap and the messages
+realtime gap as app-side items), and scripts/verify-inquiry.mjs. tsc clean, proof standard
+still green. No push.
