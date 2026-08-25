@@ -1864,6 +1864,34 @@ S5-9 THE PRACTICE-KIND CREATION GATE IS A TRIGGER, NOT AN RPC. hearth-pos writes
     derive from verification: the 2026-08-22 CORRECTION stands, display_kind maps from the
     enum alone.
 
+S5-10 THE BOOKING KEY IS THE INSTANT, AND THERE IS NO SECOND KEY (ruled 2026-08-25,
+    after 0039). A practice booking is reach_entity(kind 'booking') with scheduled_for set
+    to one of the card's open times, copied exactly as the card gives it. reach_entity
+    gains NO slot_id parameter — not now, not as an optional alternate.
+    WHY THE INSTANT IS SUFFICIENT: card_slots_card_start_uniq (0038b) is a partial unique
+    index on (card_id, starts_at) where released_at is null, so an instant names exactly
+    one live row on a card. The Worker's instant→row lookup is advisory; the claim's own
+    WHERE decides (VL-5), so a resolution that goes stale loses the race rather than
+    booking the wrong thing. Proven end to end before this was ruled
+    (scripts/verify-slots.mjs R5/R9).
+    WHY A SECOND KEY IS REFUSED: two accepted identifiers for one row is the ambiguity the
+    single-canonical-write-path rule exists to prevent — the day they disagree (an id from
+    a stale list, an instant from a fresh one) the server has to pick a winner, and every
+    such choice is a bug waiting for a reason. It also puts an opaque id back in the agent
+    surface that discipline rule 10 keeps out.
+    WHAT slot_id IS FOR: 0039's list returns it as CORRELATION DATA — the clinician's own
+    board, and the audit imprint claim_slot_and_knock already writes. It is deliberately
+    NOT carried in any MCP payload: present in the row an agent could see would be an
+    invitation to try booking with it.
+S5-11 THE PREDICATE HAS ONE DEFINITION (recorded 2026-08-25, 0039 SECTION 1). 0038b
+    defined eligibility inline inside open_slots_for_cards; 0039 lifts it into
+    public.eligible_card_slots and rewrites open_slots_for_cards as a projection over it,
+    same signature and same return columns. Standing rule for anything that reads open
+    times: READ THE HELPER, NEVER COPY THE PREDICATE. A second copy that drifts means a
+    card offers a time the claim refuses, which is the failure this whole feature is shaped
+    to prevent. claim_slot_and_knock's own WHERE is NOT a copy and must stay separate — it
+    is the authority (VL-5), not a reader.
+
 5-BUILD sequencing: docs commit first (this block, roadmap synced to hearth-pos, DEFERRED
 timezone entry re-homed); branch feat/practice-card; 0038a (the enum value alone, no
 receipt) + 0038b (card_slots, entities.timezone, the claim/release/read RPCs, the clinician
