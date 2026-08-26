@@ -2253,3 +2253,102 @@ no-op, the sweep inside credentialDrain, the copy constants,
 docs/PLEXMED_S7_TODAY_WRAP_SPEC.md as the hearth-pos contract (carrying the display_name-is-not-a-legal-name limit and the messages.origin gap as
 app-side items), and scripts/verify-today-wrap.mjs. tsc clean, proof standard still green.
 No push.
+
+## STATE OF THE BUILD — 2026-08-26
+
+WHAT THIS BLOCK IS. A dated bookmark of FACT, with hashes, so a later session does not have
+to reconstruct it from merge subjects. It carries NO decisions and supersedes nothing: canon
+rule 1 still governs — ground truth for what EXISTS is code plus applied migrations, and if
+this block ever disagrees with those, the code wins and this block is the bug. Every hash
+below was read from `git log` at write time; the ledger line was read live from
+`public.schema_migrations`.
+
+### SHIPPED
+
+  S1  RETRIEVAL HYGIENE — `180f456`, migration 0032. filters.kind honoured server-side,
+      sort_key 'verified' wired to real ordering, embedding input reduced. The prerequisite
+      every other vertical was waiting on.
+  --  IDENTITY-FLOW AMENDMENT — network `9da6dd6` (R3-AMENDED 48h window, R2-ADDENDUM,
+      R-LEDGER, R-GAP); hearth-pos `df31856` + pos-0003 via `7bea103` (entity_identity_sessions,
+      service-role only, ids behind id_verified). `afd2d54` adds the S3-A2 PRODUCTION-CUTOVER
+      LAUNCH GATE — every entity whose bound session has livemode=false has id_verified reset
+      before any live traffic. THAT GATE IS STILL OWED and is not part of anything below.
+  S2  CIVIC CARD CLASS — `de5e0b4`, migration 0033. The 988 lane, free by structure: no
+      engagement or payment RPC can name a civic card, enforced at the data layer.
+  S4  DISPLAY STACK S1 — `3ac7eef`, migration 0034. Seven-zone CardView, Tier 2/3
+      serializers, the guidance envelope. (Tier 1 interactive sheet stays CUT per the sprint.)
+  S3  CREDENTIAL CHAIN, five sessions —
+        S2 `5de43fd` (0035, PSV modules, ceremony, cron drain, LEIE ingest)
+        S3 `d344fd2` (binding + livemode assertion + cold-flow spec)
+           `0e5be5e` (BUG-014: rule N2 in normalizeNamePart + LEIE ASCII guard; 0036 dropped
+           on evidence, S3-A3 re-ruled)
+        S4 `d328ce5` (0036, stamps + receipts + the honorific gate)
+        S5 `e2ef07c` (0037a/0037b, monitoring-lite: sweep, auto-void, owner notice)
+      PROOF STANDARD GREEN — 198 passed, 0 failed across three scripts, re-run 2026-08-26 at
+      the time this block was written. Assertion 1 remains a standing ruled gap (S3-A1); the
+      HTTP+OAuth layer remains unexercised on the `.dev.vars` gap. Both stated in the artifact.
+  S5  PRACTICE CARDS — `105b417`, migrations 0038a/0038b/0039. kind 'practice' behind a
+      licence trigger, open times with the VL-1 soft hold, the availability chip, one
+      eligibility predicate with one definition (S5-11).
+  S6  CLINICAL INCOMING — `dede80f`, migration 0040. The three honesty chips, ask-first as
+      the ABSENCE of a state (S6-4), and the chips read that returns five columns and no more.
+  S7  TODAY + VISIT + WRAP — `95ce94c`, migration 0041. get_my_day, start_visit, wrap_visit,
+      the append-only plan, cadence, post_visit_link at T-60 on the existing cron, and
+      hearth-pos BUG-009's publication one-liner finally applied. `c1bd604` adds S7-5a —
+      update_plan_item over MCP and numbered plan items in get_messages.
+  S8  SUPERBILL — `86c7ba7`, migration 0042 + pos-0005 (hearth-pos `851a0b9`). Edge function,
+      pdf-lib renderer, private bucket, the two-provenance-class page. Hardened in
+      `a5aa44a` / hearth-pos `f00b7bc` + `6f7c093` after BUG-016: stat-after-upload,
+      guarded re-issue, snapshot recovery, and the layout fix that binds each verified-with
+      suffix to its own value.
+
+  LEDGER AT WRITE TIME (live read, newest first): pos-0005, 0042, 0041, 0040, 0039, 0038.
+  Files reconcile: hearth-network migrations/ tops at 0042, hearth-pos supabase/migrations/
+  tops at 0005 (= 'pos-0005'). 0015 remains the known deliberate gap.
+
+### WHAT REMAINS
+
+  1. CANVAS (Session 10) — BLOCKED ON SANDBOX APPROVAL, reported 2026-08-26 as roughly one
+     business day. Nothing is written: no branch, no mapping table, no FHIR code in either
+     repo. It is the last item of the ten-day sprint and the only one whose blocker is
+     external.
+  2. THE FOUR hearth-pos SCREEN SPECS — WRITTEN, UNBUILT. The specs are
+     docs/CRED_S3_COLD_FLOW_SPEC.md, docs/PLEXMED_S5_PRACTICE_AUTHORING_SPEC.md,
+     docs/PLEXMED_S6_INCOMING_SPEC.md and docs/PLEXMED_S7_TODAY_WRAP_SPEC.md. A ground-truth
+     sweep of hearth-pos on 2026-08-26 found:
+       · practice card authoring — ZERO hits for practice / card_slots / post_card_slots /
+         open_slots / modality across src/**;
+       · clinical Incoming variant — ZERO hits for the chip copy, first_contact,
+         get_my_pending_requests or sender_id_verified;
+       · Today — ZERO hits for get_my_day / start_visit / visit_started_at / room_url;
+       · visit wrap — ZERO hits for wrap_visit / visit_wraps / post_visit_plan /
+         set_plan_item / nudge_after_days / cpt / icd.
+     ONE CORRECTION TO THE USUAL SHORTHAND: the credential cold flow is PARTIAL, not absent —
+     src/services/credentials.ts (requestCredentialVerification :122, fetchMyVerifications
+     :182), src/components/IdentityPanel.tsx and src/hooks/useMyVerifications.ts all exist.
+     What the S3 spec adds sits on top of that, so it is an extension; the other three are
+     new surfaces. `practice` is not even in the app's CardKind union
+     (hearth-pos src/types/card.ts:13-19) nor in the authorable FLAVORS list
+     (src/components/CardEditorSheet.tsx:90-95).
+  3. EMAIL — named as remaining. ⚑ FLAGGED: no block in this roadmap, in
+     PLEXMED_10_DAY_SPRINT.md or in DEFERRED.md defines what "email" is as a deliverable, and
+     no code in either repo implements one. It is recorded here as an OPEN ITEM WITH NO
+     WRITTEN SCOPE rather than given one — inventing the scope in a state block would be the
+     thing "a ruling is not a ruling until it is in the roadmap" exists to prevent.
+  4. scripts/verify-care-loop.mjs — UNWRITTEN, confirmed absent from both repos by `find`.
+     The per-session verifies exist and pass (slots, inquiry, today-wrap, superbill, plus the
+     three the proof standard runs); what does not exist is the ONE script that walks the
+     whole loop end to end — ask → knock → ask-first → accept → Today → visit → wrap →
+     payment → superbill.
+  5. BOTH FILMS — POST-SPRINT, already ruled (SPRINT AMENDMENT 2026-08-24; FILM-1..FILM-5
+     above). Day 6 and Day 10 evening slots are RUN AND REPORT, not shoot.
+
+### TWO STANDING GAPS THIS BLOCK DOES NOT CLOSE
+
+  · hearth-pos `npx tsc --noEmit` exits 0, but tsconfig.json excludes `supabase/`, so the
+    edge functions are NOT covered by it. The superbill function's own index.ts has never been
+    typechecked or run locally — neither Deno nor Docker is installed on the build machine —
+    and scripts/verify-superbill.mjs prints that exclusion on every run rather than implying
+    otherwise. Steps 1b/1c of the live protocol are what close it.
+  · Whether a device/simulator build runs cannot be determined without running one, and has
+    not been. ios/ and android/ exist; expo ~55.0.26 and react-native 0.83.6 are pinned.
