@@ -98,6 +98,15 @@ export const VISIT_KIND_LABELS: Record<string, string> = {
 
 /** Refusals, by name — each says what to do instead. */
 export const REFUSALS = {
+  // D2 (BUG-016). A receipt row whose object is gone is a dead link waiting to
+  // be handed to a patient. It is NEVER answered with a signed URL — it is
+  // named, and the caller is told the one thing that fixes it.
+  fileMissing:
+    'this superbill was issued but its file is no longer in storage. Nothing was changed. ' +
+    'Re-issue it with recover set to true and it will be printed again from the record kept ' +
+    'when it was issued',
+  notRecoverable:
+    'this visit has no issued superbill to recover — issue one first',
   notSeller: 'only the clinician who provided the visit can issue its superbill',
   notWrapped: 'this visit has not been wrapped yet, so it has no codes to bill',
   notPaid:

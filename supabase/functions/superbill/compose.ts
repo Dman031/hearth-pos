@@ -228,3 +228,42 @@ export function compose(input: ComposeInput): ComposedDoc {
 
   return { sections, snapshot };
 }
+
+/**
+ * THE RECOVERY PATH (ruled 2026-08-26, BUG-016 §4).
+ *
+ * 0042's header claims the snapshot "can re-render the document if the object is
+ * ever lost". Nothing implemented that, so the claim was a promise with no code
+ * behind it. This is the code: it rebuilds the document model from the FROZEN
+ * SNAPSHOT ALONE and touches no live row — not `verifications`, not
+ * `transactions`, not `visit_wraps`. A licence voided last month must not edit a
+ * receipt issued before it, and the only way to guarantee that is to never look.
+ *
+ * WHAT IT CANNOT PROMISE, STATED PLAINLY: the recovered file is a faithful
+ * RE-PRINT of the same record, not a byte-identical copy of the lost one —
+ * pdf-lib stamps a creation date into every render, so the SHA-256 will differ.
+ * The snapshot is what is authoritative about content; the bytes were only ever
+ * authoritative about themselves. A recovery is honest about being a re-print.
+ */
+export function docFromSnapshot(snapshot: Record<string, unknown>): ComposedDoc | null {
+  const printed = (snapshot as { printed?: unknown }).printed;
+  if (!Array.isArray(printed) || printed.length === 0) return null;
+  // Shape-check rather than trust: a snapshot written by an older version, or by
+  // hand, must fail closed instead of rendering a half page.
+  for (const section of printed) {
+    if (
+      typeof section !== 'object' || section === null ||
+      typeof (section as DocSection).heading !== 'string' ||
+      !Array.isArray((section as DocSection).lines)
+    ) {
+      return null;
+    }
+  }
+  return { sections: printed as DocSection[], snapshot };
+}
+
+/** The issue date the recovered page reprints — the ORIGINAL one, never today's. */
+export function issuedFromSnapshot(snapshot: Record<string, unknown>): string | null {
+  const issued = (snapshot as { issued?: unknown }).issued;
+  return typeof issued === 'string' && issued.length > 0 ? issued : null;
+}
