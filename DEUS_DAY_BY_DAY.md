@@ -2151,6 +2151,87 @@ S8-2 THE PATIENT'S NAME AND DOB ARE THE CLINICIAN'S ASSERTION, NOT THE NETWORK'S
     name field and is corrected by the clinician; nothing derives, infers or verifies a patient
     identity, and no copy may suggest the network did.
 
+S8-3 THE SUPERBILL IS ISSUED ONCE (ruled 2026-08-26). superbills.engagement_id is UNIQUE
+    (0041), and that stays the whole correction policy for v1: a second call returns the
+    existing row, the existing path and the existing file. THE AGENT'S REASONING, ADOPTED AS
+    THE RULING: "a corrections flow designed before anyone has needed one usually gets the
+    shape wrong."
+    CONSEQUENCE, STATED RATHER THAN DISCOVERED: a clinician who types the wrong CPT code has
+    NO path to a corrected superbill in v1. The alternative — void-and-reissue — needs the
+    UNIQUE relaxed to a partial index plus a voided_at column, i.e. a migration and a larger
+    surface, and it can be built the day someone actually asks. DEFERRED entry with that
+    trigger.
+S8-4 NO SUCCEEDED CHARGE, NO SUPERBILL (ruled 2026-08-26). A superbill is a receipt for money
+    that moved; printing one with a zero on it would be a document that misstates its own
+    subject. The function refuses BY NAME. DERRICK'S REASONING, RECORDED AS GIVEN: an unpaid
+    or cash-outside-the-network visit wants "a visit summary, a different document, not a
+    superbill with a zero on it." DEFERRED entry opened for that document with the trigger
+    "first clinician asks for a summary on a visit with no succeeded charge".
+    Two further gates ride with this one and are ruled here so they are not left to the code:
+    SELLER ONLY (a superbill is the clinician's statement about their own services; a buyer
+    issuing one would be a patient authoring a provider's billing document) and WRAPPED ONLY
+    (the codes live in visit_wraps; no wrap row, no superbill).
+S8-5 STORED, NOT REGENERATED — AND THE VOID PROOF IS THE ASSERTION OF RECORD (ruled
+    2026-08-26). 0041 already committed to this with `storage_path text not null`; it stands.
+    WHY STORED: a re-render under a newer pdf-lib, a different font metric or a layout tweak
+    produces a DIFFERENT FILE, and the clinician may already have handed this one to a patient
+    who forwarded it to a payer. A receipt that changes is not a receipt.
+    WHY THE SNAPSHOT IS KEPT ANYWAY: it is the auditable record of what was printed, and it
+    can re-render the document if the object is ever lost. It is read INSTEAD OF
+    `verifications`, never beside it.
+    THE PROOF, WHICH DERRICK NAMED AS THE ONE HE CARES MOST ABOUT AND WHICH MUST BE LOUD:
+    issue → void the licence → confirm the stamp is gone from a LIVE card read → re-call →
+    identical superbill_id, identical storage_path, identical snapshot, and IDENTICAL SHA-256
+    OF THE BYTES. That test is the receipt's integrity. Structural rather than careful: with
+    engagement_id UNIQUE there is no code path that reaches the renderer twice.
+S8-6 THE BUCKET IS A MIGRATION, NOT A DASHBOARD CLICK (ruled 2026-08-26). DERRICK, VERBATIM:
+    "a dashboard-created bucket is infrastructure with no file describing it." pos-0005 creates
+    it and its policies in the pos-0002 shape (bucket insert + storage.objects policies, RLS
+    already on). Private, application/pdf only, participant-scoped SELECT for authenticated,
+    and NO insert/update/delete policies — only the edge function writes, under service-role.
+S8-7 THE SUPERBILL'S HEADER AND FOOTER ARE APPROVED VERBATIM (2026-08-26). A screen or a
+    renderer may not paraphrase them. THE ROADMAP IS THE SOURCE OF RECORD for this copy rather
+    than card-copy.ts, because the renderer is a Deno edge function in hearth-pos and cannot
+    import the Worker's constants module; the function holds it as a constant pointing back
+    here.
+
+      HEADER
+        SUPERBILL
+        A statement of services for insurance reimbursement.
+        Issued <date> · not a claim, and not a bill.
+
+      FOOTER
+        Where each fact on this page comes from. The provider's name, licence and NPI were
+        confirmed with the issuing registries on the dates shown, and the amount was recorded
+        when it was paid — those are the network's statements. The patient's name and date of
+        birth, the codes, and the visit length were entered by the clinician; the network holds
+        no patient identity and checked none of them. The clinician is responsible for their
+        accuracy.
+
+        This is not a medical record and not an insurance claim. Nothing about this visit was
+        recorded or transcribed.
+
+    THE LAST SENTENCE OF THE CLINICIAN PARAGRAPH IS DERRICK'S ADDITION, and it is the reason
+    the paragraph works: "Naming who owns the assertion protects both parties." Without it the
+    footer says only what the network did not do; with it, the document says who stands behind
+    what it asserts. The first sentence is S8-2 in a form a claims adjudicator can act on.
+    NO GLYPHS ANYWHERE IN THE PDF: WinAnsi has no checkmark, and one that renders as a hollow
+    box on somebody's printer is worse than none. Provenance is carried by a hairline rule down
+    the verified block, ALL-CAPS source headers, and a per-line "— verified with … on <date>"
+    suffix that appears ONLY on verified facts. The AMOUNT sits with the stamps, not with the
+    clinician's assertions: the network observed the payment.
+
+8-BUILD sequencing: docs commit first (this block + the two DEFERRED entries); branch
+feat/superbill; 0042 (issue_superbill — service-role only, the 0032:102 grant variant,
+inserting the superbills row AND posting the kind='superbill' message in ONE transaction so a
+message can never name a row that does not exist) and pos-0005 (bucket + policies) written and
+STOPPED for hand-apply — each pasted whole, no hand-splitting; neither adds an enum value, so
+NO SPLIT-ENUM pair (messages.kind already carries 'superbill' in 0041's CHECK, which is why
+that vocabulary was written as text). After the apply: the edge function
+(hearth-pos/supabase/functions/superbill, verify_jwt = true, the create-connect-account auth
+split), the pdf-lib renderer, and scripts/verify-superbill.mjs with the S8-5 proof as its
+loudest assertion. tsc clean, proof standard still green. No push, no deploy.
+
 DECISION 2 (S7-3 and S7-4 into canon before 7-BUILD) IS SATISFIED BY THIS BLOCK. Derrick:
 "I said 'per canon' and the timing and channel were never in canon." That is the failure the
 canon hierarchy exists to catch, caught for the third sprint running by the investigating
