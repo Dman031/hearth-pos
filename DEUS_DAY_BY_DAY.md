@@ -1974,6 +1974,20 @@ S7-1 TODAY IS SELLER-SIDE, DATED, AND LIVE — AND IT DOES NOT HIDE HALF THE DAY
     that lies by omission. Practice-card rows carry the visit and wrap affordances; other dated
     rows render as plain commitments with neither. Order: scheduled_for asc, tiebreak
     created_at asc.
+S7-1a AMENDED AT BUILD TIME — THE DAY INCLUDES WHAT HAS ALREADY BEEN WRAPPED (ruled
+    2026-08-25, after 0041 was written and before it was applied; 0041 applied
+    2026-08-26T05:53:55Z carrying the amended form). S7-1 as first ruled set the WHERE to
+    `status in ('accepted','paid')`. get_my_day includes 'fulfilled'. 'cancelled' stays OUT.
+    DERRICK'S REASONING, RECORDED AS GIVEN: "a derived state the read cannot produce is
+    internal evidence the WHERE was too narrow, and a visit vanishing from the clinician's day
+    at wrap time is the same lie-by-omission S7-1 rejected for practice-only filtering.
+    'cancelled' stays out; the board is where a cancelled time is re-offered."
+    The unreachable state is S7-8's `wrapped` (fulfilled_at not null): under the original WHERE
+    nothing could ever return a row in it, so a 9am visit wrapped at 9:30 left the day at 9:30.
+    'cancelled' is excluded on S5-1 — a cancelled time does not auto-reopen, and the open-times
+    board is the surface that re-offers it. Found by the agent while implementing S7-8, flagged
+    in 0041's header rather than shipped silently, and ruled before apply.
+
 S7-2 THE DAY WINDOW IS COMPUTED CLIENT-SIDE AND PASSED IN AS TWO UTC INSTANTS. VL-4 forbids
     the server emitting relative time and the DATE/TIME rule forbids TZ-implicit server
     formatting, so the read takes p_from/p_to timestamptz exactly as get_my_card_slots already
