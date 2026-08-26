@@ -2120,13 +2120,17 @@ agent rather than by a build — see the VL block's identical note.
 
 7-BUILD sequencing: docs commit first (this block + the Session 7/8 supersession edits, both
 synced to hearth-pos, + the two DEFERRED entries); branch feat/plexmed-today-wrap; 0041
-written to migrations/ and STOPPED for hand-apply — ONE file, no SPLIT-ENUM pair (S7-8), with
-the receipt as its final statement, RLS enabled on visit_wraps and superbills before any
-policy, the full grant block on every function (service-role variant for post_visit_link), and
+written to migrations/ and STOPPED for hand-apply — ONE file, no SPLIT-ENUM pair (S7-8), carrying
+BOTH the schema AND every RPC (start_visit, post_visit_plan, set_plan_item,
+set_thread_cadence, wrap_visit, post_visit_link, get_my_day, get_my_followups_due), with the
+receipt as its final statement, RLS enabled on visit_wraps and superbills before any policy,
+the full grant block on every function (service-role variant for post_visit_link), and
 hearth-pos BUG-009's publication one-liner folded in (Today's liveness depends on it and it has
-been diagnosed-but-unapplied since 2026-07-27). Then get_my_day + the wrap/visit RPCs, the
-vendor interface with the Daily adapter behind S7-10's absent-key no-op, the sweep inside
-credentialDrain, the copy constants, docs/PLEXMED_S7_TODAY_WRAP_SPEC.md as the hearth-pos
-contract (carrying the display_name-is-not-a-legal-name limit and the messages.origin gap as
+been diagnosed-but-unapplied since 2026-07-27). CORRECTED 2026-08-25 at build time: this line
+first read "Then get_my_day + the wrap/visit RPCs" AFTER the stop, which would have described
+an apply that never happened — the RPCs are in 0041 and land with it. What comes after the
+stop is WORKER code only: the vendor interface with the Daily adapter behind S7-10's absent-key
+no-op, the sweep inside credentialDrain, the copy constants,
+docs/PLEXMED_S7_TODAY_WRAP_SPEC.md as the hearth-pos contract (carrying the display_name-is-not-a-legal-name limit and the messages.origin gap as
 app-side items), and scripts/verify-today-wrap.mjs. tsc clean, proof standard still green.
 No push.
