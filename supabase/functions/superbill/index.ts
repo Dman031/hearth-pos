@@ -31,6 +31,27 @@
 // transactions and visit_wraps to render the page anyway, and a second copy of
 // the rule in SQL is the drift S5-11 named.
 //
+// ─── BYTES BEFORE BOOKKEEPING (BUG-016, ruled 2026-08-26) ─────────────────
+// A receipt row with no object behind it is worse than a plain failure: a
+// clinician hands a patient a link and both believe a document exists. So:
+//   * NOTHING is recorded until the object has been STATTED — present, non-empty
+//     and application/pdf. An upload reporting success is not the same fact as
+//     bytes being addressable, and only one of those is what a patient clicks.
+//   * NO signed URL is minted for a path that was not just verified. That
+//     includes the already-issued path, which is where the hole actually lived:
+//     row present + object gone returned a 200 and a dead link.
+//   * NO field in a response is synthesised from a failed call. A null RPC
+//     result is a 500 — the no-plausible-placeholder rule, applied to a response
+//     shape rather than to a database column.
+//
+// ─── RECOVERY (ruled 2026-08-26) ───────────────────────────────────────────
+// 0042's header claims the snapshot can re-render a lost document; that claim is
+// now true. `{"recover": true}` re-prints from the FROZEN SNAPSHOT ALONE and
+// never from a live row. It is opt-in on purpose: a missing file is answered by
+// NAMING it, so nobody is handed a silently-regenerated document they did not
+// ask for. The re-print is honest about being one — the bytes differ (pdf-lib
+// stamps a creation date), the record does not.
+//
 // ─── ISSUE-ONCE (ruling S8-3) ──────────────────────────────────────────────
 // The existing-superbill check happens BEFORE rendering, and 0042's UNIQUE is
 // the backstop behind it. A second call returns the first document — same id,
@@ -46,7 +67,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.105.4';
 // bytes it proves and the bytes this issues come off the same code path.
 import { PDFDocument, StandardFonts, rgb } from 'npm:pdf-lib@1.17.1';
 
-import { compose, type ComposeInput } from './compose.ts';
+import { compose, docFromSnapshot, issuedFromSnapshot, type ComposeInput } from './compose.ts';
 import { renderSuperbill, type PdfLib } from './render.ts';
 import { REFUSALS } from './copy.ts';
 
@@ -109,9 +130,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (!userId) return jsonResponse({ error: 'unauthorized' }, 401);
 
   let engagementId = '';
+  let recover = false;
   try {
     const body = await req.json();
     engagementId = typeof body?.engagement_id === 'string' ? body.engagement_id.trim() : '';
+    recover = body?.recover === true;
   } catch {
     return jsonResponse({ error: 'bad_request', message: 'expected a json body' }, 400);
   }
@@ -166,13 +189,58 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
   if (existing) {
     // The first document IS the answer. Nothing is re-rendered, nothing is
-    // re-uploaded, and no second message is posted (ruling S8-3/S8-5).
+    // re-uploaded, and no second message is posted (ruling S8-3/S8-5) — but the
+    // OBJECT IS CHECKED FIRST. This is where BUG-016 lived: a row whose file had
+    // gone still produced a 200 and a signed URL pointing at nothing.
+    const path = existing.storage_path as string;
+    if (await objectIsPresent(svc, path)) {
+      return jsonResponse({
+        superbill_id: existing.id,
+        storage_path: path,
+        issued_at: existing.issued_at,
+        already_issued: true,
+        signed_url: await signedUrl(svc, path),
+      });
+    }
+    if (!recover) {
+      // NAMED, never papered over, and never answered with a URL.
+      return jsonResponse(
+        { error: 'file_missing', message: REFUSALS.fileMissing,
+          superbill_id: existing.id, storage_path: path },
+        409,
+      );
+    }
+    // Opt-in recovery: re-print from the snapshot and from NOTHING else.
+    const { data: row, error: snapErr } = await svc
+      .from('superbills').select('snapshot').eq('engagement_id', engagementId).maybeSingle();
+    if (snapErr || !row?.snapshot) {
+      console.error('[superbill] snapshot read failed:', snapErr);
+      return jsonResponse({ error: 'lookup_failed' }, 500);
+    }
+    const fromSnapshot = docFromSnapshot(row.snapshot as Record<string, unknown>);
+    const issuedOn = issuedFromSnapshot(row.snapshot as Record<string, unknown>);
+    if (!fromSnapshot || !issuedOn) {
+      // Fail CLOSED. A snapshot we cannot read is not a document we may guess at.
+      return jsonResponse({ error: 'unrecoverable', message: REFUSALS.notRecoverable }, 409);
+    }
+    let reprinted: Uint8Array;
+    try {
+      reprinted = await renderSuperbill(LIB, fromSnapshot, { issued: issuedOn });
+    } catch (err) {
+      console.error('[superbill] re-render failed:', err);
+      return jsonResponse({ error: 'render_failed' }, 500);
+    }
+    const restored = await putObject(svc, path, reprinted);
+    if (!restored.ok) return jsonResponse({ error: restored.error }, 500);
     return jsonResponse({
       superbill_id: existing.id,
-      storage_path: existing.storage_path,
+      storage_path: path,
       issued_at: existing.issued_at,
       already_issued: true,
-      signed_url: await signedUrl(svc, existing.storage_path as string),
+      // Said out loud: a re-print of the same record, not the original file.
+      // The bytes differ; what the page states does not.
+      recovered: true,
+      signed_url: await signedUrl(svc, path),
     });
   }
 
@@ -291,13 +359,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
   // scopes on, and the file name is stable for a given visit. A retry after a
   // crash overwrites the same object rather than littering the bucket.
   const storagePath = `${engagementId}/superbill.pdf`;
-  const { error: uploadErr } = await svc.storage
-    .from(BUCKET)
-    .upload(storagePath, bytes, { contentType: 'application/pdf', upsert: true });
-  if (uploadErr) {
-    console.error('[superbill] upload failed:', uploadErr);
-    return jsonResponse({ error: 'upload_failed' }, 500);
-  }
+  const stored = await putObject(svc, storagePath, bytes);
+  if (!stored.ok) return jsonResponse({ error: stored.error }, 500);
 
   // UPLOAD BEFORE RECORD, deliberately. If this call fails, the object is an
   // orphan nobody was told about and the next attempt overwrites it. The inverse
@@ -312,14 +375,85 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return jsonResponse({ error: 'issue_failed', message: issueErr.message }, 500);
   }
 
+  // D1 (BUG-016): NO `??` FALLBACKS. A null result with no error is a failure,
+  // and the old shape dressed it as a 200 carrying a path and a timestamp that
+  // no row backed — a plausible placeholder in a response body.
+  if (!issued?.superbill_id) {
+    console.error('[superbill] issue_superbill returned no row', { engagementId });
+    return jsonResponse({ error: 'issue_failed', message: 'the superbill was not recorded' }, 500);
+  }
+
   return jsonResponse({
-    superbill_id: issued?.superbill_id ?? null,
-    storage_path: issued?.storage_path ?? storagePath,
-    issued_at: issued?.issued_at ?? issuedIso,
-    already_issued: issued?.idempotent === true,
+    superbill_id: issued.superbill_id,
+    storage_path: issued.storage_path,
+    issued_at: issued.issued_at,
+    already_issued: issued.idempotent === true,
     signed_url: await signedUrl(svc, storagePath),
   });
 });
+
+/**
+ * Is the object actually there? (D2/D3, BUG-016.)
+ *
+ * `list` with a search on the exact file name, rather than a HEAD of a signed
+ * URL: the storage LIST is the same catalogue a download reads from, it needs no
+ * URL to be minted first, and it hands back size and mimetype in the same call.
+ * A signed HEAD would also 200 for a path that does not exist until the GET.
+ *
+ * Requires PRESENT, NON-EMPTY and application/pdf. A zero-byte object is the
+ * failure this whole change exists to catch: storage happily accepts one, and
+ * every downstream check that only asks "does the key exist" would pass it.
+ */
+async function objectIsPresent(
+  svc: ReturnType<typeof createClient>,
+  path: string,
+): Promise<boolean> {
+  const slash = path.lastIndexOf('/');
+  const folder = slash === -1 ? '' : path.slice(0, slash);
+  const name = slash === -1 ? path : path.slice(slash + 1);
+  const { data, error } = await svc.storage.from(BUCKET).list(folder, { search: name, limit: 1 });
+  if (error) {
+    console.error('[superbill] object stat failed:', error);
+    return false;
+  }
+  const found = (data ?? []).find((o: { name: string }) => o.name === name) as
+    | { name: string; metadata?: { size?: number; mimetype?: string } }
+    | undefined;
+  if (!found) return false;
+  const size = found.metadata?.size ?? 0;
+  const mime = found.metadata?.mimetype ?? '';
+  if (size <= 0 || mime !== 'application/pdf') {
+    console.error('[superbill] object present but unfit', { path, size, mime });
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Upload, then PROVE it landed. BYTES BEFORE BOOKKEEPING: an upload that reports
+ * success is not the same fact as an object a patient can open, and the whole of
+ * BUG-016 is the distance between those two sentences. Nothing downstream of
+ * this — no superbills row, no message, no signed URL, no 200 — happens unless
+ * this returns ok.
+ */
+async function putObject(
+  svc: ReturnType<typeof createClient>,
+  path: string,
+  bytes: Uint8Array,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { error } = await svc.storage
+    .from(BUCKET)
+    .upload(path, bytes, { contentType: 'application/pdf', upsert: true });
+  if (error) {
+    console.error('[superbill] upload failed:', error);
+    return { ok: false, error: 'upload_failed' };
+  }
+  if (!(await objectIsPresent(svc, path))) {
+    console.error('[superbill] upload reported success but the object is not addressable', { path });
+    return { ok: false, error: 'upload_unverified' };
+  }
+  return { ok: true };
+}
 
 /**
  * A short-lived link, returned so the wrap screen can hand the document over
