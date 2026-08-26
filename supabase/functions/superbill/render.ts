@@ -56,7 +56,17 @@ const MARGIN = 54;
 const CONTENT_WIDTH = PAGE[0] - MARGIN * 2;
 
 const SIZE = { title: 20, header: 10, section: 9, label: 10, note: 8, footer: 8 };
+// PROXIMITY IS ATTRIBUTION. The "verified with …" suffix belongs to the value
+// ABOVE it, and on a document a payer reads, an ambiguous attribution is the
+// wrong kind of ambiguous. The first draft put 16pt above the note and 11pt
+// below, so it sat nearer the NEXT row's label and the NPI suffix read as if it
+// qualified Licence. The gaps are now 10 above / 20 below — a 1:2 ratio, so the
+// binding is unmistakable without a rule or a bullet.
 const LEAD = { header: 14, section: 22, line: 16, note: 11, footer: 11 };
+/** Gap between a value and its own suffix. Deliberately the SMALLER of the two. */
+const NOTE_ABOVE = 10;
+/** Gap between a suffix and the next row's label. Deliberately the LARGER. */
+const NOTE_BELOW = 20;
 /** Where the label column ends and the value column begins. */
 const VALUE_X = MARGIN + 132;
 /** The verified block's rule sits here, and nothing else in the document does. */
@@ -185,11 +195,13 @@ export async function renderSuperbill(
       if (i > 0) y -= LEAD.line;
       text(part, VALUE_X, SIZE.label, bold, ink);
     }
-    y -= LEAD.line;
+    // Tighter above a suffix than below it, so the suffix reads as part of the
+    // row it qualifies rather than as a heading for the next one.
+    y -= line.note ? NOTE_ABOVE : LEAD.line;
     // Device 3: the suffix, and its ABSENCE on a clinician line is the signal.
     if (line.note) {
       text(line.note, VALUE_X, SIZE.note, body, stone);
-      y -= LEAD.note;
+      y -= NOTE_BELOW;
     }
   }
 }
