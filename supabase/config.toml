@@ -389,6 +389,12 @@ verify_jwt = false
 [functions.create-connect-account]
 verify_jwt = true
 
+# superbill: signed-in clinician only (valid JWT). The function itself then
+# checks that the caller is the SELLER of the visit — verify_jwt proves who is
+# calling, not what they are entitled to (PlexMed S8-4).
+[functions.superbill]
+verify_jwt = true
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.
