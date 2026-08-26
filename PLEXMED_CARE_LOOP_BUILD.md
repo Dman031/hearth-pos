@@ -356,17 +356,39 @@ round-trip. Light palette on clinician surfaces. STOP.
 ```
 INVESTIGATION ONLY. Using existing engagements as the source of truth:
 1. TODAY: a schedule strip + visit tiles screen assembled entirely from accepted
-   engagements with slot datetimes (Session 5). Tile: patient first-name, new/follow-up,
-   her note, latest assistant-logged summaries from the thread, plan status if a plan
-   exists. Quote which queries/RPCs supply each field; propose any missing read RPC.
+   engagements with slot datetimes (Session 5). Tile: the patient's display name, first-
+   visit-on-this-network, her note, the latest messages in the thread, plan status if a
+   plan exists. Quote which queries/RPCs supply each field; propose any missing read RPC.
+   [SUPERSEDED 2026-08-25 — rulings S7-1, S7-2, and S6-3 applied. Three edits: "patient
+   first-name" became the display name, because entities holds display_name and NOTHING
+   else (0000:42-60) and S6-2 proved name/DOB are never stored — a first name is the first
+   token of a display name, never a name of record. "new/follow-up" came out entirely: S6-3
+   already ruled new-vs-established is a CPT distinction the network cannot make, and S7-6
+   puts it where it belongs, on the clinician at wrap; what Today may honestly show is
+   "First visit on this network". "assistant-logged summaries" became "the latest messages",
+   because messages.origin is currently a FICTION — post_message hardcodes 'human'
+   (0004:203) and nothing anywhere writes 'ai', so no surface can distinguish an assistant's
+   message from a person's (DEFERRED, with a trigger).]
 2. WRAP: on engagement completion, a wrap screen with three items: (a) plan tiles —
    propose plan as structured thread messages (type "plan", items[] with done flags both
    parties can see; patient can check off) NOT a new table unless the report argues
    otherwise; (b) cadence — a per-thread nudge_after_days setting; nudges are ALWAYS
-   drafted-then-sent by the clinician's tap, never auto-sent; (c) follow-up booking =
-   existing engagement creation with price snapshot.
-3. Engagement states: propose adding in_visit and wrapped transitions to the existing
-   machine (quote current states from Session 0).
+   drafted-then-sent by the clinician's tap, never auto-sent; (c) follow-up booking = the
+   clinician OFFERS a time (post_card_slots) and the patient takes it on the existing rails,
+   with the price snapshot happening at accept exactly as it does today.
+   [SUPERSEDED 2026-08-25 — ruling S7-7. The original read "existing engagement creation
+   with price snapshot", which reads as though the CLINICIAN creates it. They cannot: every
+   path that mints an inbound derives the sender from the caller (0038b:224), and a clinician
+   minting a request FROM the patient would fabricate consent — against the doctrine four
+   lines of this doc's OUT OF SCOPE block already state.]
+3. Engagement states: in_visit and wrapped are ATTRIBUTES, not enum values —
+   engagements.visit_started_at plus the existing 'fulfilled', with the tile state derived.
+   [SUPERSEDED 2026-08-25 — ruling S7-8. The original asked for two new engagement_status
+   values, which would have superseded a LOCKED block (0017:26, 0022:57). Refused on the
+   broken writers, not on taste: complete_engagement and both cancel writers gate on
+   status in ('accepted','paid') (0018:134,229,268), so an 'in_visit' engagement would
+   silently fail to complete AND fail to cancel, and the app's status-based Upcoming/Past
+   split would drop it from both sections.]
 STOP after proposal.
 ```
 ### Prompt 7-BUILD: implement as approved; branch feat/plexmed-today-wrap; light palette;
@@ -379,14 +401,25 @@ cadence set, follow-up booked, payment settled via existing rails). STOP.
 ### Prompt 8-INVESTIGATE:
 ```
 INVESTIGATION ONLY.
-1. PRIVATE NOTES: per-thread clinician-only notes. Propose storage with RLS such that
+1. PRIVATE NOTES — POST-SPRINT, NOT PART OF S8 AS RUN. [SCOPED OUT 2026-08-25, confirming
+   the sprint CUT LIST: S8 is SUPERBILL + visit-summary export only. The text below stands
+   unchanged as the spec of record for the post-sprint session.]
+   PRIVATE NOTES: per-thread clinician-only notes. Propose storage with RLS such that
    ONLY the authoring entity can ever read (prove the policy SQL), encrypted at rest per
    our Supabase posture, exportable, hard-deletable. UI carries verbatim label:
    "PRIVATE · VISIBLE ONLY TO YOU · NOT THE MEDICAL RECORD". Report RLS policy text.
-2. SUPERBILL: PDF generation from thread data (visit date, duration, CPT + ICD codes the
-   clinician selects from a short list on wrap, price paid, provider NPI + license
-   stamps, patient name). Propose the generation path (edge function vs client) and
-   where the PDF lands (thread attachment via existing message model?).
+2. SUPERBILL: PDF generation from thread data (visit date, duration, CPT from a short
+   reviewed list + ICD as free text, both clinician-selected at wrap, price paid, provider
+   NPI + license stamps, and the patient name AND DOB the clinician types). Generation is a
+   Supabase EDGE FUNCTION; the PDF lands in a PRIVATE bucket, and the announcing thread
+   message carries the superbill id, never a raw expiring URL.
+   [SUPERSEDED 2026-08-25 — rulings S7-9, S8-1, S8-2. ICD has no honest short list, so it is
+   free text with no lookup and no autocomplete. The generation path was never open: two of
+   the four inputs (transactions, verifications) are sealed to the client by ruling, so
+   client-side generation cannot be honest, and a Worker route would be a third token plane.
+   "patient name" gained DOB and an owner: the network stores neither, by design (R2), so the
+   clinician asserts both — the stamps are the network's claim, the name and DOB are the
+   clinician's, and the PDF must make that split legible.]
 3. VISIT SUMMARY EXPORT: same data as a clean one-page PDF + copy-to-clipboard text.
 CPT/ICD in v1 are clinician-entered/selected — we never auto-code. STOP after proposal.
 ```

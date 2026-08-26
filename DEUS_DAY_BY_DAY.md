@@ -1959,3 +1959,174 @@ hand-apply. Then the RPCs, respond_thread's fallback branch, the chips read, the
 docs/PLEXMED_S6_INCOMING_SPEC.md (carrying the useInbound scheduled_for gap and the messages
 realtime gap as app-side items), and scripts/verify-inquiry.mjs. tsc clean, proof standard
 still green. No push.
+
+## RULINGS — 2026-08-25 (PLEXMED S7 + S8, Today · Visit · Wrap · Superbill — approved for 7-BUILD)
+Source: PLEXMED S7-INVESTIGATE report (main @ dede80f), plus five decisions ruled the same
+day. Binds PLEXMED_CARE_LOOP_BUILD.md Sessions 7 and 8 (S8 scoped to SUPERBILL +
+visit-summary export only; private notes are post-sprint per the sprint CUT LIST). Prior
+rulings unchanged: CRISIS_RULE / SYMPTOM_RULE / ROUTING_RULE, VL-1..VL-5, S5-1..S5-11,
+S6-1..S6-6, S1-3 (get_status is not widened).
+
+S7-1 TODAY IS SELLER-SIDE, DATED, AND LIVE — AND IT DOES NOT HIDE HALF THE DAY. The set is
+    seller_entity_id = me, status in ('accepted','paid'), scheduled_for inside the requested
+    window, ALL KINDS — not practice-only. A clinician who also sells a non-practice thing has
+    that commitment on the same day, and a Today that renders only practice rows is a calendar
+    that lies by omission. Practice-card rows carry the visit and wrap affordances; other dated
+    rows render as plain commitments with neither. Order: scheduled_for asc, tiebreak
+    created_at asc.
+S7-2 THE DAY WINDOW IS COMPUTED CLIENT-SIDE AND PASSED IN AS TWO UTC INSTANTS. VL-4 forbids
+    the server emitting relative time and the DATE/TIME rule forbids TZ-implicit server
+    formatting, so the read takes p_from/p_to timestamptz exactly as get_my_card_slots already
+    does (0038b:565-568). The app computes "today" from entities.timezone, falling back to UTC
+    WITH AN EXPLICIT UTC LABEL — never a guessed local zone (0038b:164-166). The zone is the
+    CLINICIAN'S: Today is the clinician's day; the patient's zone is their assistant's problem
+    and always has been.
+S7-3 THE ROOM IS MINTED AT T-60 BY THE WORKER'S EXISTING SCHEDULED HANDLER, AND NOWHERE ELSE.
+    RULED HERE BECAUSE IT WAS NEVER IN CANON: the strategy-chat phrase "per canon" covered a
+    timing and a channel that a grep of the roadmap, the sprint file, the build doc, docs/ and
+    DEFERRED could not find — the only prior text is PLEXMED_10_DAY_SPRINT.md:42-48 (Daily.co
+    prebuilt rooms, free tier, BAA before any real patient, tap-out) and
+    PLEXMED_CARE_LOOP_BUILD.md:475 (tap-out room). Caught by the S7 agent, not by a build that
+    shipped against a fiction — the same catch as VL-1's.
+    MECHANISM: the Worker already runs a per-minute cron (wrangler.jsonc:37-39, src/index.ts:72,
+    src/credential/ceremony.ts:337). The visit sweep rides it under the pattern CRED S5 ruling 4
+    already fixed (ceremony.ts:322-335): one handler, pending-first, each sweep budgeted, each
+    wrapped so one failure cannot starve the other. NO new cron expression, NO wrangler.jsonc
+    change, therefore no `npx wrangler types`.
+    WHY NOT AT ACCEPT: accept runs app-side through respond_to_inbound (0038b:651), a Supabase
+    RPC. The Worker is not in that path and the app cannot hold a video-vendor API key. Minting
+    from two places is two write sites for one row — single-canonical-write-path, verbatim.
+    WHY T-60 IS THE RIGHT NUMBER AND NOT A ROUND ONE: VL-2 says nothing books inside 60 minutes
+    of slot start, so at T-60 the hour's roster is final BY CONSTRUCTION. It also means a visit
+    cancelled before T-60 never mints a room at all — no vendor object to revoke, no orphan link
+    in a thread, no cleanup path to get wrong.
+    EXPIRY, TWICE: the room is created with a vendor-side expiry at slot ends_at + 30 minutes
+    grace (Daily's `exp`; LiveKit's token TTL) — the expiry that matters, because the party
+    running the media enforces it. Ours is nothing: the message stays readable forever and
+    should. The copy says the room closed, never that the link vanished. room_url is never
+    nulled after the fact — it is a receipt of what was created.
+S7-4 THE LINK ARRIVES AS A THREAD MESSAGE ON THE ENGAGEMENT'S THREAD, WRITTEN AS
+    origin = 'system'. Both parties see it (messages_select_participant, 0004:77) and the
+    patient's assistant reads it through the existing get_messages with NO tool change and no
+    new agent surface. RULED HERE FOR THE SAME REASON AS S7-3 — the channel was never written
+    down either.
+    THE GAP THIS CLOSES: no 'system'-origin writer exists anywhere. post_message hardcodes
+    'human' (0004:203) and derives the actor from the caller, so a Worker posting the link would
+    post AS THE CLINICIAN — a lie about authorship on a clinical surface. post_visit_link(...)
+    is service-role only (the 0032:102 grant variant) and writes the row with origin = 'system'
+    and engagements.room_url in one transaction. message_origin's third value finally acquires
+    the writer it was declared for at 0004:29.
+S7-5 THE PLAN IS APPEND-ONLY. A CHECK-OFF IS A NEW MESSAGE, NEVER AN EDIT. Plan tiles are
+    thread messages (messages gains nullable `kind text` + `payload jsonb`; NOT a new table, as
+    Session 7 asked). The design is decided by one constraint and not by taste: get_messages is
+    a `since` cursor on created_at (src/tools/get-messages.ts:118-121), so AN IN-PLACE jsonb
+    UPDATE ON THE PLAN MESSAGE IS INVISIBLE TO EVERY CURSOR READER — the patient's assistant
+    would poll forever and never learn an item was checked. Bumping created_at to force
+    visibility would reorder the transcript and rewrite history. So: one 'plan' message, and
+    each check-off a small 'plan_item' row; readers fold. Messages stay immutable and the audit
+    trail gains who checked what, when — worth more on a clinical surface than a compact blob.
+    The plan message's BODY carries a complete human-readable rendering composed in SQL (the
+    shape the accept message already uses, 0038b:826-834), so an assistant that knows nothing
+    about `payload` still reads the plan correctly. get_messages therefore gains NOTHING in v1 —
+    zero widening of the agent surface.
+S7-6 THE CODES ARE THE CLINICIAN'S RECORD, NOT A THREAD MESSAGE, AND THEY GET THE ONE NEW
+    TABLE. The plan is a conversation and belongs in the thread; a diagnosis code is not
+    something to hand a patient inside a chat, and the superbill needs it structured.
+    public.visit_wraps — engagement_id unique, visit_kind text check in ('new','follow_up'),
+    cpt_code, icd_codes text[], duration_minutes, patient_name_for_billing, patient_dob,
+    wrapped_at. RLS ON WITH ZERO POLICIES, definer RPCs only, table grants revoked — the
+    card_slots posture verbatim (0038b:140-148).
+    visit_kind is the CLINICIAN'S pick, which is exactly the resolution S6-3 promised when it
+    struck "New patient" off the chip. Never suggested, never ranked: the CPT short list is a
+    static reviewed constant, not model output (PLEXMED_CARE_LOOP_BUILD.md:460, :443).
+S7-7 WRAP OFFERS A TIME; THE PATIENT TAKES IT. Session 7's "follow-up booking = existing
+    engagement creation with price snapshot" reads as though the CLINICIAN creates it. THEY
+    CANNOT: every path that mints an inbound derives the sender from the caller (reach_entity →
+    claim_slot_and_knock, 0038b:224), and a clinician minting a request FROM the patient would
+    fabricate consent — against doctrine (PLEXMED_CARE_LOOP_BUILD.md:456-458, "Patient asks →
+    network answers → humans accept, every time"). So wrap's follow-up action calls the existing
+    post_card_slots (0038b:407) to put the offered time on the board and drafts a thread message
+    naming it; the patient or their assistant books on the existing rails with THE INSTANT as
+    the key (S5-10), which snapshots the price at accept exactly as it does today. Two-sided by
+    construction, and it needs no new booking path at all.
+S7-8 IN_VISIT AND WRAPPED ARE ATTRIBUTES, NOT STATES (decision 1, ruled 2026-08-25). Session 7
+    item 3 asked for two new engagement_status values; that would have SUPERSEDED A LOCKED BLOCK
+    (0017:26 "States: accepted → paid → fulfilled … scheduled_for is an ATTRIBUTE, never a
+    state"; 0022:57 "no enum change — the status enum is locked by STOP-0"). Refused, and the
+    argument that decides it is the broken writers, not the aesthetics: complete_engagement
+    (0018:134), cancel_engagement (0018:229) and its 0022/0024 successors (0018:268) ALL gate on
+    status in ('accepted','paid'), so an 'in_visit' engagement would silently fail to complete
+    AND fail to cancel; EngagementScreen's Upcoming/Past split is status-based by ruling
+    (hearth-pos EngagementScreen.tsx:39-41) and would drop those rows out of both sections.
+    INSTEAD: engagements.visit_started_at timestamptz (nullable), wrapped stays status
+    'fulfilled' via the existing seller-only complete_engagement (0018:93), and the tile state is
+    DERIVED — the discipline get_my_card_slots already uses (0038b:594-601):
+      cancelled_at not null → cancelled; fulfilled_at not null → wrapped;
+      visit_started_at not null → in_visit; else → scheduled.
+    Writer: start_visit(p_engagement_id) — definer, seller-only (0018:117-120's actor check),
+    idempotent, refuses cancelled/fulfilled, audit-imprinted. CONSEQUENCE FOR NUMBERING: 0041
+    adds no enum value and stays a SINGLE FILE (see 7-BUILD sequencing).
+S7-9 ICD IS FREE TEXT, CLINICIAN-TYPED — NO LOOKUP, NO AUTOCOMPLETE (decision 3). No short list
+    of diagnosis codes is honest across specialties, and any list we author is a suggestion by
+    another name — which is the line PLEXMED_CARE_LOOP_BUILD.md:460 draws ("auto-coding …
+    never"). CPT keeps its static reviewed short list (S7-6); ICD gets a text field and nothing
+    else. A clinician-authored SAVED list is DEFERRED, not rejected.
+S7-10 BUILD IT UNPROVISIONED (decision 4). The Daily.co account is Derrick's errand and the
+    build does not wait on it. DAILY_API_KEY goes in Bindings but NOT in REQUIRED_KEYS
+    (src/utils/env.ts:37 — the precedent for an optional binding is already at :27). Absent key:
+    the sweep logs once and no-ops, room_url stays null, the Today tile says there is no room
+    yet, and NOTHING ELSE DEGRADES. Only the room beat of the end-to-end walk waits on the
+    account. The vendor is behind an interface (createRoom({engagementId, notBefore, notAfter})
+    → {url, provider, expiresAt}) with a deterministic room name derived from the engagement id,
+    so a retried tick returns the same room and LiveKit is a second file, not a rewrite.
+S8-1 THE SUPERBILL IS A SUPABASE EDGE FUNCTION, NOT A WORKER ROUTE. Two of its four required
+    inputs are SEALED to the client by ruling — transactions (0016:77-82; 0023 returns a boolean
+    on purpose) and verifications (0035, re-asserted 0036) — so the client cannot honestly
+    compose the PDF and generation is server-side, full stop. It is not a Worker route because
+    token-planes canon fixes the Worker at exactly two planes and says a third "is a ruling, not
+    a diff"; a superbill is agent-facing on neither. The in-family precedent is
+    create-identity-session / create-connect-account / stripe-identity-webhook: authorize on the
+    caller's own session JWT, read the sealed tables with service-role. PDF via pdf-lib on
+    esm.sh, in the edge function ONLY — never in the Worker bundle.
+    STAMPS ARE SNAPSHOTTED AT ISSUE, live rows only (status='verified' and voided_at is null —
+    the verifications_live_stamp_idx predicate, 0036:155-157). A licence voided next month must
+    not retro-edit an issued receipt, and the PDF must state what was true on the day it issued.
+    LANDS IN A PRIVATE BUCKET, `superbills` — card-media is PUBLIC-READ (hearth-pos
+    services/storage.ts:129) and must not be the pattern for a document carrying codes and a
+    patient name. Access via a definer RPC returning a short-lived signed URL to participants
+    only. The announcing thread message carries the SUPERBILL ID, never a raw expiring URL — a
+    link that 403s next week reads as a broken product. HONEST LIMIT, stated up front: an MCP
+    client cannot fetch from Supabase Storage, so the assistant-visible artifact in v1 is the
+    visit-summary TEXT and the PDF is an app-side download; both are composed by the SAME
+    serializer so they cannot drift.
+S8-2 THE PATIENT'S NAME AND DOB ARE THE CLINICIAN'S ASSERTION, NOT THE NETWORK'S (decision 5).
+    Both are clinician-typed at wrap and both are stored on visit_wraps. RULED VERBATIM:
+      "a superbill is useless for reimbursement without the name and DOB the insurer holds, and
+       the network cannot supply either (R2 — we store neither, by design). So the clinician
+       asserts them. The schema comment and the PDF must both make the split legible: the stamps
+       are the network's claim, the patient's name and DOB are the clinician's. Storing them is
+       safe precisely because they make no verification claim — but they are PHI, so visit_wraps
+       stays RLS-on with zero policies and definer-only access."
+    The impossibility is proven, not assumed: entities holds display_name and nothing else
+    (0000:42-60), and S6-2 established that name/DOB are never stored (hearth-pos
+    0003_identity_session.sql:35-45, "Never store name/DOB here"). display_name PREFILLS the
+    name field and is corrected by the clinician; nothing derives, infers or verifies a patient
+    identity, and no copy may suggest the network did.
+
+DECISION 2 (S7-3 and S7-4 into canon before 7-BUILD) IS SATISFIED BY THIS BLOCK. Derrick:
+"I said 'per canon' and the timing and channel were never in canon." That is the failure the
+canon hierarchy exists to catch, caught for the third sprint running by the investigating
+agent rather than by a build — see the VL block's identical note.
+
+7-BUILD sequencing: docs commit first (this block + the Session 7/8 supersession edits, both
+synced to hearth-pos, + the two DEFERRED entries); branch feat/plexmed-today-wrap; 0041
+written to migrations/ and STOPPED for hand-apply — ONE file, no SPLIT-ENUM pair (S7-8), with
+the receipt as its final statement, RLS enabled on visit_wraps and superbills before any
+policy, the full grant block on every function (service-role variant for post_visit_link), and
+hearth-pos BUG-009's publication one-liner folded in (Today's liveness depends on it and it has
+been diagnosed-but-unapplied since 2026-07-27). Then get_my_day + the wrap/visit RPCs, the
+vendor interface with the Daily adapter behind S7-10's absent-key no-op, the sweep inside
+credentialDrain, the copy constants, docs/PLEXMED_S7_TODAY_WRAP_SPEC.md as the hearth-pos
+contract (carrying the display_name-is-not-a-legal-name limit and the messages.origin gap as
+app-side items), and scripts/verify-today-wrap.mjs. tsc clean, proof standard still green.
+No push.
