@@ -2043,6 +2043,30 @@ S7-5 THE PLAN IS APPEND-ONLY. A CHECK-OFF IS A NEW MESSAGE, NEVER AN EDIT. Plan 
     shape the accept message already uses, 0038b:826-834), so an assistant that knows nothing
     about `payload` still reads the plan correctly. get_messages therefore gains NOTHING in v1 —
     zero widening of the agent surface.
+S7-5a get_messages GAINS `kind`, AND `plan` ON PLAN MESSAGES ONLY (ruled 2026-08-26).
+    THIS SUPERSEDES S7-5's closing sentence — "get_messages therefore gains NOTHING in v1 —
+    zero widening of the agent surface." Everything else in S7-5 stands; the append-only
+    design is what made the plan foldable at all.
+    WHY IT HAD TO GIVE: a plan the patient cannot check off is a plan they cannot
+    participate in, which defeats the reason the plan is a two-sided thread message rather
+    than a clinician's note — and Film #3's patient is an MCP entity. Checking an item off
+    means naming WHICH visit and WHICH item, and an assistant could learn neither: the
+    get_messages allow-list (src/tools/get-messages.ts:110) carries no kind, no payload and
+    no engagement_id; get_status returns three fields and S1-3 forbids widening it; get_my_day
+    is authenticated-only. A tool alone would have been a button with no label.
+    WHAT IS ADDED, AND NOTHING MORE: `kind` on every message (null on every row that exists
+    today and on every pre-0041 writer's output), and on a kind='plan' message only,
+    `plan: {items:[{n, text}]}` read straight from payload. n is 1-BASED — the tool's `item`
+    argument is the number a person would say, and the 0-based index the SQL takes is
+    converted in the handler, in one place, never shown to a model.
+    FOLDED done-STATE IS DELIBERATELY NOT ADDED. DERRICK'S REASONING, RECORDED AS GIVEN:
+    "idempotent writes mean the assistant does not need authoritative done-state to act
+    correctly, and B would put a TypeScript fold beside the SQL fold in get_my_day — the
+    drift S5-11 outlawed for slot eligibility. If folded done-state proves necessary later it
+    earns 0042 and the plan_state() lift then, with a real trigger." DEFERRED entry opened
+    with that trigger. State is still legible without it: each check-off is its own readable
+    message in the same transcript ("Done: …"), which is what append-only bought.
+
 S7-6 THE CODES ARE THE CLINICIAN'S RECORD, NOT A THREAD MESSAGE, AND THEY GET THE ONE NEW
     TABLE. The plan is a conversation and belongs in the thread; a diagnosis code is not
     something to hand a patient inside a chat, and the superbill needs it structured.
