@@ -2335,6 +2335,9 @@ below was read from `git log` at write time; the ledger line was read live from
      no code in either repo implements one. It is recorded here as an OPEN ITEM WITH NO
      WRITTEN SCOPE rather than given one — inventing the scope in a state block would be the
      thing "a ruling is not a ruling until it is in the roadmap" exists to prevent.
+     SUPERSEDED 2026-08-27 by RULINGS — 2026-08-27 (email, Session 11) below, which gives it
+     a written scope (E-1..E-10). The flag is left standing as the record of how it was
+     closed: written into the roadmap first, then built.
   4. scripts/verify-care-loop.mjs — UNWRITTEN, confirmed absent from both repos by `find`.
      The per-session verifies exist and pass (slots, inquiry, today-wrap, superbill, plus the
      three the proof standard runs); what does not exist is the ONE script that walks the
@@ -2352,3 +2355,69 @@ below was read from `git log` at write time; the ledger line was read live from
     otherwise. Steps 1b/1c of the live protocol are what close it.
   · Whether a device/simulator build runs cannot be determined without running one, and has
     not been. ios/ and android/ exist; expo ~55.0.26 and react-native 0.83.6 are pinned.
+
+## RULINGS — 2026-08-27 (email, Session 11) — approved for 11-BUILD
+Source: the S11-INVESTIGATE report (main @ ff93c30). The build prompt cited a "B5"
+visit-lifecycle ruling; `grep -n -iE "\bB5\b"` returns nothing in either copy of this file,
+and the 2026-08-25 visit-lifecycle block (roadmap:1803) is VL-1..VL-5 / S5-* with no email
+item — so the shape was ruled in chat and is written here BEFORE 11-BUILD is issued, which
+is what "a ruling is not a ruling until it is in the roadmap" asks for. SUPERSEDES the "OPEN
+ITEM WITH NO WRITTEN SCOPE" flag at WHAT REMAINS item 3. Binds hearth-network migration 0043
+and src/email/.
+
+E-1  THREAD IS TRUTH; EMAIL MIRRORS IT. No email carries content that is not already in the
+     thread or on the engagement row. Nothing is AI-composed: four fixed templates, reviewed
+     as text, composed nowhere at runtime (the card-copy.ts ruling-8 discipline).
+E-2  FOUR TEMPLATES ON FOUR TRANSITIONS. knock -> request receipt (NO .ics); accept ->
+     confirmation + .ics; T-60 -> reminder + join link; cancel/expire -> notice.
+     AMENDED 2026-08-27 — THE REMINDER DOES NOT CARRY A RAW ROOM URL. Until the Daily
+     private-room / meeting-token probe round-trips, a URL in an inbox is a door anyone with
+     that inbox can walk through. It carries a MAGIC LINK instead: a single-use token on our
+     own domain, tied to the engagement, expiring at slot end, resolving to the room. The
+     patient installs nothing — that is the product claim, not a compromise: incumbents make
+     people download an app before a visit and we do not.
+E-2a EXTENDED 2026-08-27 — A DECLINE GETS THE NOTICE TEMPLATE. A person who asked for a time
+     and was told no must not be met with silence; that is the case where they are actively
+     waiting. No fifth template: the notice carries a decline variant.
+E-3  PROVIDER IS RESEND, BEHIND THE S7-10 POSTURE. An absent RESEND_API_KEY no-ops cleanly;
+     the only thing that degrades is that no mail arrives. Resend's attachment shape and
+     Idempotency-Key header are DOCUMENTED, NOT PROVEN — the same state src/visit/daily.ts
+     was in on 2026-08-26. The first live send is the proof.
+E-4  ENQUEUE IN SQL, DELIVER IN THE WORKER. Accept (respond_to_inbound) and cancel
+     (cancel_engagement) each have an app caller AND a Worker caller; the RPC transaction is
+     the only place both converge, so a Worker-side send would silently skip every
+     app-initiated accept and cancel. One outbox table, one delivery site, in the tick that
+     already runs. The single exception is the lapsed hold, which is a lapse BY PREDICATE
+     (VL-1) and writes no row: enqueue_lapsed_booking_notices() keeps that enqueue in SQL
+     too, and the cron only says "look now".
+E-5  ADDRESS OF RECORD IS entities.email, RESOLVED AT SEND TIME. Ruled verbatim:
+     "email_confirmed_at is NOT evidence of control; Supabase auto-confirm stamped it within
+     milliseconds of signup with no mail sent. The address is self-supplied by an account
+     holder and is used only for transactional mail about that person's own booking. It must
+     never be cited as a verified address anywhere, and no marketing or third-party send may
+     ever use it."
+     Measured 2026-08-26: 15 of 19 entities non-null, 14 account-linked and all 14
+     byte-identical to the auth.users address; 18 of 19 auth users confirmed 13-50 ms after
+     creation with confirmation_sent=no; exactly one person ever confirmed.
+E-6  THREE IDEMPOTENCY LAYERS: a derived unique dedupe_key (never enqueued twice), the VL-5
+     claim-by-predicate update (never claimed twice), and Resend's Idempotency-Key set to
+     that same key (never delivered twice when a response is lost).
+E-7  WHAT A SEND MAY NOT CARRY: the patient's message, anything from the visit (plan,
+     cadence, wrap, CPT/ICD), the superbill or its existence, any diagnosis or symptom, any
+     Stripe identifier, any id column.
+E-8  Migration 0043 (hearth-network). No pos migration. No enum — text + CHECK — so no
+     SPLIT-ENUM pair is owed; stated, not skipped.
+E-9  THE T-60 REMINDER IS CONDITIONAL, NOT SEQUENCED. For a video visit it HOLDS while the
+     room is not yet minted and sends when it is, or LAPSES UNSENT if the slot starts first.
+     Never a "join here" mail with nothing to join. (The room sweep's budget is five a
+     minute, so tick ordering alone is not a guarantee.)
+E-10 NO APP-INSTALL PROMPT IN ANY TRANSACTIONAL EMAIL. The reminder has one job and a
+     competing call to action costs someone a visit. DEFERRED: a low-key app line in the
+     CONFIRMATION mail only — trigger "first real patient cohort".
+
+REPORTED, AWAITING RULING (not self-approved): the magic-link REDEEM ROUTE is more than a
+small slice. The token table is ~40 lines of SQL, but a public /visit/<token> endpoint is a
+THIRD TOKEN PLANE on the Worker, and CLAUDE.md's locked token-planes block rules that "adding
+a third is a ruling, not a diff". 0043 therefore ships the outbox ONLY; the reminder's link
+line reads "the link is in your conversation in Teleoplexy" until that slice is ruled and
+built. See the 11-BUILD report for the proposed table, route, and single-use semantics.
