@@ -2485,7 +2485,9 @@ E-11 ADDRESSING IS PATIENT-SIDE, AND 'order' KINDS GET NO MAIL. Ruled 2026-08-27
      enqueues nothing.
 
 RULED 2026-08-27 — THE MAGIC LINK GETS ITS OWN SESSION, AND THE DAILY JOIN-SEMANTICS PROBE
-IS IN SCOPE WITH IT. Scoping it out of 0043 was correct: the token table is ~40 lines of SQL,
+IS IN SCOPE WITH IT. → THAT SESSION IS BELOW: "RULINGS — 2026-08-27 (magic link + the third
+token plane, Session 12)". Both halves ran together as ruled, and Part 1 answered the S7
+unknown from observed behaviour. Scoping it out of 0043 was correct: the token table is ~40 lines of SQL,
 but a public /visit/<token> endpoint is a THIRD TOKEN PLANE on the Worker, and CLAUDE.md's
 locked token-planes block rules that "adding a third is a ruling, not a diff". The two
 questions are ruled together because separately each is half an answer — the link improves
@@ -2496,3 +2498,68 @@ link line reads "the link is in your conversation in Teleoplexy".
 SINGLE-USE IS PRE-RULED, accepting the build's pushback: ONE TOKEN PER ENGAGEMENT PER
 RECIPIENT, redeemable until slot end, with use_count recorded so a shared link is VISIBLE.
 Not literal one-click — that loses someone their visit to a page reload.
+
+## RULINGS — 2026-08-27 (magic link + the third token plane, Session 12) — approved for 12-BUILD
+Source: the S12 build. Part 1 (the Daily probe) answered the unknown flagged in
+src/visit/daily.ts since S7-10 and carried in E-2 as the reason the reminder shipped without a
+link. Part 2 was built to what Part 1 proved, in that order, as ruled.
+
+### PART 1 — WHAT THE VENDOR ACTUALLY DOES (observed, not documented)
+Measured with a real headless Chrome running Daily's OWN client (daily-js) against the live
+API on teleoplexy.daily.co, plus the real prebuilt page. Four observations, all reproducible:
+
+  D-1  A PRIVATE ROOM REFUSES A URL-ONLY VISITOR. accessState reports no level and the join
+       raises 'not-allowed'; the prebuilt page renders, in its own words, "You are not allowed
+       to join this meeting". Every room this system mints is private (daily.ts:80).
+  D-2  A MEETING TOKEN IS WHAT ADMITS. The same room with ?t=<token> reports
+       access { level: 'full' } and the prebuilt page renders "Get ready for your call".
+       `?t=` is the parameter; the token is minted with the API key, which a patient does not
+       have and must never have.
+  D-3  THE CONTROL HOLDS. A PUBLIC room with the URL alone reports access { level: 'full' } —
+       so D-1 is privacy, not a broken probe.
+  D-4  exp IS ENFORCED BY THE VENDOR, NOT ADVISORY. The same room past its exp raises
+       'exp-room', "This room is no longer available". nbf/exp round-trip to the second.
+  Housekeeping: create → resolve → delete round-tripped; the probe left no rooms behind.
+
+### PART 2 — THE THIRD TOKEN PLANE
+  TP-1 APPROVED, and the reasoning is the ruling: "a public, token-authenticated,
+       single-purpose GET that redirects into a room is not a new API surface — it is the
+       mechanism that lets a patient join in one tap with no app install, which is a product
+       claim I am making against every incumbent." This supersedes the two-plane count in
+       CLAUDE.md, which is amended in the same commit.
+  TP-2 SINGLE-PURPOSE, FOREVER. This plane serves /visit/<token> and NOTHING ELSE, EVER. One
+       verb, one path shape, one outcome, one table read. It is not a session and grants
+       nothing beyond one room. A fourth capability hung off this plane is a new ruling, not a
+       new route.
+  TP-3 WHAT THE LINK PROTECTS — SAY IT PLAINLY, BECAUSE D-1 CHANGED IT. The link is NOT what
+       keeps strangers out of a visit: the room's own privacy is, and it was doing that job
+       before this session started. The link CARRIES THE ADMISSION CREDENTIAL — the meeting
+       token nobody without our API key can mint. Expiry, use_count and the rate limit bound
+       ABUSE OF THE CARRIER; they are not the wall. Recording this because a future reader who
+       assumes the link is the boundary will make the wrong trade-off somewhere else.
+  TP-4 SHAPE. visit_access_tokens holds the SHA-256 of a 32-byte opaque value and never the
+       value (the mcp_oauth_tokens discipline); engagement_id, to_entity_id, expires_at at
+       SLOT END PLUS THE ROOM'S 30-MINUTE TAIL so nothing outlives what it opens;
+       first_used_at; use_count. RLS on, zero policies. Minted at REMINDER-SEND time, not at
+       accept — a link that exists a day before it is needed is a day of exposure bought for
+       nothing.
+  TP-5 NOT LITERALLY SINGLE-USE. One token per engagement per recipient, redeemable until
+       expiry, use_count recorded so a shared link is visible. Literal one-click loses someone
+       their visit to a page reload, which is what a phone does when it switches apps mid-tap.
+       A re-mint REPLACES the row and resets the counters: the raw value is unrecoverable by
+       design, so a retry cannot re-send the old link and must issue a new one.
+  TP-6 RATE-LIMITED, AND THE LIMITER FAILS OPEN. src/middleware/rate-limit.ts was a 0-byte
+       placeholder, so it is built here: a per-IP sliding window counted in SQL (0044) with the
+       threshold in TypeScript. The Worker passes a HASH of the address — the raw IP never
+       reaches the database, because a visit-adjacent table must not become a location log.
+       On a limiter failure the request is ALLOWED and the failure logged: a patient at T-60
+       must not lose their visit because a bookkeeping table refused a write.
+  E-2c THE T-60 REMINDER CARRIES THE MAGIC LINK. Amends E-2 as amended: "a patient an hour out
+       is in their inbox, not their assistant." The mail still names no vendor and carries no
+       vendor URL — only ours — and asks that the link not be forwarded. If the mint fails the
+       copy falls back to pointing at the conversation: a worse reminder, never a broken one.
+  ⚑ OPEN, DERRICK'S: THE LINK'S HOSTNAME. It currently reads
+       https://mcp.teleoplexy.ai/visit/… — 'mcp' is an agent-facing name appearing in a
+       patient's inbox an hour before a clinical visit. VISIT_LINK_ORIGIN is a binding
+       precisely so a friendlier host is a DNS + route change rather than a code change.
+       Trigger: before the first non-fixture patient receives a reminder.
