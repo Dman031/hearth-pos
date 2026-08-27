@@ -2391,6 +2391,39 @@ E-3  PROVIDER IS RESEND, BEHIND THE S7-10 POSTURE. An absent RESEND_API_KEY no-o
      the only thing that degrades is that no mail arrives. Resend's attachment shape and
      Idempotency-Key header are DOCUMENTED, NOT PROVEN — the same state src/visit/daily.ts
      was in on 2026-08-26. The first live send is the proof.
+     PROVEN 2026-08-27, and this line closes the last documented-not-proven item in the build.
+     Deployed version 8e62db9d, its own cron, against the real API on the verified domain:
+     the knock receipt accepted at 20:31:53.918Z (id ab75d3c9-c840-4ac5-a324-e65746d28e56) and
+     the confirmation WITH its calendar attachment at 20:32:54.142Z
+     (id 458c4ce1-cd38-4caa-9797-9202143b322d). BOTH attempts:0 — no retry, so the first call
+     succeeded; a malformed attachment envelope would have returned 4xx and left the row
+     failed. The reminder enqueued by the same accept correctly stayed undue for 26 hours
+     (E-9). Fixtures torn down. What the send does NOT prove, and is left to a human eye: that
+     a mail client RENDERS visit.ics as an add-to-calendar event.
+E-3a THE SENDER IS THE PLATFORM, NOT THE CLINICIAN. Ruled 2026-08-27:
+     `Teleoplexy <visits@teleoplexy.ai>`, and NO clinician name in the From line, ever.
+     THE REPLY ARGUMENT, which is the disqualifying one: a personal From INVITES a personal
+     reply — that is exactly its appeal, it feels like a person, so people answer it. Nothing
+     monitors mail. A patient who writes "can we make it 3pm?" and hears nothing misses their
+     visit AND blames their clinician for ignoring them. On a clinical surface that is not a
+     UX wrinkle. A platform From sets the expectation the templates already state: this is a
+     notification, the conversation is elsewhere.
+     THE AUTHORSHIP ARGUMENT: she tapped Accept, she did not write the words — every sentence
+     was written weeks earlier and reviewed by a human here (E-1). A From line saying otherwise
+     is the no-plausible-placeholder-data rule broken in prose: a field that LOOKS like real
+     provenance and is not. Supporting, not load-bearing: a real name on a domain its owner
+     does not control is the shape of a phishing pattern and attributes any error in the mail
+     to them personally; Gmail appends "via teleoplexy.ai" to a mismatched display name anyway;
+     and display_name is nullable, so the honest failure would read "null accepted your
+     request".
+     WHERE THE HUMAN BELONGS — the subject and the first line, where it already is:
+     "Confirmed — Thursday, August 28 at 2:00 PM PDT with Dr. Ana Reyes" / "Dr. Ana Reyes
+     accepted your request." Doctrine is satisfied there: emotion flows toward the human in the
+     content, where it is true, and authorship stays with the system, where it is true.
+     ⚑ OPEN PROVISIONING ITEM, DERRICK'S: visits@teleoplexy.ai must REJECT VISIBLY rather than
+     blackhole, so a reply returns "this address isn't monitored" instead of silence. Trigger:
+     before the first non-fixture patient receives mail. Silence is the failure this ruling
+     exists to prevent, and an unconfigured mailbox reintroduces it by the back door.
 E-4  ENQUEUE IN SQL, DELIVER IN THE WORKER. Accept (respond_to_inbound) and cancel
      (cancel_engagement) each have an app caller AND a Worker caller; the RPC transaction is
      the only place both converge, so a Worker-side send would silently skip every
