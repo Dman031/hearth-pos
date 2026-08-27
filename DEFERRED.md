@@ -209,6 +209,20 @@ invokes it — and deleting an `entities` row still leaves the `auth.users` row
   `verified` verifications row, and accept that those entities need a fresh ID check to ever
   re-bind. Never redact an entity with no `verifications` row.
 
+### App line in the confirmation email (logged 2026-08-27 — hearth-network E-10; migration 0043)
+- **Trigger: first real patient cohort.** Ruled with the Session 11 email build
+  (DEUS_DAY_BY_DAY.md RULINGS — 2026-08-27, E-10): NO app-install prompt in any transactional
+  email. The reminder has one job, and a competing call to action costs someone a visit.
+- What is deferred is narrower than the rule: a LOW-KEY app line, in the CONFIRMATION mail
+  ONLY — never the reminder, never the receipt, never a notice. The confirmation is the one
+  send where the person is not mid-decision and not mid-journey.
+- **Adjacent and NOT deferred, because it was never ruled:** the in-message opt-out affordance.
+  `0043` ships the server half (`entities.email_opt_out_at` + `set_email_preference`), and the
+  mail deliberately makes NO opt-out claim until hearth-pos has a Settings toggle — a footer
+  pointing at a control that does not exist is the promise-the-system-cannot-keep failure. The
+  toggle is app work with no trigger yet; when it ships, the footer line and a
+  `List-Unsubscribe` header ship with it.
+
 ---
 
 ## Pre-launch architecture decisions (locked)

@@ -2390,6 +2390,17 @@ E-4  ENQUEUE IN SQL, DELIVER IN THE WORKER. Accept (respond_to_inbound) and canc
      already runs. The single exception is the lapsed hold, which is a lapse BY PREDICATE
      (VL-1) and writes no row: enqueue_lapsed_booking_notices() keeps that enqueue in SQL
      too, and the cron only says "look now".
+     AMENDED 2026-08-27 — TRIGGERS, NOT FOUR RESTATEMENTS. The enqueue is an AFTER trigger on
+     the two tables (inbound, engagements) rather than an insert added to claim_slot_and_knock
+     / respond_to_inbound / cancel_engagement / post_visit_link, which 0043 therefore does not
+     touch. Two reasons, both decisive: a same-signature `create or replace` means restating
+     ~550 lines of the accept branch that snapshots price and the cancel branch that decides
+     refunds, and a transcription slip THERE is a payment bug, not a mail bug; and a trigger
+     sits on the row transition itself, so a FIFTH writer added later INHERITS the enqueue
+     instead of forgetting it — which is E-4's own argument carried one step further. Same
+     transaction, so the rollback property is unchanged: a claim that loses the VL-5 race
+     raises and the receipt rolls back with it. Purely additive, so nothing existing can
+     regress. Precedent: cards_practice_requires_licence_trg (0038b:171).
 E-5  ADDRESS OF RECORD IS entities.email, RESOLVED AT SEND TIME. Ruled verbatim:
      "email_confirmed_at is NOT evidence of control; Supabase auto-confirm stamped it within
      milliseconds of signup with no mail sent. The address is self-supplied by an account
@@ -2414,10 +2425,23 @@ E-9  THE T-60 REMINDER IS CONDITIONAL, NOT SEQUENCED. For a video visit it HOLDS
 E-10 NO APP-INSTALL PROMPT IN ANY TRANSACTIONAL EMAIL. The reminder has one job and a
      competing call to action costs someone a visit. DEFERRED: a low-key app line in the
      CONFIRMATION mail only — trigger "first real patient cohort".
+E-11 ADDRESSING IS PATIENT-SIDE, AND 'order' KINDS GET NO MAIL. Ruled 2026-08-27 (both were
+     carried as flagged assumptions in 0043's header and are now ruled, not assumed). Every
+     row is addressed to inbound.from_entity_id / engagements.buyer_entity_id: email exists
+     because the patient books agent-side and may never open the app, while the clinician has
+     Incoming and Today. Clinician-side mail is a second set of triggers, not a change to
+     these. E-2's four templates are the VISIT lifecycle, so an 'order'-kind engagement
+     enqueues nothing.
 
-REPORTED, AWAITING RULING (not self-approved): the magic-link REDEEM ROUTE is more than a
-small slice. The token table is ~40 lines of SQL, but a public /visit/<token> endpoint is a
-THIRD TOKEN PLANE on the Worker, and CLAUDE.md's locked token-planes block rules that "adding
-a third is a ruling, not a diff". 0043 therefore ships the outbox ONLY; the reminder's link
-line reads "the link is in your conversation in Teleoplexy" until that slice is ruled and
-built. See the 11-BUILD report for the proposed table, route, and single-use semantics.
+RULED 2026-08-27 — THE MAGIC LINK GETS ITS OWN SESSION, AND THE DAILY JOIN-SEMANTICS PROBE
+IS IN SCOPE WITH IT. Scoping it out of 0043 was correct: the token table is ~40 lines of SQL,
+but a public /visit/<token> endpoint is a THIRD TOKEN PLANE on the Worker, and CLAUDE.md's
+locked token-planes block rules that "adding a third is a ruling, not a diff". The two
+questions are ruled together because separately each is half an answer — the link improves
+DISTRIBUTION (single recipient, expiring, revocable, countable) and the probe answers SAFETY
+(whether a URL alone admits someone), and a redirect to an unproven room inherits whatever
+the room permits. Until that session lands, 0043 ships the outbox ONLY and the reminder's
+link line reads "the link is in your conversation in Teleoplexy".
+SINGLE-USE IS PRE-RULED, accepting the build's pushback: ONE TOKEN PER ENGAGEMENT PER
+RECIPIENT, redeemable until slot end, with use_count recorded so a shared link is VISIBLE.
+Not literal one-click — that loses someone their visit to a page reload.
