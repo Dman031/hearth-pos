@@ -2376,6 +2376,14 @@ E-2  FOUR TEMPLATES ON FOUR TRANSITIONS. knock -> request receipt (NO .ics); acc
      own domain, tied to the engagement, expiring at slot end, resolving to the room. The
      patient installs nothing — that is the product claim, not a compromise: incumbents make
      people download an app before a visit and we do not.
+E-2b THE CANCELLATION CARRIES A CALENDAR RETRACTION. Ruled 2026-08-27, closing the one item
+     E-2 was silent on. METHOD:CANCEL, STATUS:CANCELLED, SEQUENCE 1, against the SAME derived
+     UID the confirmation shipped at SEQUENCE 0. WHY, verbatim: "a stale calendar event means
+     someone shows up for a visit that is not happening" — the notice email is not enough,
+     because the calendar is what a person actually reads on the day. Ten lines against a real
+     failure. The confirmation and the cancellation are the ONLY two templates that attach a
+     file, and the sentence naming the attachment renders only when the file was actually
+     built.
 E-2a EXTENDED 2026-08-27 — A DECLINE GETS THE NOTICE TEMPLATE. A person who asked for a time
      and was told no must not be met with silence; that is the case where they are actively
      waiting. No fifth template: the notice carries a decline variant.
@@ -2425,6 +2433,16 @@ E-9  THE T-60 REMINDER IS CONDITIONAL, NOT SEQUENCED. For a video visit it HOLDS
 E-10 NO APP-INSTALL PROMPT IN ANY TRANSACTIONAL EMAIL. The reminder has one job and a
      competing call to action costs someone a visit. DEFERRED: a low-key app line in the
      CONFIRMATION mail only — trigger "first real patient cohort".
+     THE OPT-OUT TOGGLE IS POS SCREEN WORK, ruled 2026-08-27. 0043 shipped the server half
+     (entities.email_opt_out_at + set_email_preference, granted to authenticated); the switch
+     itself belongs to the block that consumes the four hearth-pos screen specs, NOT to this
+     one. Until it exists the mail makes no opt-out claim and sends no List-Unsubscribe header
+     — a footer pointing at a control that does not exist is the promise-the-system-cannot-keep
+     failure E-1 exists to prevent. Written up for that block in
+     hearth-network/docs/CRED_S3_COLD_FLOW_SPEC.md ("CARRIED ITEM"), whose session is the one
+     that opens the account holder's own profile. ⚑ NONE of the four specs owns a Settings
+     surface today, so that is the closest home rather than the obvious one — move it whole if
+     the pos block grows a Settings spec.
 E-11 ADDRESSING IS PATIENT-SIDE, AND 'order' KINDS GET NO MAIL. Ruled 2026-08-27 (both were
      carried as flagged assumptions in 0043's header and are now ruled, not assumed). Every
      row is addressed to inbound.from_entity_id / engagements.buyer_entity_id: email exists
