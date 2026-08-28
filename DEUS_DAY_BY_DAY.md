@@ -2558,8 +2558,19 @@ API on teleoplexy.daily.co, plus the real prebuilt page. Four observations, all 
        is in their inbox, not their assistant." The mail still names no vendor and carries no
        vendor URL — only ours — and asks that the link not be forwarded. If the mint fails the
        copy falls back to pointing at the conversation: a worse reminder, never a broken one.
-  ⚑ OPEN, DERRICK'S: THE LINK'S HOSTNAME. It currently reads
-       https://mcp.teleoplexy.ai/visit/… — 'mcp' is an agent-facing name appearing in a
-       patient's inbox an hour before a clinical visit. VISIT_LINK_ORIGIN is a binding
-       precisely so a friendlier host is a DNS + route change rather than a code change.
-       Trigger: before the first non-fixture patient receives a reminder.
+  TP-7 THE LINK LIVES ON visit.teleoplexy.ai, NOT mcp. Ruled 2026-08-27, closing the open
+       item this block was written with: "a patient an hour from a medical visit should not
+       tap a link that reads like machinery." Wired as a SECOND custom domain on the same
+       Worker (wrangler.jsonc) with VISIT_LINK_ORIGIN as a var, not a secret — it is the
+       hostname printed in the mail, and a change to it belongs in review. Routing stays by
+       PATH: one script answers on both names, and the var alone decides which name reaches a
+       person's inbox. src/visit/access.ts carries the same value as its fallback; the two
+       must not disagree.
+       ORDER OF OPERATIONS, and it matters: the DNS record (Derrick) comes BEFORE the deploy.
+       A deploy that lands first puts a hostname in the mail that does not resolve, and the
+       reminder is the one message with a deadline attached.
+       NOT DONE, and flagged rather than assumed: nothing restricts WHICH hostname serves
+       which path. /visit/<token> also answers on mcp., and /mcp also answers on visit. Both
+       are harmless today — every plane authenticates independently of hostname — but if the
+       split should be enforced, that is host-based routing in src/index.ts and a ruling of
+       its own, not a diff.
