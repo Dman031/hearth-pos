@@ -13,7 +13,7 @@ import type { Inbound } from '../types/inbound';
 // mounted under the tab navigator and duplicate topics collide.
 
 const INBOUND_SELECT =
-  'id, to_entity_id, from_entity_id, card_id, thread_id, kind, message, status, return_address, created_at';
+  'id, to_entity_id, from_entity_id, card_id, thread_id, kind, message, status, return_address, scheduled_for, quantity, created_at';
 
 /** Unwrap an unknown thrown/returned value into a context-prefixed Error. */
 function toError(value: unknown, context: string): Error {

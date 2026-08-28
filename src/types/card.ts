@@ -16,7 +16,13 @@ export type CardKind =
   | 'content'
   | 'event'
   | 'presence'
-  | 'reachability';
+  | 'reachability'
+  // A free public resource (0033). Cannot be reached, booked, ordered or paid.
+  | 'civic'
+  // A clinician offering visits (0038a). The database refuses one without a
+  // live licence (trigger cards_practice_requires_licence), and its
+  // availability is the open-times board — never a typed field.
+  | 'practice';
 
 /** Who may SEE the card. Ascending exposure: off < contacts < verified < anyone. */
 export type SeePerm = 'off' | 'contacts' | 'verified' | 'anyone';

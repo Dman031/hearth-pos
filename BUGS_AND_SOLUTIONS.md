@@ -563,8 +563,9 @@ Confounds that cost diagnosis time — each is an adjacent trap on this surface:
 
 ## BUG-009: Engagement realtime channels are dead — engagements table never added to the supabase_realtime publication
 
-**Status:** OPEN (root cause diagnosed; DB fix is hearth-network scope; client mitigation shipped)
+**Status:** RESOLVED 2026-08-27 (fixed in hearth-network migration `0041`, applied 2026-08-26; publication membership confirmed directly against `pg_publication_tables`)
 **Date:** 2026-07-27
+**Closed:** 2026-08-27 (hearth-pos Session 0, contract sync)
 **Severity:** Medium
 **Category:** supabase-realtime
 **Introduced-by:** claude-prompt
@@ -581,9 +582,10 @@ Supabase realtime only streams tables in the `supabase_realtime` publication. Gr
 
 ### Solution
 
-- **Real fix (hearth-network, NOT applied — needs Derrick):** one migration/SQL-editor snippet in the 0004 idempotent style:
+- **Real fix (hearth-network) — APPLIED.** Shipped as `0041_today_visit_wrap.sql` SECTION 2 (`:242-243`), in exactly the 0004 idempotent style this entry specified:
   `alter table public.engagements replica identity full;`
   `do $$ begin alter publication supabase_realtime add table public.engagements; exception when duplicate_object then null; end $$;`
+  Applied 2026-08-26; ledger row `'0041'` in `public.schema_migrations` (RECEIPT RULE — the receipt and the schema change land in one transaction).
 - **Client mitigation (this commit):** `src/utils/engagement-refresh.ts` — an in-app change signal. The Done action (`complete_engagement`) fires `notifyEngagementsChanged()`; `useEngagementActionCount` subscribes, so the badge decrements deterministically. The dormant realtime channels stay in place and go live the moment the publication gains the table.
 
 ### Files Changed
@@ -598,13 +600,15 @@ Supabase realtime only streams tables in the `supabase_realtime` publication. Gr
 
 ### Verification
 
-- Ground truth is migrations (canon rule 1): no publication add exists for engagements in any applied migration. Not verifiable against the live DB from this session — if Derrick added the table via the Dashboard by hand, the channels are already live and the mitigation is harmless redundancy.
-- Post-fix check (network side): `select * from pg_publication_tables where pubname = 'supabase_realtime';` must list `engagements`.
+- (At diagnosis, 2026-07-27) Ground truth is migrations (canon rule 1): no publication add existed for engagements in any applied migration. Not verifiable against the live DB from that session.
+- **Post-fix check, PERFORMED (2026-08-27):** `select * from pg_publication_tables where pubname = 'supabase_realtime';` → **returns `engagements`.** Run by Derrick against the live database; this is the entry's closing evidence. (The hearth-pos session could only reach `0041:242-243` plus the ledger row — PostgREST cannot expose `pg_catalog`, so the direct read was the necessary confirmation.)
 
 ### Cross-check Performed
 
 - **Other engagements subscribers:** `grep -rn "table: 'engagements'" src/` → `useMyEngagements.ts`, `useEngagementActionCount.ts`, `useThreadEngagements.ts` (STOP 4 decision-slot chips). The banner's post-accept chip appearing today relies on its explicit `refresh()` + the inbound channel (inbound IS published), so it functions; its engagements channel is equally dormant. Out-of-scope-but-flagged: no code change needed there once the publication fix lands.
 - **Other tables subscribed in-app:** `inbound` (published, 0004), `messages` (published, 0004) — both fine. `threads` deliberately uses fetch-on-focus because it is NOT published (`useThreads.ts` comment) — the same discipline engagements code assumed incorrectly.
+- **At close (Session 0, 2026-08-27):** all three engagement channels go live with NO code change — `useMyEngagements.ts:188`, `useEngagementActionCount.ts:77`, `useThreadEngagements.ts:84`. `src/utils/engagement-refresh.ts` is KEPT deliberately (PLEXMED S7 spec, app-side gap 2): idempotent re-reads cost nothing and remain the deterministic path when a realtime connection drops. Only the two stale comments asserting dormancy were corrected (`useMyEngagements.ts:32-37`, `engagement-refresh.ts:1-16`).
+- **Same failure class, swept in the same session:** a select string narrower than the type it casts into is the same silent, tsc-invisible lie as a channel on an unpublished table. All five were widened together — `useInbound.ts:14`, `useThreadPendingInbound.ts:15`, `useMyEngagements.ts:36`, `useThreadEngagements.ts:15`, `useThreadMessages.ts:11` — rather than only the three the session's scope originally named.
 
 ### Prevention
 

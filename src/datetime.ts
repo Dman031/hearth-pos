@@ -12,7 +12,16 @@
 
 const DEFAULT_TZ = 'America/Los_Angeles';
 
-export type DisplayStyle = 'date' | 'shortDate' | 'time' | 'datetime';
+export type DisplayStyle =
+  | 'date'
+  | 'shortDate'
+  | 'time'
+  // Time WITH its zone abbreviation ("4:40 PM PDT"). Every clinical surface
+  // renders times this way — PLEXMED S5/S6/S7 all rule that a time with no
+  // zone label is a bug (VL-4), because the server emits UTC instants and the
+  // reader is not necessarily in the practice's zone.
+  | 'timeWithZone'
+  | 'datetime';
 
 /**
  * Parse a UTC/ISO timestamp string (Supabase timestamptz) into a Date.
@@ -41,7 +50,9 @@ export function formatForDisplay(
         ? { month: 'short', day: 'numeric' }
         : style === 'time'
           ? { hour: 'numeric', minute: '2-digit' }
-          : { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' };
+          : style === 'timeWithZone'
+            ? { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }
+            : { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' };
   return new Intl.DateTimeFormat('en-US', { ...opts, timeZone: tz }).format(date);
 }
 
@@ -98,4 +109,27 @@ export function formatMonthTitle(year: number, monthIndex: number): string {
     year: 'numeric',
     timeZone: 'UTC',
   }).format(new Date(Date.UTC(year, monthIndex, 1, 12)));
+}
+
+/**
+ * The zone's own label at a given instant — "PDT" (short) or "Pacific Daylight
+ * Time" (long). Takes an instant because the label is date-dependent: the same
+ * zone is PDT in August and PST in January, so a hardcoded abbreviation would
+ * be wrong for half the year.
+ *
+ * Feeds the standing-zone lines ("Times shown in {zone name}") that sit above a
+ * board or a day, where the zone is stated once instead of on every row.
+ * Returns the IANA name unchanged if the runtime declines to name the zone —
+ * an honest fallback, never a guess at an abbreviation.
+ */
+export function formatZoneLabel(
+  value: Date | string,
+  tz: string = DEFAULT_TZ,
+  width: 'short' | 'long' = 'long',
+): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    timeZoneName: width,
+  }).formatToParts(asDate(value));
+  return parts.find((p) => p.type === 'timeZoneName')?.value ?? tz;
 }

@@ -29,13 +29,17 @@ import type { Engagement } from '../types/engagement';
 // scopes WAL delivery to rows the caller can SELECT — exactly the set this
 // hook renders — so the server-side filter is redundant with the policy. Same
 // trust posture as the rest of the app: filters narrow, RLS is the boundary.
-// CAVEAT (BUG-009): engagements is not in the realtime publication yet, so
-// this channel is dormant until the network-side one-liner lands; the screen
-// refreshes explicitly after its own writes.
+// LIVE since hearth-network 0041 (applied 2026-08-26; publication membership
+// confirmed directly against pg_publication_tables). This channel was dormant
+// from 2026-07-27 to then — BUG-009, now CLOSED — because engagements was
+// never in the supabase_realtime publication. The screen's explicit refresh
+// after its own writes stays: it is idempotent redundancy, not a workaround
+// to remove (PLEXMED S7 spec, app-side gap 2).
 
 const ENGAGEMENT_SELECT =
   'id, inbound_id, kind, buyer_entity_id, seller_entity_id, card_id, thread_id, ' +
-  'agreed_price_cents, currency, status, scheduled_for, fulfilled_at, cancelled_at, ' +
+  'agreed_price_cents, currency, status, scheduled_for, visit_started_at, ' +
+  'room_url, room_provider, room_created_at, fulfilled_at, cancelled_at, ' +
   'created_at, updated_at, inbound:inbound_id ( message )';
 
 /** An engagement row + the app-side display context joined at load time.

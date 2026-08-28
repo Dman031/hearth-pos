@@ -14,7 +14,8 @@ import type { Engagement } from '../types/engagement';
 
 const ENGAGEMENT_SELECT =
   'id, inbound_id, kind, buyer_entity_id, seller_entity_id, card_id, thread_id, ' +
-  'agreed_price_cents, currency, status, scheduled_for, fulfilled_at, cancelled_at, ' +
+  'agreed_price_cents, currency, status, scheduled_for, visit_started_at, ' +
+  'room_url, room_provider, room_created_at, fulfilled_at, cancelled_at, ' +
   'created_at, updated_at';
 
 /** Unwrap an unknown thrown/returned value into a context-prefixed Error. */

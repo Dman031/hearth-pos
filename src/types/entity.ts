@@ -21,6 +21,15 @@ export interface Entity {
   business_verified: boolean; // not null, default false
   credential_verified: boolean; // not null, default false
   status: string; // not null, default 'active'
+  // The practice's own zone (0038b), stored as an IANA name via
+  // set_entity_timezone. NULL = never confirmed. Every rendered time is placed
+  // in THIS value, not the device zone — a clinician on a trip still sees their
+  // board in their practice's zone (PLEXMED S5 note 3).
+  timezone: string | null;
+  // Set = no transactional mail (0043). The sender re-reads this at send time,
+  // so turning it off skips a row that is already queued. Default is ON, which
+  // is this column being NULL.
+  email_opt_out_at: string | null; // timestamptz → ISO string
   created_at: string; // timestamptz → ISO string
   updated_at: string; // timestamptz → ISO string
 }

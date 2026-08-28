@@ -33,6 +33,9 @@ export const KIND_LABEL: Record<InboundKind, string> = {
   booking: 'Booking',
   order: 'Order',
   message: 'Message',
+  // The network speaking for itself (0037a) — a stamp coming off, not a person
+  // knocking. Senderless and thread-less, so it carries no accept path.
+  notice: 'Notice',
 };
 
 /**
@@ -61,6 +64,11 @@ export const ENGAGEMENT_KIND_LABEL: Record<InboundKind, string> = {
   booking: 'Booking',
   order: 'Order',
   message: 'Message',
+  // Mapped for exhaustiveness only, exactly as 'message' above is: a notice
+  // cannot mint an engagement, so this entry is unreachable. It is still a real
+  // word rather than a placeholder — an unreachable string a user could
+  // theoretically read must not look like debug output.
+  notice: 'Notice',
 };
 
 /** Vendor-side status words (Day 21 STOP-0): never "fulfilled" in the app. */

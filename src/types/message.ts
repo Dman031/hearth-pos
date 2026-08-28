@@ -1,8 +1,8 @@
 /**
  * Message — mirrors the live `public.messages` table (persisted PlexChat history)
  * that hearth-network writes via the canonical RPCs and the app reads. Shape is
- * authoritative per hearth-network/migrations/0004. Do NOT add app-only fields —
- * the network owns this contract.
+ * authoritative per hearth-network/migrations/0004, widened by 0041 (the three
+ * visit columns). Do NOT add app-only fields — the network owns this contract.
  *
  * `origin` encodes AUTHORSHIP (who wrote it), not transport: 'human' (a person
  * wrote it — always, in V1), 'ai' (V2 autonomy — the AI answered for them), or
@@ -18,6 +18,14 @@ export interface Message {
   body: string;
   origin: MessageOrigin; // not null, default 'human'
   inbound_id: string | null; // uuid — provenance of message #1 (the accepted knock)
+  // The 0041 columns. `kind` null is an ORDINARY message — which is every row
+  // that exists today, so nothing about the conversation view changes until a
+  // typed row ('visit_link', 'plan', 'plan_item') appears. `payload` carries
+  // that row's structure; `origin` still carries authorship, so a 'system' row
+  // is never attributed to the person in from_entity_id.
+  engagement_id: string | null; // uuid → engagements(id)
+  kind: string | null;
+  payload: Record<string, unknown> | null; // jsonb
   read_at: string | null; // timestamptz → ISO string, nullable (unread)
   created_at: string; // timestamptz → ISO string
 }

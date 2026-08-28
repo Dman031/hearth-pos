@@ -9,7 +9,7 @@ import type { Message } from '../types/message';
 // the caller participates in.
 
 const MESSAGE_SELECT =
-  'id, thread_id, from_entity_id, body, origin, inbound_id, read_at, created_at';
+  'id, thread_id, from_entity_id, body, origin, inbound_id, engagement_id, kind, payload, read_at, created_at';
 
 function toError(value: unknown, context: string): Error {
   if (value instanceof Error) return new Error(`${context}: ${value.message}`);
