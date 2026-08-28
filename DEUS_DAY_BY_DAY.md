@@ -2574,3 +2574,85 @@ API on teleoplexy.daily.co, plus the real prebuilt page. Four observations, all 
        are harmless today — every plane authenticates independently of hostname — but if the
        split should be enforced, that is host-based routing in src/index.ts and a ruling of
        its own, not a diff.
+
+---
+
+## RULINGS — 2026-08-28 (hearth-pos navigation shape, N-1…N-5) — approved for the SCREEN BLOCK
+Source: the hearth-pos navigation investigation, 2026-08-28. Four specs (CRED S3,
+PLEXMED S5/S6/S7) mount screens into a four-tab shell that STOP 5 fixed, and the question
+"where does PlexMed live" had to be answered before the contract sync, because the answer
+changes where everything mounts. Two shapes were scoped against four tests: navigation cost,
+what duplicates, what an entity with no practice card sees, and what survives a second
+vertical. These five rulings are the answer. They are canon; the specs bend to them.
+
+  N-1  MODULES LIVE IN THE ACCOUNT MENU, BEHIND SETTINGS. Not a fifth tab. The four-tab bar
+       STOP 5 fixed (Profile / Incoming / PlexChat / Engagement) stands untouched, and
+       PlexLaw and PlexATS never threaten it — which a tab-per-vertical shape would, at six
+       tabs, having already ruled two surfaces OFF a five-tab bar.
+       WHY THE ACCOUNT SHEET IS THE RIGHT HOME, and it is not a layout preference: PlexMed,
+       PlexLaw and PlexATS are PURCHASED ENTITLEMENTS at a flat monthly rate. That puts them
+       beside identity, contacts and money — the things you own and administer — not beside
+       the four surfaces you work in. The dead `Settings` placeholder at AccountChip.tsx:113
+       is where this lands.
+       THE GATE IS TWO CONDITIONS, NOT ONE: the module is OWNED (commerce) AND the licence
+       stamp is LIVE (verification). The two failure states are different screens and must
+       not be collapsed — pays but unverified sees THE CEREMONY (CRED S3); verified but
+       unpaid sees THE PRICE. Neither is a locked tab teasing them (see N-4).
+       PlexMed's paywall is a LATER SESSION and does not exist yet. Build the entitlement
+       check as a SEAM RETURNING TRUE until it ships, so the screen sessions build against
+       the right shape without waiting on commerce. The seam carries a TODO so it is
+       greppable; a seam that silently returns true forever is the placeholder this rule
+       exists to prevent.
+
+  N-2  TODAY IS GENERIC AND STAYS ON ENGAGEMENT. get_my_day (0041) is vertical-agnostic: it
+       returns engagement_kind booking|order for ANY card kind, and card_kind gates only the
+       visit-and-wrap affordances. A plumber with three scheduled bookings HAS A DAY. Locking
+       Today behind a clinician stamp would withhold a surface whose data the server already
+       returns to that vendor — the failure this ruling exists to refuse.
+       ONE CONSUMER of get_my_day, not two. The room row and the wrap affordance are
+       CONDITIONAL ON CARD KIND within that one surface; a second Today for clinicians would
+       be a second fold of the same read, and two folds drift.
+
+  N-3  BOARD AND WRAP LIVE IN THE MODULE. Both are meaningless without a practice card, and
+       cards_practice_requires_licence already refuses the card at the database — so the
+       module is the honest form of a refusal the schema makes anyway. This is the pair that
+       is genuinely practice-only; Today is not, which is why N-2 splits them.
+
+  N-4  HIDDEN WHEN UNGATED, NOT VISIBLE-LOCKED. A locked surface advertises what someone
+       cannot have and invites a tap that will be refused. Same reasoning that killed the
+       inert action (S1-5) and removed rather than greyed the Accept on a lapsed hold
+       (S7 T4): a control that cannot act must not be rendered as though it could.
+
+  N-5  S7:68-69 IS AMENDED, NOT S5:120. Today staying on Engagement means that screen DOES
+       change, so the spec line claiming "Nothing about that screen changes" is false and is
+       corrected at the source (hearth-network docs/PLEXMED_S7_TODAY_WRAP_SPEC.md). What
+       survives the amendment unchanged is the substantive half: the status-based
+       Upcoming/Past split itself keeps working untouched.
+       S5:120 STANDS — "Booked-row tap → opens the visit in Engagement." One destination for
+       a visit, and N-2 is what keeps that true.
+
+  N-D  STANDING DISCIPLINE, recorded with the five because it is the condition they rest on:
+       SHARED TABS REGISTER PER-KIND ROW COMPONENTS BY CARD KIND, NEVER BRANCH INLINE. The
+       distributed surfaces (Incoming, Engagement, Today) survive a second vertical only if
+       each vertical ADDS a registered component rather than another inline branch.
+       InboundTile already kind-switches inline (:50-53, :85); that is the pattern to convert
+       when the second vertical arrives, and not to extend before then.
+
+### SESSION MAP — the screen block, as ruled
+  S0  CONTRACT SYNC — BUILT 2026-08-28, commit c71211f. Five type widenings, all five select
+      strings, the zone-labelled formatter in datetime.ts, 'Notice' in both label maps, and
+      BUG-009 closed against 0041. Renders nothing; it is the shape the rest compiles against.
+  S1  CRED S3 + E-10 — the cold-arrival ceremony mounted on the already-built data layer
+      (credentials.ts, useMyVerifications.ts, zero consumers today), plus the Settings panel
+      that N-1 puts modules behind and that E-10's toggle needs. BLOCKS S5's P0 gate and
+      unblocks the network's email footer + List-Unsubscribe.
+  S2  PLEXMED S5 — practice authoring + the open-times board, in the module (N-3). Mints
+      entities.timezone, which every S6/S7 time renders from. Two sessions.
+  S3  PLEXMED S6 — the honesty chips, the two-source join, T1–T4, and the messages-channel
+      fix for the silently-arriving reply. S7 reuses these chips verbatim, so it precedes it.
+  S4  PLEXMED S7 — Today on Engagement (N-2), the room row, start_visit, and the wrap in the
+      module (N-3). Two sessions.
+  Honest total: seven sessions, six only if S5 or S7 lands under expectation.
+  OPEN, and not a session's decision: where CRED S3's licence number and state come from —
+  get_my_verifications returns neither by ruling, and the spec forbids widening the view.
+  S1 builds every other state without it.
