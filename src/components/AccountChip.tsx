@@ -6,6 +6,8 @@ import { theme } from '../styles/theme';
 import IdentityPanel from './IdentityPanel';
 import ContactsPanel from './ContactsPanel';
 import MoneyPanel from './MoneyPanel';
+import SettingsPanel from './SettingsPanel';
+import CredentialPanel from './CredentialPanel';
 import SignOutButton from './SignOutButton';
 
 // AccountChip — the account affordance behind the user's name, present on ALL
@@ -14,7 +16,7 @@ import SignOutButton from './SignOutButton';
 //
 // The chip (the entity's initial) opens a bottom-sheet Modal it owns entirely —
 // no NavigationContainer/App changes. The sheet has three states:
-//   - 'menu':     My ID / Contacts / Settings (placeholder) / Money /
+//   - 'menu':     My ID / Contacts / Settings / Money /
 //                 Sign Out (separated at the bottom, reusing <SignOutButton inline/>).
 //   - 'identity': the "My ID" panel (IdentityPanel) with a back affordance.
 //   - 'contacts': the private rolodex (ContactsPanel) — the top-corner home of
@@ -24,25 +26,32 @@ import SignOutButton from './SignOutButton';
 //                 scaffolds — useEarnings / EarningsCard / TransactionCounter —
 //                 stay empty: the ruled Money surface is thinner than the
 //                 shape they anticipated.)
+//   - 'settings': the account's own settings (SettingsPanel) — the second "Soon"
+//                 placeholder made real. Ruling N-1 (2026-08-28) also makes this
+//                 the home for OWNED MODULES (PlexMed / PlexLaw / PlexATS):
+//                 purchased entitlements belong beside identity, contacts and
+//                 money, never on the four-tab bar STOP 5 fixed.
+//   - 'credential': the licence ceremony (CredentialPanel, CRED S3), reached
+//                 from the Credential pill inside 'identity'. It sits here
+//                 rather than on a screen because the pill is here.
 // One <AccountChip/> instance is dropped into each header (TabNavigator's
 // ShellHeader + PlexChatStack's headerRight); only one header is visible at once.
 
-type SheetView = 'menu' | 'identity' | 'contacts' | 'money';
+type SheetView = 'menu' | 'identity' | 'contacts' | 'money' | 'settings' | 'credential';
+
+/** Sheet titles for every non-menu view, in one place. */
+const VIEW_TITLE: Record<Exclude<SheetView, 'menu'>, string> = {
+  identity: 'My ID',
+  contacts: 'Contacts',
+  money: 'Money',
+  settings: 'Settings',
+  credential: 'Verify my license',
+};
 
 /** First letter of the display name, upper-cased; '·' when unknown. */
 function initialOf(name: string | null | undefined): string {
   const trimmed = (name ?? '').trim();
   return trimmed.length > 0 ? trimmed[0].toUpperCase() : '·';
-}
-
-/** A placeholder menu row (Settings / Billing) — visible, honestly marked "Soon". */
-function PlaceholderRow({ label }: { label: string }) {
-  return (
-    <View style={[styles.row, styles.rowDisabled]} accessibilityRole="text">
-      <Text style={[styles.rowLabel, styles.rowLabelMuted]}>{label}</Text>
-      <Text style={styles.soon}>Soon</Text>
-    </View>
-  );
 }
 
 export default function AccountChip() {
@@ -110,7 +119,14 @@ export default function AccountChip() {
                   <Text style={styles.chevron}>›</Text>
                 </Pressable>
 
-                <PlaceholderRow label="Settings" />
+                <Pressable
+                  style={styles.row}
+                  onPress={() => setView('settings')}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.rowLabel}>Settings</Text>
+                  <Text style={styles.chevron}>›</Text>
+                </Pressable>
 
                 <Pressable
                   style={styles.row}
@@ -129,19 +145,23 @@ export default function AccountChip() {
               <>
                 <Pressable
                   style={styles.backRow}
-                  onPress={() => setView('menu')}
+                  onPress={() => setView(view === 'credential' ? 'identity' : 'menu')}
                   accessibilityRole="button"
                   hitSlop={8}
                 >
-                  <Text style={styles.back}>‹ Account</Text>
+                  <Text style={styles.back}>
+                    {view === 'credential' ? '‹ My ID' : '‹ Account'}
+                  </Text>
                 </Pressable>
-                <Text style={styles.sheetTitle}>
-                  {view === 'identity' ? 'My ID' : view === 'contacts' ? 'Contacts' : 'Money'}
-                </Text>
+                <Text style={styles.sheetTitle}>{VIEW_TITLE[view]}</Text>
                 {view === 'identity' ? (
-                  <IdentityPanel />
+                  <IdentityPanel onOpenCredential={() => setView('credential')} />
                 ) : view === 'contacts' ? (
                   <ContactsPanel />
+                ) : view === 'settings' ? (
+                  <SettingsPanel />
+                ) : view === 'credential' ? (
+                  <CredentialPanel onClose={close} />
                 ) : (
                   <MoneyPanel />
                 )}
@@ -203,21 +223,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: theme.spacing.md,
   },
-  rowDisabled: {
-    opacity: 0.8,
-  },
   rowLabel: {
     ...theme.typography.body,
     color: theme.colors.textPrimary,
-  },
-  rowLabelMuted: {
-    color: theme.colors.textSecondary,
-  },
-  soon: {
-    ...theme.typography.caption,
-    color: theme.colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.7,
   },
   chevron: {
     ...theme.typography.body,

@@ -29,8 +29,17 @@ import type { Verification } from '../types/verification';
 // Status values are RAW. Vendor-facing copy for each state is ruled
 // separately (S3-2) and belongs in the screens, not here.
 
-/** How often to re-read while a ceremony is in flight. The drain runs ~60s. */
-const POLL_INTERVAL_MS = 20_000;
+// TWO-PHASE CADENCE (CRED S3 spec, "Polling"): every 5s for the first 60s,
+// then every 30s. The shape matters — the ceremony's drain runs on a one-minute
+// cron, so a result typically appears within ~90s of submission. A flat
+// interval either misses that window (too slow, and the vendor watches a
+// spinner past the moment it resolved) or hammers a read that has nothing new
+// to say (too fast, forever). The fast phase covers the likely resolution; the
+// slow phase is for the tail.
+const FAST_INTERVAL_MS = 5_000;
+const SLOW_INTERVAL_MS = 30_000;
+/** How long the fast phase lasts, measured from when this pump started. */
+const FAST_WINDOW_MS = 60_000;
 
 export interface UseMyVerifications {
   verifications: Verification[];
@@ -54,6 +63,10 @@ export default function useMyVerifications(): UseMyVerifications {
   const [error, setError] = useState<Error | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
+  // When the CURRENT pump started, for the fast/slow phase boundary. Reset on
+  // focus and on refresh() — a screen re-entered after an hour gets the fast
+  // phase again, which is right: that is a fresh look, not a stale one.
+  const pollStartedAtRef = useRef<number>(0);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current !== null) {
@@ -96,9 +109,11 @@ export default function useMyVerifications(): UseMyVerifications {
       const rows = await load({ signal });
       if (signal?.aborted) return;
       if (rows && hasPending(rows)) {
+        const elapsed = Date.now() - pollStartedAtRef.current;
+        const delay = elapsed < FAST_WINDOW_MS ? FAST_INTERVAL_MS : SLOW_INTERVAL_MS;
         timerRef.current = setTimeout(() => {
           void pumpOnce();
-        }, POLL_INTERVAL_MS);
+        }, delay);
       }
     },
     [load, clearTimer],
@@ -109,6 +124,7 @@ export default function useMyVerifications(): UseMyVerifications {
     useCallback(() => {
       const controller = new AbortController();
       controllerRef.current = controller;
+      pollStartedAtRef.current = Date.now();
       setIsLoading(true);
       void pump();
 
@@ -126,6 +142,7 @@ export default function useMyVerifications(): UseMyVerifications {
   // Restarts the pump, not just a single read — an error stops the chain and
   // this is how it resumes.
   const refresh = useCallback(async () => {
+    pollStartedAtRef.current = Date.now();
     setIsLoading(true);
     await pump();
   }, [pump]);

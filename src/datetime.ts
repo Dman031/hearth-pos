@@ -21,6 +21,10 @@ export type DisplayStyle =
   // zone label is a bug (VL-4), because the server emits UTC instants and the
   // reader is not necessarily in the practice's zone.
   | 'timeWithZone'
+  // Month and year only ("Aug 2026") — the granularity a credential is stated
+  // at. A licence is verified in a month and renews in a month; printing a day
+  // would claim a precision the record does not carry.
+  | 'monthYear'
   | 'datetime';
 
 /**
@@ -52,7 +56,9 @@ export function formatForDisplay(
           ? { hour: 'numeric', minute: '2-digit' }
           : style === 'timeWithZone'
             ? { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }
-            : { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' };
+            : style === 'monthYear'
+              ? { month: 'short', year: 'numeric' }
+              : { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' };
   return new Intl.DateTimeFormat('en-US', { ...opts, timeZone: tz }).format(date);
 }
 

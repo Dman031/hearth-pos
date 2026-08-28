@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import useAuth from '../hooks/useAuth';
 import useEntity from '../hooks/useEntity';
@@ -23,20 +23,41 @@ import { theme } from '../styles/theme';
 interface VerificationPillProps {
   label: string;
   verified: boolean;
+  /** When present the pill becomes the entry to that verification's flow. */
+  onPress?: () => void;
 }
 
-/** One verification pill — amber+dot when verified, muted outline when not. */
-function VerificationPill({ label, verified }: VerificationPillProps) {
-  return (
-    <View
-      style={[styles.pill, verified ? styles.pillOn : styles.pillOff]}
-      accessibilityRole="text"
-    >
+/** One verification pill — amber+dot when verified, muted outline when not.
+ *  With onPress it is also the door to the flow that earns the stamp; without,
+ *  it stays a read-only statement of fact. */
+function VerificationPill({ label, verified, onPress }: VerificationPillProps) {
+  const content = (
+    <>
       {verified ? <View style={styles.pillDot} /> : null}
       <Text style={[styles.pillLabel, verified ? styles.pillLabelOn : styles.pillLabelOff]}>
         {verified ? `${label} verified` : `${label} not verified`}
       </Text>
-    </View>
+    </>
+  );
+  if (!onPress) {
+    return (
+      <View
+        style={[styles.pill, verified ? styles.pillOn : styles.pillOff]}
+        accessibilityRole="text"
+      >
+        {content}
+      </View>
+    );
+  }
+  return (
+    <Pressable
+      style={[styles.pill, verified ? styles.pillOn : styles.pillOff]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={verified ? `${label} verified — view details` : `Verify your ${label}`}
+    >
+      {content}
+    </Pressable>
   );
 }
 
@@ -50,7 +71,14 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default function IdentityPanel() {
+interface IdentityPanelProps {
+  /** Opens the licence ceremony (CRED S3). The Credential pill is its door —
+   *  spec note 2: the pill reads credential_verified, which is a DERIVED
+   *  projection the app never writes, so it stays correct automatically. */
+  onOpenCredential?: () => void;
+}
+
+export default function IdentityPanel({ onOpenCredential }: IdentityPanelProps) {
   const { user } = useAuth();
   const { entity } = useEntity();
 
@@ -91,7 +119,11 @@ export default function IdentityPanel() {
       <View style={styles.pillRow}>
         <VerificationPill label="ID" verified={entity?.id_verified ?? false} />
         <VerificationPill label="Business" verified={entity?.business_verified ?? false} />
-        <VerificationPill label="Credential" verified={entity?.credential_verified ?? false} />
+        <VerificationPill
+          label="Credential"
+          verified={entity?.credential_verified ?? false}
+          onPress={onOpenCredential}
+        />
       </View>
 
       <View style={styles.fields}>
