@@ -2656,3 +2656,27 @@ vertical. These five rulings are the answer. They are canon; the specs bend to t
   OPEN, and not a session's decision: where CRED S3's licence number and state come from —
   get_my_verifications returns neither by ruling, and the spec forbids widening the view.
   S1 builds every other state without it.
+
+### ADDENDUM — recorded 2026-08-28, same block
+  N-6  GET_MY_VERIFICATIONS IS NOT WIDENED. A status view stays a status view (R2 /
+       discipline rule 8). The licence detail the S3 verified state and the S5 practice chip
+       need comes from a NEW self-scoped definer RPC instead — get_my_credential_detail(),
+       returning registry_ref and credential_class for the CALLER'S OWN live verified rows
+       only. A clinician's own licence number is not a secret from the clinician, and
+       current_entity_id() is what stops it reaching a viewer.
+       RULED 2026-08-26, recorded 2026-08-28 — stated plainly because the gap between the
+       two is exactly what this block exists to close.
+       SMALL MIGRATION, FOLDED INTO SESSION 2. Not built in Session 1. Session 1 renders
+       `verified {Mon YYYY}` and OMITS the number — an omission, never an invented source.
+
+  N-7  entities.email_opt_out_at HAS EXACTLY ONE WRITER: set_email_preference (0043). The
+       app never writes the column directly, and EntityContext.updateEntity() — which could
+       — must not be used for it. A direct entities write would be a second write path for
+       the same column, which is the rule that holds everywhere else in this system
+       (state-transition writes go through one canonical function).
+
+  N-8  THE P0 GATE REFUSES AND POINTS; IT DOES NOT OPEN THE CEREMONY. Follows from N-1
+       placing the ceremony in the account sheet: S5's P0 gate must NOT open a sheet from
+       inside the card editor's sheet (no stacked modals, ProfileScreen.tsx:312). It refuses
+       and names where the thing lives — the pattern S5's own approved copy already uses for
+       Incoming ("That request lives in Incoming, where it is answered"). Note for SESSION 2.
