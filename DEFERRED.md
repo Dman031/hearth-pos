@@ -502,3 +502,23 @@ Cross-repo: spans hearth-pos (app download, caller verify, caller-as-new-owner) 
   `ProfileCard` gaining the banner. Two files, neither touched by 2b.
 - **Adjacent and NOT deferred:** the board's own empty state (S1) ships in 2b and is the
   honest floor. Nothing about the card is silently paused with no explanation anywhere.
+
+### S4b — "That time was let go" (logged 2026-08-28 — Session 3; belongs to the accept path)
+- **Trigger: the accept-path work.** Not a date and not a cohort — this ships with whatever
+  session touches `respond_to_inbound`'s accept branch, because that is the only place it can
+  fire.
+- **What it is.** PLEXMED S5's S4b and S6's T4: when an accept is refused with
+  `SLOT_NO_LONGER_HELD` (`0038b:767`), the clinician sees *"That time was let go"* — a hold
+  lapsed, the time went back on the board, and the request is still there to reply to.
+- **Why it stayed out of Session 3.** S6 is about ASKING BEFORE DECIDING. S4b is about an
+  accept that was refused. Bolting them together would put two different moments in one
+  surface, and the second one would arrive without the accept-path context that makes it
+  legible.
+- **Two things it must get right when it lands, both already ruled:** it is NOT an error state
+  and must not be styled as one — the clinician did nothing wrong and neither did the person
+  who asked. And **Accept is REMOVED, not disabled** (T4): a greyed Accept invites a tap that
+  will be refused.
+- **Never say "expired" to the clinician about a person's request**, and never imply the asker
+  gave up. They asked; the clock ran; that is all that happened.
+- **Adjacent and NOT deferred:** the `held_until` row and the hold deadline ship in Session 3.
+  A clinician can always see when a hold runs out; what is deferred is only what happens after.
