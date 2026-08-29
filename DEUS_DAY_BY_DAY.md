@@ -2715,6 +2715,32 @@ vertical. These five rulings are the answer. They are canon; the specs bend to t
        licence detail row, and nothing in S1–S4 asks for it. Logged as DEFERRED in
        hearth-network with trigger "the honorific surfaces on a screen".
 
+  N-16 THE WRAP IS A SHEET PUSHED FROM THE TODAY TILE — N-3 AMENDED (2026-08-28).
+       N-3 said "board and wrap live in the module". THE BOARD HALF WAS ALWAYS THE
+       LOAD-BEARING ONE: a board is meaningless without a practice card. A wrap is meaningless
+       without a VISIT, and under N-2 the visit is on Engagement — so the wrap goes where the
+       visit is. N-3 narrows to: THE BOARD lives in the module.
+       WHY, and it is the Josh fix in miniature (DEUS_DAY_BY_DAY.md ~531-533, "the accept
+       control sitting in a different tab from where the vendor was looking"): a ninety-second
+       wrap immediately after a visit is the worst possible moment to send someone two taps
+       away into the account sheet. One component, one entry, on Engagement.
+
+  N-17 TODAY CARRIES NO IDENTITY CHIP (2026-08-28). S7's A3 says the identity chip renders
+       "exactly as on Incoming". It cannot: get_my_day returns no verification flag and
+       neither does get_my_thread_peers. Under the SPEC-CONTRACT RULE promoted the same day,
+       that is a spec defect to report and omit — never a read to widen, and never a migration
+       written to satisfy an example.
+       AND IT IS RIGHT ON MERITS, NOT ONLY ON CONSISTENCY, which is why this is a ruling and
+       not a workaround: the chip earns its place on INCOMING because the clinician is
+       deciding whether to see a stranger. By TODAY they have accepted, been paid, and are
+       about to join a room. The decision is made, and identity verification no longer changes
+       anything they would do. A chip that cannot change a decision is decoration on a
+       clinical surface.
+       RECORDED SO NOBODY ADDS IT BACK AS AN OVERSIGHT. Today shows "First visit on this
+       network" (first_visit_on_network IS returned) and no identity chip. HonestyChips already
+       takes firstContact as optional for exactly this — the component is unchanged.
+       Reported to hearth-network as a spec defect the same day.
+
   N-15 SPEC-CONTRACT RULE PROMOTED (2026-08-28). A spec's rendered example may only use
        columns its own data contract returns; a mismatch is a SPEC DEFECT to report, never a
        read to widen. Written into BOTH CLAUDE.md files — hearth-pos's as a consumer rule

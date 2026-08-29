@@ -41,6 +41,16 @@ Brand mark hierarchy (Derrick, 2026-07-15): **face-orb = hero, signet = tiny ico
 
 Process rules:
 
+- **ONLY `DEUS_DAY_BY_DAY.md` IS MIRRORED ACROSS THE REPOS.** It is byte-identical in
+  hearth-pos and hearth-network by design, and a change to it is copied verbatim to the other.
+  **`CLAUDE.md`, `DEFERRED.md` and `BUGS_AND_SOLUTIONS.md` ARE PER-REPO AND MUST NEVER BE
+  COPIED BETWEEN THEM.** Each carries instructions, cut decisions and bug history specific to
+  its own codebase; a `cp` between repos silently destroys the target's contents. When a rule
+  belongs in both CLAUDE.md files, INSERT it into each in that repo's own voice — never copy
+  the file. (Origin: a `cp CLAUDE.md ../hearth-network/CLAUDE.md` on 2026-08-28 overwrote the
+  network's instructions wholesale; caught and reverted from an uncommitted tree, which is the
+  only reason it cost nothing.)
+
 - A RULING IS NOT A RULING UNTIL IT IS IN THE ROADMAP. Decisions made in strategy chat
   are written into the Day N block BEFORE the build prompt is issued.
 - A QUEUED ITEM YOU CANNOT COMPLETE IS REPORTED BLOCKED, NEVER SILENTLY DROPPED.
