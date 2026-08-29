@@ -139,3 +139,114 @@ export function formatZoneLabel(
   }).formatToParts(asDate(value));
   return parts.find((p) => p.type === 'timeZoneName')?.value ?? tz;
 }
+
+// ─── Zone + week helpers (PLEXMED S5, the open-times board) ─────────────────
+
+/**
+ * The device's IANA zone. THE ONLY PLACE this app resolves it.
+ *
+ * The DATE/TIME rule bars resolving a zone at a display site, and this is not
+ * one: it is the value the first-run confirm PROPOSES, which the clinician then
+ * accepts or corrects into entities.timezone. Every render afterwards uses the
+ * STORED zone, not this — a clinician on a trip still sees their board in their
+ * practice's zone (S5 note 3).
+ */
+export function getDeviceTimeZone(): string {
+  const resolved = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return resolved && resolved.length > 0 ? resolved : DEFAULT_TZ;
+}
+
+/** How far `tz` is from UTC at a given instant, in ms. DST-correct by construction. */
+function zoneOffsetMs(instant: Date, tz: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(instant);
+  const get = (type: string): number =>
+    Number(parts.find((p) => p.type === type)?.value ?? '0');
+  const asIfUTC = Date.UTC(
+    get('year'),
+    get('month') - 1,
+    get('day'),
+    get('hour'),
+    get('minute'),
+    get('second'),
+  );
+  return asIfUTC - instant.getTime();
+}
+
+/**
+ * A wall-clock time in a zone → the INSTANT it names.
+ *
+ * This is what makes "9:00 on the 30th" unambiguous before it is sent: the
+ * board posts instants, never naive datetimes, and the server refuses a naive
+ * one rather than silently reinterpreting it (0038b, post_card_slots).
+ *
+ * TWO PASSES, DELIBERATELY. The first guess uses the offset at the naive
+ * instant, which is wrong across a DST boundary — 2:30 AM on a spring-forward
+ * day sits on the far side of the shift. The second pass re-reads the offset at
+ * the corrected instant and settles it. A single pass is right 363 days a year,
+ * which is the kind of wrong that surfaces twice a year and is never reproduced.
+ */
+export function wallClockToInstant(
+  dateKey: string,
+  hour: number,
+  minute: number,
+  tz: string = DEFAULT_TZ,
+): Date {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const naive = Date.UTC(y, m - 1, d, hour, minute, 0, 0);
+  const firstPass = naive - zoneOffsetMs(new Date(naive), tz);
+  return new Date(naive - zoneOffsetMs(new Date(firstPass), tz));
+}
+
+/** Shift a YYYY-MM-DD key by whole days. Key arithmetic, never instant math. */
+export function addDaysToKey(dateKey: string, days: number): string {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const shifted = new Date(Date.UTC(y, m - 1, d + days, 12));
+  return shifted.toISOString().slice(0, 10);
+}
+
+/** The seven keys of the Sunday-start calendar week containing `dateKey`. */
+export function weekKeysFor(dateKey: string): string[] {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const weekday = new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay(); // 0 = Sunday
+  const sunday = addDaysToKey(dateKey, -weekday);
+  return Array.from({ length: 7 }, (_, i) => addDaysToKey(sunday, i));
+}
+
+/** "Tue" — the column header. Noon-UTC anchored so no zone can shift the day. */
+export function shortWeekday(dateKey: string): string {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(y, m - 1, d, 12)));
+}
+
+/** "25" — the day number under the column header. */
+export function dayOfMonth(dateKey: string): string {
+  return String(Number(dateKey.split('-')[2]));
+}
+
+/**
+ * A bare wall clock ("9:45 AM") from an hour and minute — no date, no zone.
+ *
+ * Lives here because the DATE/TIME rule admits no inline Intl at a display
+ * site, and a chip grid of a day's times is a display site even though the
+ * value it renders is not an instant. The zone is stated ONCE above such a grid
+ * (formatZoneLabel), not repeated on every chip.
+ */
+export function formatWallClock(hour: number, minute: number): string {
+  return new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(2000, 0, 1, hour, minute)));
+}

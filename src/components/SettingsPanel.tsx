@@ -1,8 +1,12 @@
-import React, { useCallback, useState } from 'react';
-import { StyleSheet, Switch, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { theme } from '../styles/theme';
 import useEntity from '../hooks/useEntity';
+import useCards from '../hooks/useCards';
 import { setEmailPreference } from '../services/settings';
+import { getModuleAccess, type ModuleAccess } from '../services/entitlements';
+import OpenTimesBoard from './OpenTimesBoard';
+import type { Card } from '../types/card';
 
 // SettingsPanel — the account's own settings, as an embedded sheet panel
 // (ContactsPanel / MoneyPanel pattern: navigation-free, lives inside
@@ -11,7 +15,16 @@ import { setEmailPreference } from '../services/settings';
 // board ships, and an empty "Modules" heading is exactly the placeholder N-4
 // forbids. It appears when there is something in it.
 //
-// TODAY IT HOLDS ONE SWITCH: the email preference (E-10, migration 0043).
+// THE MODULES SECTION IS NOW REAL. N-1 deferred it until there was something in
+// it; the open-times board is that something. It renders ONLY when a module is
+// unlocked — hidden when ungated, never visible-locked (N-4): a locked surface
+// advertises what someone cannot have and invites a refused tap.
+//
+// THE GATE IS TWO CONDITIONS (N-1): owned AND licensed. isModuleOwned() is the
+// TODO(PAYWALL) seam and returns true until commerce ships, so today the licence
+// stamp is what decides. The two lock arms are kept distinct in entitlements.ts
+// because they are different screens once the paywall exists — nothing here
+// collapses them.
 //
 // N-7 — THE WRITE PATH IS NOT NEGOTIABLE. entities.email_opt_out_at has exactly
 // one writer, set_email_preference. EntityContext.updateEntity() could write
@@ -27,6 +40,28 @@ import { setEmailPreference } from '../services/settings';
 
 export default function SettingsPanel() {
   const { entity, refresh } = useEntity();
+  const { cards } = useCards();
+  const [access, setAccess] = useState<ModuleAccess | null>(null);
+  // The board this panel is showing, or null for the settings list. Kept HERE
+  // rather than as another AccountChip SheetView: the board is a module's
+  // interior, not a peer of My ID / Contacts / Money.
+  const [boardCard, setBoardCard] = useState<Card | null>(null);
+
+  const practiceCards = cards.filter((c) => c.kind === 'practice');
+
+  useEffect(() => {
+    if (!entity) {
+      setAccess(null);
+      return;
+    }
+    let active = true;
+    void getModuleAccess('plexmed', entity).then((result) => {
+      if (active) setAccess(result);
+    });
+    return () => {
+      active = false;
+    };
+  }, [entity]);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   // Held only across the round trip so the switch does not visibly snap back
@@ -59,8 +94,32 @@ export default function SettingsPanel() {
     [busy, refresh],
   );
 
+  if (boardCard) {
+    return <OpenTimesBoard card={boardCard} onBack={() => setBoardCard(null)} />;
+  }
+
   return (
     <View style={styles.container}>
+      {/* Modules — hidden entirely unless unlocked (N-4). A practice card is
+          what a PlexMed board attaches to, so with no practice card there is
+          nothing to open and the section stays absent rather than empty. */}
+      {access?.unlocked && practiceCards.length > 0 ? (
+        <View style={styles.modules}>
+          <Text style={styles.sectionLabel}>PlexMed</Text>
+          {practiceCards.map((c) => (
+            <Pressable
+              key={c.id}
+              style={styles.moduleRow}
+              onPress={() => setBoardCard(c)}
+              accessibilityRole="button"
+            >
+              <Text style={styles.moduleLabel}>{`Open times · ${c.title}`}</Text>
+              <Text style={styles.chevron}>›</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+
       <View style={styles.row}>
         <Text style={styles.label}>Emails about your visits</Text>
         <Switch
@@ -85,6 +144,21 @@ export default function SettingsPanel() {
 
 const styles = StyleSheet.create({
   container: { gap: theme.spacing.sm, paddingBottom: theme.spacing.sm },
+  modules: { gap: theme.spacing.sm, marginBottom: theme.spacing.lg },
+  sectionLabel: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.7,
+  },
+  moduleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: theme.spacing.md,
+  },
+  moduleLabel: { ...theme.typography.body, color: theme.colors.textPrimary },
+  chevron: { ...theme.typography.body, color: theme.colors.textMuted },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

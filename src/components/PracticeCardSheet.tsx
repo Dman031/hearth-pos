@@ -13,7 +13,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../styles/theme';
 import { formatForDisplay } from '../datetime';
 import useCards from '../hooks/useCards';
-import useEntity from '../hooks/useEntity';
 import useMyVerifications from '../hooks/useMyVerifications';
 import useMoneyBalance from '../hooks/useMoneyBalance';
 import PermissionPicker from './PermissionPicker';
@@ -65,7 +64,6 @@ interface PracticeCardSheetProps {
 
 export default function PracticeCardSheet({ mode, card, onClose }: PracticeCardSheetProps) {
   const { createCard, updateCard, setCardCommerce } = useCards();
-  const { entity } = useEntity();
   const { verifications } = useMyVerifications();
   const { balance } = useMoneyBalance();
 
