@@ -37,6 +37,10 @@ interface PermissionPickerProps {
   value: Perm;
   ownerVerified: boolean;
   onChange: (perm: Perm) => void;
+  /** Overrides the generic axis label. A practice card asks the question in the
+   *  spec's approved words ("Who can request a visit"), which a screen may not
+   *  paraphrase — so the label is the caller's to supply where copy is ruled. */
+  label?: string;
 }
 
 export default function PermissionPicker({
@@ -44,6 +48,7 @@ export default function PermissionPicker({
   value,
   ownerVerified,
   onChange,
+  label,
 }: PermissionPickerProps) {
   const tiers: readonly Perm[] = axis === 'see' ? SEE_TIERS : ACT_TIERS;
   const requiresVerification = (perm: Perm): boolean =>
@@ -55,7 +60,7 @@ export default function PermissionPicker({
   return (
     <View style={styles.wrap}>
       <Text style={styles.axisLabel}>
-        {axis === 'see' ? 'Who can SEE this' : 'Who can ACT on this'}
+        {label ?? (axis === 'see' ? 'Who can SEE this' : 'Who can ACT on this')}
       </Text>
       <View style={styles.row}>
         {tiers.map((perm) => {

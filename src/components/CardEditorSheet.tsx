@@ -76,6 +76,13 @@ export interface CardEditorSeed {
 }
 
 interface CardEditorSheetProps {
+  /** True when the owner holds a live Verified Clinician stamp. False renders
+   *  P0 — the honest form of a refusal the database makes anyway (trigger
+   *  cards_practice_requires_licence). */
+  practiceAvailable?: boolean;
+  /** Hands off to PracticeCardSheet. The parent closes this sheet first —
+   *  sequential sheets, never stacked (the RetiredCardsSheet pattern). */
+  onChoosePractice?: () => void;
   mode: EditorMode;
   card: Card | null; // the card being edited; null in create mode / closed
   onClose: () => void;
@@ -97,10 +104,19 @@ const FLAVORS: ReadonlyArray<{ kind: CardKind; label: string }> = [
 // Sensible defaults for a brand-new card. see='contacts' / act='off' mirrors the
 // safe defaults onboarding uses; flavor defaults to the table default.
 const DEFAULT_KIND: CardKind = 'capability';
+
+// PRACTICE IS NOT IN FLAVORS ON PURPOSE. Choosing it does not set this sheet's
+// `kind` — it ROUTES OUT to PracticeCardSheet, because a practice card's fields
+// are canonical and this sheet's Details section is free-form (PLEXMED S5 note
+// 7). It renders as a chip beside the flavors so the kind picker stays the one
+// place a card type is chosen, which is what the spec's P0 assumes.
+const PRACTICE_LABEL = 'Practice';
 const DEFAULT_SEE: SeePerm = 'contacts';
 const DEFAULT_ACT: ActPerm = 'off';
 
 export default function CardEditorSheet({
+  practiceAvailable = false,
+  onChoosePractice,
   mode,
   card,
   onClose,
@@ -119,6 +135,10 @@ export default function CardEditorSheet({
 
   const [title, setTitle] = useState('');
   const [kind, setKind] = useState<CardKind>(DEFAULT_KIND);
+  // P0 — shown when Practice is tapped without a live stamp. Per N-8 it REFUSES
+  // AND POINTS: it never opens the ceremony, because opening the account sheet
+  // from inside this sheet is the stacked modal that ruling exists to prevent.
+  const [practiceGate, setPracticeGate] = useState(false);
   const [fields, setFields] = useState<FieldEntry[]>([]); // user fields, no reserved
   const [mediaUrl, setMediaUrlState] = useState('');
   // Gallery image URLs (Day 15) — persisted as repeated gallery_image entries.
@@ -171,6 +191,7 @@ export default function CardEditorSheet({
       // defaults for the owner to set who-can-order on this confirm screen.
       setTitle(createSeed?.title ?? '');
       setKind(createSeed?.kind ?? DEFAULT_KIND);
+      setPracticeGate(false);
       setFields(withoutReservedFields(createSeed?.fields ?? []));
       setMediaUrlState(createSeed?.mediaUrl ?? '');
       setGalleryUrlsState(getGalleryUrls(createSeed?.fields ?? []));
@@ -597,7 +618,50 @@ export default function CardEditorSheet({
                   </Pressable>
                 );
               })}
+              {/* Practice — CREATE only. Tapping it does not select a kind; it
+                  hands off (or refuses). An existing practice card never opens
+                  this sheet at all — Profile routes it straight to
+                  PracticeCardSheet. */}
+              {mode === 'create' ? (
+                <Pressable
+                  onPress={() => {
+                    if (practiceAvailable && onChoosePractice) {
+                      onChoosePractice();
+                      return;
+                    }
+                    setPracticeGate(true);
+                  }}
+                  accessibilityRole="button"
+                  style={styles.flavorChip}
+                >
+                  <Text style={styles.flavorChipLabel}>{PRACTICE_LABEL}</Text>
+                </Pressable>
+              ) : null}
             </View>
+
+            {/* P0 — the gate. The database refuses a practice card without a
+                live licence either way (cards_practice_requires_licence); this
+                is the honest form of that refusal. It NAMES where the licence
+                flow lives rather than opening it (N-8). */}
+            {practiceGate ? (
+              <View style={styles.practiceGate}>
+                <Text style={styles.practiceGateTitle}>Verify your license first</Text>
+                <Text style={styles.practiceGateBody}>
+                  A practice card offers visits, so we check your license with the board that
+                  issued it before it can go up.
+                </Text>
+                <Text style={styles.practiceGateHint}>
+                  Your license lives in your account menu, under My ID.
+                </Text>
+                <Pressable
+                  onPress={() => setPracticeGate(false)}
+                  accessibilityRole="button"
+                  hitSlop={8}
+                >
+                  <Text style={styles.practiceGateDismiss}>Not now</Text>
+                </Pressable>
+              </View>
+            ) : null}
 
             {/* Media — available on ANY card type -------------------------- */}
             <View style={styles.mediaSection}>
@@ -1037,6 +1101,25 @@ const styles = StyleSheet.create({
   },
   flavorChipLabelSelected: {
     color: theme.colors.accent,
+  },
+  practiceGate: {
+    marginTop: theme.spacing.md,
+    padding: theme.spacing.lg,
+    borderRadius: theme.borderRadius.card,
+    backgroundColor: theme.colors.surfaceInset,
+    gap: theme.spacing.sm,
+  },
+  practiceGateTitle: {
+    ...theme.typography.body,
+    fontFamily: theme.fonts.semiBold,
+    color: theme.colors.textPrimary,
+  },
+  practiceGateBody: { ...theme.typography.bodyMuted, color: theme.colors.textSecondary },
+  practiceGateHint: { ...theme.typography.caption, color: theme.colors.textMuted },
+  practiceGateDismiss: {
+    ...theme.typography.body,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.xs,
   },
   mediaSection: {
     gap: theme.spacing.sm,

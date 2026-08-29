@@ -14,6 +14,8 @@ import useEntity from '../hooks/useEntity';
 import useCards from '../hooks/useCards';
 import VerifiedHumanBadge from '../components/VerifiedHumanBadge';
 import ProfileCard from '../components/ProfileCard';
+import PracticeCardSheet from '../components/PracticeCardSheet';
+import useMyVerifications from '../hooks/useMyVerifications';
 import CardEditorSheet, {
   type CardEditorSeed,
 } from '../components/CardEditorSheet';
@@ -55,6 +57,19 @@ const VERIFY_ERROR_COPY: Record<string, string> = {
 export default function ProfileScreen() {
   const { entity, refresh } = useEntity();
   const { cards, retiredCards, setFieldAvailability } = useCards();
+  // The licence gate for the Practice card type. A live verified, unvoided
+  // licence row is what the database itself requires
+  // (cards_practice_requires_licence), so the picker offers a path the write
+  // will accept — never one it will reject.
+  const { verifications } = useMyVerifications();
+  const practiceAvailable = verifications.some(
+    (v) => v.type === 'license' && v.status === 'verified' && v.voided_at === null,
+  );
+  // The practice sheet's own open-state. A practice card NEVER opens
+  // CardEditorSheet: its fields are canonical and that sheet's Details section
+  // is free-form, so the two would fight (PLEXMED S5 note 7).
+  const [practiceCard, setPracticeCard] = useState<Card | null>(null);
+  const [creatingPractice, setCreatingPractice] = useState(false);
   const [starting, setStarting] = useState(false);
   // Day 22E — the retired list sheet (ruling 4: a sheet, not a screen).
   const [showRetired, setShowRetired] = useState(false);
@@ -274,7 +289,9 @@ export default function ProfileScreen() {
               <ProfileCard
                 key={card.id}
                 card={card}
-                onPress={() => setEditingCard(card)}
+                onPress={() =>
+                  card.kind === 'practice' ? setPracticeCard(card) : setEditingCard(card)
+                }
                 onToggleAvailability={(fieldIndex, next) =>
                   void setFieldAvailability(card.id, fieldIndex, next)
                 }
@@ -312,6 +329,12 @@ export default function ProfileScreen() {
           // the same pageSheet pattern (no stacked modals).
           setShowRetired(false);
           setMenuSeed(null);
+          // Same routing as the live list: a practice card never opens the
+          // free-form editor, retired or not.
+          if (card.kind === 'practice') {
+            setPracticeCard(card);
+            return;
+          }
           setEditingCard(card);
         }}
       />
@@ -321,6 +344,22 @@ export default function ProfileScreen() {
         card={editingCard}
         onClose={closeEditor}
         createSeed={menuSeed}
+        practiceAvailable={practiceAvailable}
+        onChoosePractice={() => {
+          // Sequential sheets, never stacked — close the editor first, then
+          // open the practice sheet (the RetiredCardsSheet pattern above).
+          closeEditor();
+          setCreatingPractice(true);
+        }}
+      />
+
+      <PracticeCardSheet
+        mode={creatingPractice ? 'create' : practiceCard ? 'edit' : null}
+        card={practiceCard}
+        onClose={() => {
+          setCreatingPractice(false);
+          setPracticeCard(null);
+        }}
       />
     </SafeAreaView>
   );
