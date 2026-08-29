@@ -2712,6 +2712,34 @@ vertical. These five rulings are the answer. They are canon; the specs bend to t
        licence detail row, and nothing in S1–S4 asks for it. Logged as DEFERRED in
        hearth-network with trigger "the honorific surfaces on a screen".
 
+  N-10 A TIME INSIDE THE LEAD-TIME HOUR RENDERS GREYED, WITH NO LABEL. get_my_card_slots
+       derives state 'past' at `starts_at <= now() + interval '60 minutes'` (0038b:598), so a
+       5:40 time returns 'past' at 5:05. The STATE IS CORRECT — the lead-time rule makes it
+       unbookable — but the word is not, and a clinician seeing this evening's slot labelled
+       "Past" in the afternoon will report it as a bug.
+       ONLY THE RENDERING IS RULED HERE. The server state name stays 'past'; PLEXMED S5's row
+       table stands as written (that row carries a style, not a chip). Greyed and unbookable
+       is self-evident and says nothing false.
+       IF A LABEL EVER PROVES NECESSARY it must describe THE RULE, not the time — "too soon",
+       never "past". No label is better.
+
+  N-11 SESSION 2 SPLITS: 2a AUTHORING, 2b THE BOARD. They share no files, 2b needs a practice
+       card to attach times to, and ten files across two surfaces behind one approval is the
+       batch size that hides mistakes.
+       2a: the licence-gated practice kind and the card itself, in CardEditorSheet on Profile
+       (S5 note 5 — reuse CardContext, no new card write path).
+       2b: the board, in the module behind Settings (N-3), plus the modules section in
+       SettingsPanel — which N-1 deferred until there was something in it, and now there is.
+       P0 AND P5 REFUSE AND POINT, per N-8. P5 says the times live in Settings › PlexMed; it
+       does not open the board, because opening the account sheet from inside the card
+       editor's sheet is the stacked modal N-8 exists to prevent.
+
+  N-12 THE DAY CHOOSER IS BESPOKE, NOT A DEPENDENCY. S3's add-times sheet needs a day chooser,
+       not a calendar. EngagementCalendar already made this call once (EngagementCalendar.tsx:8-9,
+       "minimal, no new dependency; the Field styling is bespoke anyway") and a second bespoke
+       picker beside it is more consistent than one dependency plus one hand-rolled component.
+       REUSE WHAT EngagementCalendar ESTABLISHED rather than inventing a third pattern.
+
   N-9  SESSION 2 CARRIES THREE THINGS OUT OF SESSION 1, recorded so they are not rediscovered:
        (a) SUPERSEDED by N-6-CORRECTED — there is no get_my_credential_detail() and no
            migration. registry_ref was already on get_my_verifications from 0036; the S5
