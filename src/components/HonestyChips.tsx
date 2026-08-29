@@ -62,7 +62,12 @@ function Chip({ label, tone, expanded }: { label: string; tone: ChipTone; expand
 }
 
 interface HonestyChipsProps {
-  idVerified: boolean;
+  /** OPTIONAL, and undefined means NO IDENTITY CHIP AT ALL — not an unverified
+   *  one. Today omits it by ruling N-17: get_my_day returns no verification
+   *  flag, and the chip earns its place on Incoming only because the clinician
+   *  is deciding whether to see a stranger. Passing `false` here would render
+   *  "Identity not verified", which on Today would be a claim nobody made. */
+  idVerified?: boolean;
   /** Omitted on surfaces where history is not part of the claim (S7 Today). */
   firstContact?: boolean;
   /** A2's established-thread wording differs by surface; S7 uses its own. */
@@ -79,11 +84,13 @@ export default function HonestyChips({
 }: HonestyChipsProps) {
   return (
     <View style={styles.row}>
-      <Chip
-        label={idVerified ? 'Identity verified' : 'Identity not verified'}
-        tone={idVerified ? 'verified' : 'plain'}
-        expanded={IDENTITY_EXPANDED}
-      />
+      {idVerified !== undefined ? (
+        <Chip
+          label={idVerified ? 'Identity verified' : 'Identity not verified'}
+          tone={idVerified ? 'verified' : 'plain'}
+          expanded={IDENTITY_EXPANDED}
+        />
+      ) : null}
       {firstContact !== undefined ? (
         <Chip
           label={firstContact ? historyLabels.first : historyLabels.established}

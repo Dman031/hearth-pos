@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   StyleSheet,
@@ -47,6 +48,7 @@ interface PendingMessage {
 
 type Row =
   | { kind: 'message'; key: string; body: string; mine: boolean }
+  | { kind: 'system'; key: string; body: string; url: string | null }
   | { kind: 'pending'; key: string; tempId: string; body: string; status: 'sending' | 'failed' };
 
 // Header-right "Add to contacts": saves the OTHER participant to the owner's
@@ -269,12 +271,34 @@ export default function PlexChatScreen() {
   const visiblePending = pending.filter((p) => !findCanonicalTwin(p));
 
   const rows: Row[] = [
-    ...messages.map((m) => ({
-      kind: 'message' as const,
-      key: m.id,
-      body: m.body,
-      mine: m.from_entity_id === myEntityId,
-    })),
+    // ORIGIN CARRIES AUTHORSHIP; from_entity_id DOES NOT.
+    //
+    // This mapping used to derive the speaker from from_entity_id alone, which
+    // made EVERY origin='system' row render as a person — as the vendor's own
+    // bubble when the row carried their id, and as the peer's otherwise. That
+    // was a general rendering defect, not a visit-link one; the room link is
+    // simply the first system message this app will ever show.
+    //
+    // It matters most exactly there: post_visit_link writes the row with the
+    // SELLER's from_entity_id because the column is NOT NULL (0041), so a
+    // clinician would have appeared to type a link at their own patient an hour
+    // before the visit. That is the same authorship lie E-3a ruled against in
+    // the From line — she tapped Accept, she did not write it.
+    ...messages.map((m) =>
+      m.origin === 'system'
+        ? {
+            kind: 'system' as const,
+            key: m.id,
+            body: m.body,
+            url: extractUrl(m.body),
+          }
+        : {
+            kind: 'message' as const,
+            key: m.id,
+            body: m.body,
+            mine: m.from_entity_id === myEntityId,
+          },
+    ),
     ...visiblePending.map((p) => ({
       kind: 'pending' as const,
       key: p.tempId,
@@ -285,6 +309,26 @@ export default function PlexChatScreen() {
   ];
 
   const renderRow = ({ item }: { item: Row }) => {
+    if (item.kind === 'system') {
+      // Not a bubble, and attributed to nobody. A link row when it carries one
+      // — the room link's URL lives in the BODY, not the payload (0041).
+      if (item.url) {
+        return (
+          <Pressable
+            style={styles.systemRow}
+            onPress={() => void Linking.openURL(item.url as string)}
+            accessibilityRole="link"
+          >
+            <Text style={styles.systemText}>{item.body}</Text>
+          </Pressable>
+        );
+      }
+      return (
+        <View style={styles.systemRow}>
+          <Text style={styles.systemText}>{item.body}</Text>
+        </View>
+      );
+    }
     if (item.kind === 'message') {
       return <ConversationBubble speaker={item.mine ? 'vendor' : 'hearth'} text={item.body} />;
     }
@@ -348,7 +392,32 @@ export default function PlexChatScreen() {
   );
 }
 
+/** The first URL in a body, or null. The room link's URL is in the BODY rather
+ *  than the payload (0041's post_visit_link writes
+ *  'Your visit room is ready: ' || url), so a system row finds its link here. */
+function extractUrl(body: string): string | null {
+  return /https?:\/\/[^\s]+/.exec(body)?.[0] ?? null;
+}
+
 const styles = StyleSheet.create({
+  // System rows are NOT bubbles. A bubble on either side is an authorship
+  // claim, and origin='system' means nobody wrote it.
+  systemRow: {
+    alignSelf: 'center',
+    maxWidth: '90%',
+    marginVertical: theme.spacing.sm,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: theme.borderRadius.card,
+    borderWidth: 1,
+    borderColor: theme.colors.hairline,
+    backgroundColor: theme.colors.surfaceInset,
+  },
+  systemText: {
+    ...theme.typography.bodyMuted,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+  },
   flex: {
     flex: 1,
   },

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,6 +13,11 @@ import { theme, tileSurface } from '../styles/theme';
 import { supabase } from '../services/supabase';
 import useEntity from '../hooks/useEntity';
 import useMyEngagements, { type MyEngagement } from '../hooks/useMyEngagements';
+import useMyDay from '../hooks/useMyDay';
+import TodayTile from '../components/TodayTile';
+import WrapSheet from '../components/WrapSheet';
+import { FOLLOWUPS_DUE_HEADER } from '../services/visit-copy';
+import { fetchFollowupsDue, type DayVisit, type FollowupDue } from '../services/visits';
 import EngagementCalendar from '../components/EngagementCalendar';
 import { notifyEngagementsChanged } from '../utils/engagement-refresh';
 import { ENGAGEMENT_KIND_LABEL, STATUS_LABEL, formatCents } from '../utils/format';
@@ -184,6 +189,33 @@ export default function EngagementScreen() {
   const { entity } = useEntity();
   const entityId = entity?.id ?? null;
   const { engagements, isLoading, error, refresh } = useMyEngagements();
+  // TODAY LIVES HERE (ruling N-2). get_my_day is vertical-agnostic — it returns
+  // booking|order for ANY card kind — so a plumber with three scheduled
+  // bookings has a day too. Locking it behind a clinician stamp would withhold
+  // a surface whose data the server already returns to them. The room row and
+  // the wrap affordance are conditional on card_kind WITHIN this one surface;
+  // a second clinician-only Today would be a second fold of the same read.
+  //
+  // The Upcoming/Past split below is UNTOUCHED (S7 A2) — this section sits
+  // above it and shares nothing with it.
+  const { visits: todayVisits, tz: dayTz, zoneUnset, refresh: refreshDay } = useMyDay();
+  const [wrapping, setWrapping] = useState<DayVisit | null>(null);
+  const [followups, setFollowups] = useState<FollowupDue[]>([]);
+
+  const peerNameForThread = useCallback(
+    (threadId: string) => engagements.find((e) => e.thread_id === threadId)?.peerName ?? null,
+    [engagements],
+  );
+
+  useEffect(() => {
+    let active = true;
+    void fetchFollowupsDue().then((result) => {
+      if (active && result.ok) setFollowups(result.value);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
   const [mode, setMode] = useState<ViewMode>('list');
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
@@ -482,6 +514,36 @@ export default function EngagementScreen() {
           </View>
         ) : (
           <>
+            {todayVisits.length > 0 ? (
+              <View style={styles.todaySection}>
+                <Text style={styles.sectionHeader}>Today</Text>
+                {/* The one place a guessed zone would be wrong: S7 says fall
+                    back to UTC WITH AN EXPLICIT UTC LABEL, never to a local
+                    guess. This says so rather than showing times that look
+                    local and are not. */}
+                {zoneUnset ? (
+                  <Text style={styles.todayZoneNote}>
+                    Times shown in UTC — confirm your zone on your open times board.
+                  </Text>
+                ) : null}
+                {todayVisits.map((v) => (
+                  <TodayTile
+                    key={v.engagement_id}
+                    visit={v}
+                    peerName={
+                      engagements.find((e) => e.id === v.engagement_id)?.peerName ?? null
+                    }
+                    tz={dayTz}
+                    onWrap={setWrapping}
+                    onChanged={() => {
+                      void refreshDay();
+                      void refresh();
+                    }}
+                  />
+                ))}
+              </View>
+            ) : null}
+
             <Text style={styles.sectionHeader}>Upcoming</Text>
             {upcoming.length === 0 ? (
               <Text style={styles.sectionEmpty}>Nothing upcoming.</Text>
@@ -497,6 +559,50 @@ export default function EngagementScreen() {
           </>
         )}
       </ScrollView>
+
+      {/* C4's other half: the conversations whose cadence has elapsed. A
+          PREDICATE evaluated when someone looks — nothing runs on a timer and
+          nothing is drafted. Tapping one opens the conversation; sending is the
+          ordinary post_message, and no copy here may imply otherwise. */}
+      {followups.length > 0 ? (
+        <View style={styles.followupBar}>
+          <Text style={styles.sectionHeader}>{FOLLOWUPS_DUE_HEADER}</Text>
+          {followups.map((f) => (
+            <Pressable
+              key={f.thread_id}
+              style={styles.followupRow}
+              onPress={() =>
+                navigation.navigate('PlexChat', {
+                  screen: 'Conversation',
+                  params: { threadId: f.thread_id },
+                })
+              }
+              accessibilityRole="button"
+            >
+              <Text style={styles.followupLabel}>
+                {peerNameForThread(f.thread_id) ?? 'Conversation'}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+
+      {/* THE WRAP IS A SHEET PUSHED FROM HERE (N-16, amending N-3). A
+          ninety-second wrap immediately after a visit must not send anyone two
+          taps away into the account sheet. */}
+      <WrapSheet
+        visit={wrapping}
+        peerName={
+          wrapping
+            ? (engagements.find((e) => e.id === wrapping.engagement_id)?.peerName ?? null)
+            : null
+        }
+        onClose={() => setWrapping(null)}
+        onWrapped={() => {
+          void refreshDay();
+          void refresh();
+        }}
+      />
     </View>
   );
 }
@@ -552,6 +658,20 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: theme.spacing.lg,
     flexGrow: 1,
+  },
+  todaySection: { marginBottom: theme.spacing.lg },
+  followupBar: {
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.hairline,
+    padding: theme.spacing.lg,
+    gap: theme.spacing.sm,
+  },
+  followupRow: { paddingVertical: theme.spacing.sm },
+  followupLabel: { ...theme.typography.body, color: theme.colors.accent },
+  todayZoneNote: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    marginBottom: theme.spacing.sm,
   },
   sectionHeader: {
     ...theme.typography.caption,
