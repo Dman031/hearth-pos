@@ -250,3 +250,16 @@ export function formatWallClock(hour: number, minute: number): string {
     timeZone: 'UTC',
   }).format(new Date(Date.UTC(2000, 0, 1, hour, minute)));
 }
+
+/**
+ * "25 Aug" — day then month, the order PLEXMED S6's time row is written in
+ * ("Video · Tue 25 Aug · 4:40 PM PDT"). Approved copy specifies the order, so
+ * it lives here rather than being composed differently at each display site.
+ */
+export function formatDayMonth(value: Date | string, tz: string = DEFAULT_TZ): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    timeZone: tz,
+  }).format(asDate(value));
+}

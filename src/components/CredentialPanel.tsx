@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { theme } from '../styles/theme';
 import { formatForDisplay } from '../datetime';
 import useEntity from '../hooks/useEntity';
@@ -46,6 +47,14 @@ interface CredentialPanelProps {
 }
 
 export default function CredentialPanel({ onClose }: CredentialPanelProps) {
+  // SAFE HERE, AND PROVEN: useNavigation throws only when BOTH NavigationContext
+  // and NavigationContainerRefContext are undefined (@react-navigation/core,
+  // useNavigation.tsx). NavigationContainer wraps the whole shell (App.tsx:79),
+  // so the container ref is always defined and the throw is unreachable. A
+  // header-rendered component gets the container ref rather than a screen's
+  // navigation prop — which supports navigate() to a root route, and 'Profile'
+  // is one (TabNavigator.tsx:90).
+  const navigation = useNavigation<{ navigate: (screen: string) => void }>();
   const { entity, refresh: refreshEntity } = useEntity();
   const { verifications, refresh: refreshVerifications } = useMyVerifications();
 
@@ -177,7 +186,15 @@ export default function CredentialPanel({ onClose }: CredentialPanelProps) {
           stamp.
         </Text>
         {detail.length > 0 ? <Text style={styles.detail}>{detail}</Text> : null}
-        <Pressable style={styles.primary} onPress={onClose} accessibilityRole="button">
+        <Pressable
+          style={styles.primary}
+          onPress={() => {
+            // Close the sheet FIRST — a modal left open would cover the tab.
+            onClose();
+            navigation.navigate('Profile');
+          }}
+          accessibilityRole="button"
+        >
           <Text style={styles.primaryLabel}>See my card</Text>
         </Pressable>
       </View>

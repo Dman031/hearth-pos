@@ -159,7 +159,7 @@ export default function AccountChip() {
                 ) : view === 'contacts' ? (
                   <ContactsPanel />
                 ) : view === 'settings' ? (
-                  <SettingsPanel />
+                  <SettingsPanel onDismiss={close} />
                 ) : view === 'credential' ? (
                   <CredentialPanel onClose={close} />
                 ) : (

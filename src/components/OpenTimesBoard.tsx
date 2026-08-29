@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { theme } from '../styles/theme';
 import {
   addDaysToKey,
@@ -39,9 +40,18 @@ import type { Card } from '../types/card';
 // device testing is deferred to the App Store pass, so a swipe bug would not
 // surface for weeks. Row-tap loses nothing the approved copy promises.
 //
-// NOTHING HERE NAVIGATES. This board renders inside the account sheet, whose
-// component tree has no navigation object proven available. Per N-8 the held
-// and booked rows NAME where their answer lives rather than jumping there.
+// THE HELD AND BOOKED ROWS NAVIGATE. useNavigation throws only when BOTH
+// NavigationContext and NavigationContainerRefContext are undefined
+// (@react-navigation/core, useNavigation.tsx); NavigationContainer wraps the
+// shell (App.tsx:79), so the container ref is always defined and the throw is
+// unreachable. A header-rendered component gets the container ref, which
+// supports navigate() to a root route. Two sessions of caution here were wrong.
+//
+// THE SHEET STILL NEVER NAMES THE PERSON. That request lives in Incoming, and
+// this row's job is to take the clinician there — not to answer it in place.
+//
+// CLOSE BEFORE NAVIGATING. This renders inside the account sheet's Modal; a
+// modal left open would cover the tab it just moved to.
 
 /** The zones the first-run confirm can offer as an alternative. */
 const ZONE_CHOICES = [
@@ -57,9 +67,12 @@ const ZONE_CHOICES = [
 interface OpenTimesBoardProps {
   card: Card;
   onBack: () => void;
+  /** Closes the whole account sheet, before a tab change. */
+  onDismiss?: () => void;
 }
 
-export default function OpenTimesBoard({ card, onBack }: OpenTimesBoardProps) {
+export default function OpenTimesBoard({ card, onBack, onDismiss }: OpenTimesBoardProps) {
+  const navigation = useNavigation<{ navigate: (screen: string) => void }>();
   const { entity, refresh: refreshEntity } = useEntity();
   const { verifications } = useMyVerifications();
 
@@ -131,17 +144,25 @@ export default function OpenTimesBoard({ card, onBack }: OpenTimesBoardProps) {
         Alert.alert(
           'Someone has asked for this time',
           'It is held for them until you answer. Answer in Incoming.',
-          [{ text: 'Close', style: 'cancel' }],
+          [
+            { text: 'Close', style: 'cancel' },
+            {
+              text: 'Go to Incoming',
+              onPress: () => {
+                onDismiss?.();
+                navigation.navigate('Incoming');
+              },
+            },
+          ],
         );
         return;
       }
 
+      // Booked-row tap opens the visit in Engagement (S5:120). The tab is as
+      // deep as this can go — Engagement has no per-visit route to target.
       if (slot.state === 'booked') {
-        Alert.alert(
-          'This time is booked',
-          'The visit is in your Engagement tab.',
-          [{ text: 'Close', style: 'cancel' }],
-        );
+        onDismiss?.();
+        navigation.navigate('Engagement');
         return;
       }
 
@@ -173,7 +194,7 @@ export default function OpenTimesBoard({ card, onBack }: OpenTimesBoardProps) {
         ],
       );
     },
-    [refresh, showToast],
+    [refresh, showToast, navigation, onDismiss],
   );
 
   const defaultModality: SlotModality = 'video';

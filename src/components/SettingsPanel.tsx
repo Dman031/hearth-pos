@@ -38,7 +38,13 @@ import type { Card } from '../types/card';
 // Default is ON and is never pre-set to off for a new account — a booking
 // confirmation nobody receives is the worse failure.
 
-export default function SettingsPanel() {
+interface SettingsPanelProps {
+  /** Closes the whole account sheet. The board needs it before navigating —
+   *  a modal left open would cover the tab it just moved to. */
+  onDismiss?: () => void;
+}
+
+export default function SettingsPanel({ onDismiss }: SettingsPanelProps) {
   const { entity, refresh } = useEntity();
   const { cards } = useCards();
   const [access, setAccess] = useState<ModuleAccess | null>(null);
@@ -95,7 +101,13 @@ export default function SettingsPanel() {
   );
 
   if (boardCard) {
-    return <OpenTimesBoard card={boardCard} onBack={() => setBoardCard(null)} />;
+    return (
+      <OpenTimesBoard
+        card={boardCard}
+        onBack={() => setBoardCard(null)}
+        onDismiss={onDismiss}
+      />
+    );
   }
 
   return (

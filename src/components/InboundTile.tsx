@@ -3,6 +3,8 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { theme, tileSurface } from '../styles/theme';
 import useCards from '../hooks/useCards';
 import { formatAcceptLabel, formatCents, KIND_LABEL } from '../utils/format';
+import ClinicalRequestTile from './ClinicalRequestTile';
+import type { PendingRequest } from '../services/inquiry';
 import type { Inbound } from '../types/inbound';
 
 // A single Incoming tile: the "knock". Kind-aware since Day 21 STOP 4: a
@@ -31,12 +33,26 @@ type Outcome = 'accepted' | 'declined';
 
 interface InboundTileProps {
   inbound: Inbound;
+  /** The chip/hold facts for a practice request, joined by inbound_id. Null
+   *  when the read failed or the request is not a practice one. */
+  pending?: PendingRequest | null;
+  /** The practice's stored zone — every clinical time carries it (VL-4). */
+  tz?: string;
+  /** Refetches the chips after this tile asks a question. */
+  onAsked?: () => void;
   // Returns a resolved promise on success; throws on failure (tile shows error).
   onAccept: (inbound: Inbound, body: string) => Promise<void>;
   onDecline: (inbound: Inbound) => Promise<void>;
 }
 
-export default function InboundTile({ inbound, onAccept, onDecline }: InboundTileProps) {
+export default function InboundTile({
+  inbound,
+  pending = null,
+  tz,
+  onAsked,
+  onAccept,
+  onDecline,
+}: InboundTileProps) {
   const { cards } = useCards();
   const [composing, setComposing] = useState<boolean>(false);
   const [body, setBody] = useState<string>('');
@@ -48,6 +64,11 @@ export default function InboundTile({ inbound, onAccept, onDecline }: InboundTil
   // it; no fetch. null for kind 'message' (card_id null) or a deleted card.
   const card = inbound.card_id ? (cards.find((c) => c.id === inbound.card_id) ?? null) : null;
   const isCommerce = inbound.kind === 'booking' || inbound.kind === 'order';
+  // REGISTRATION, NOT ANOTHER INLINE BRANCH (N-D). A request on a practice card
+  // is a different surface — chips, a hold deadline, a pre-decision
+  // conversation — and it is rendered by its own component. Each future
+  // vertical adds one of these rather than another arm of this switch.
+  const isClinical = card?.kind === 'practice';
   const priceCents = card?.price_cents ?? null;
   const currency = card?.price_currency ?? 'usd';
   const acceptLabel = formatAcceptLabel(inbound.kind, priceCents, currency);
@@ -77,6 +98,21 @@ export default function InboundTile({ inbound, onAccept, onDecline }: InboundTil
       setBusy(false);
     }
   };
+
+  if (isClinical) {
+    return (
+      <ClinicalRequestTile
+        inbound={inbound}
+        pending={pending}
+        priceCents={priceCents}
+        currency={currency}
+        tz={tz}
+        onAccept={onAccept}
+        onDecline={onDecline}
+        onAsked={onAsked ?? (() => {})}
+      />
+    );
+  }
 
   return (
     <View style={styles.tile}>

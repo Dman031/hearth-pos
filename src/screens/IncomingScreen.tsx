@@ -1,9 +1,11 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { theme } from '../styles/theme';
 import { supabase } from '../services/supabase';
 import useInbound from '../hooks/useInbound';
+import usePendingRequests from '../hooks/usePendingRequests';
+import useEntity from '../hooks/useEntity';
 import InboundTile from '../components/InboundTile';
 import type { Inbound } from '../types/inbound';
 
@@ -15,6 +17,18 @@ import type { Inbound } from '../types/inbound';
 export default function IncomingScreen() {
   const navigation = useNavigation<{ navigate: (screen: string, params?: object) => void }>();
   const { inbound, isLoading, error } = useInbound();
+  const { entity } = useEntity();
+
+  // THE TILE IS A TWO-SOURCE JOIN. Chips and the hold deadline come from
+  // get_my_pending_requests; the message and the requested time come from the
+  // inbound rows. Joined here on inbound_id, because widening either read to
+  // avoid the join is what S6-6 forbids — the pending read must not learn to
+  // return a name.
+  const threadIds = useMemo(
+    () => inbound.map((i) => i.thread_id).filter((t): t is string => t !== null),
+    [inbound],
+  );
+  const { byInboundId, refresh: refreshPending } = usePendingRequests(threadIds);
 
   const handleAccept = useCallback(
     async (item: Inbound, body: string) => {
@@ -80,7 +94,14 @@ export default function IncomingScreen() {
         data={inbound}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <InboundTile inbound={item} onAccept={handleAccept} onDecline={handleDecline} />
+          <InboundTile
+            inbound={item}
+            pending={byInboundId.get(item.id) ?? null}
+            tz={entity?.timezone ?? undefined}
+            onAsked={() => void refreshPending()}
+            onAccept={handleAccept}
+            onDecline={handleDecline}
+          />
         )}
         contentContainerStyle={styles.listContent}
       />
