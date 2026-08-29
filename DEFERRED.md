@@ -466,3 +466,23 @@ Cross-repo: spans hearth-pos (app download, caller verify, caller-as-new-owner) 
   (`src/services/storage.ts` + `src/hooks/useMediaUpload.ts`) for Day 14. Indeterminate
   "Uploading…" spinner (no % — supabase-js upload has no progress callback). Ops: apply
   `supabase/migrations/0002_card_media_storage.sql` (`supabase db push`).
+
+### CRED S3 S3→S4 elapsed timer is per-mount (logged 2026-08-28 — hearth-pos Session 1)
+- **Trigger: first clinician reports the timer resetting.** Until someone actually notices,
+  this is a cosmetic imprecision on a state that already behaves correctly.
+- **What is imprecise, exactly.** `CredentialPanel` flips S3 ("Checking with the board…") to
+  S4 ("Still checking…") after 45 seconds, measured from when THIS MOUNT first observed a
+  pending row — not from when the licence was submitted. Backgrounding the app and returning
+  restarts the count, so a clinician can see S3 again several minutes into a slow check.
+- **What is NOT broken, and is the part that matters.** The spec's actual requirement — that
+  S3/S4 survive backgrounding — is met: the OUTCOME is server-held and re-read by
+  `useMyVerifications`, and the screen is a viewer, never the driver. A restarted label never
+  loses or delays a result.
+- **Why it cannot simply be fixed today.** `get_my_verifications()` returns no `created_at`
+  (`src/types/verification.ts`), so there is no durable submission instant to measure from.
+  The honest fix is the network adding `created_at` to that RPC's column list — a status
+  column, so it does not widen the view in the sense R2 forbids. Until then, measuring from
+  mount is the only non-invented option; storing a submission timestamp client-side would
+  drift from the row it claims to describe.
+- **Adjacent and deliberately NOT deferred:** nothing about the polling cadence. That is the
+  spec's two-phase 5s/30s and is correct as built.

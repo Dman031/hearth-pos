@@ -2675,6 +2675,19 @@ vertical. These five rulings are the answer. They are canon; the specs bend to t
        the same column, which is the rule that holds everywhere else in this system
        (state-transition writes go through one canonical function).
 
+  N-9  SESSION 2 CARRIES THREE THINGS OUT OF SESSION 1, recorded so they are not rediscovered:
+       (a) get_my_credential_detail() — the N-6 migration. It lands in hearth-network BEFORE
+           any pos screen work in Session 2, because the S5 practice chip reads it and the S3
+           verified detail row is waiting on it. Session 1 shipped `verified {Mon YYYY}` with
+           the number OMITTED, which is the correct interim and not a bug to "fix" elsewhere.
+       (b) "See my card" (CRED S3 S5) currently only CLOSES the sheet. Wiring it to the
+           Profile tab needs useNavigation inside AccountChip — a component rendered in ALL
+           FOUR headers, so an unavailable navigation context there breaks every header at
+           once. That approach gets VERIFIED on its own before it is added, never bundled
+           blind into another change.
+       (c) The S3→S4 elapsed timer is per-mount and is DEFERRED, not owed (see DEFERRED.md,
+           trigger: first clinician reports the timer resetting).
+
   N-8  THE P0 GATE REFUSES AND POINTS; IT DOES NOT OPEN THE CEREMONY. Follows from N-1
        placing the ceremony in the account sheet: S5's P0 gate must NOT open a sheet from
        inside the card editor's sheet (no stacked modals, ProfileScreen.tsx:312). It refuses

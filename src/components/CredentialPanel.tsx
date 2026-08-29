@@ -262,9 +262,11 @@ export default function CredentialPanel({ onClose }: CredentialPanelProps) {
             again.
           </Text>
         ) : null}
-        {/* NOT SPEC COPY — flagged for ratification. The spec covers a malformed
-            number (S7a) and every server-side outcome (S6), but not a request
-            that never reached us. Saying nothing would be worse. */}
+        {/* S7d — RATIFIED 2026-08-28 as CRED S3 copy. The spec covered a
+            malformed number (S7a) and every server-side outcome (S6), but not a
+            request that never reached the server. This names what failed (the
+            send, not the licence), does not blame the clinician, and promises
+            nothing. Approved verbatim — do not paraphrase. */}
         {transportError ? (
           <Text style={styles.danger}>We couldn’t send that just now. Try again.</Text>
         ) : null}
