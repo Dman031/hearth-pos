@@ -2712,6 +2712,19 @@ vertical. These five rulings are the answer. They are canon; the specs bend to t
        licence detail row, and nothing in S1–S4 asks for it. Logged as DEFERRED in
        hearth-network with trigger "the honorific surfaces on a screen".
 
+  N-13 THERE IS NO slot_overlap ERROR — SPEC CORRECTED (2026-08-28). PLEXMED S5's error list
+       named `slot_overlap` alongside the raises. post_card_slots PRE-CHECKS overlap and
+       SKIPS-AND-COUNTS it (0038b:469-482); so does the unique-index conflict. An overlapping
+       time returns inside {posted, skipped} and surfaces as the spec's OWN partial-success
+       line — "Posted {n} times. {m} were already on your board."
+       card_slots_no_overlap (0038b:126-127) is a RACE BACKSTOP: it fires only on a concurrent
+       insert (SQLSTATE 23P01), and the honest outcome then is the SAME message. 23P01 is
+       classified and folded into "already on your board" — no eighth error state.
+       SAME DRIFT CLASS AS N-6-CORRECTED, and named as such deliberately: a spec table
+       describing behaviour the migration does not have. This is the second instance in two
+       days. The migration files are ground truth; a spec's contract or error table is a
+       snapshot and must be checked against the function before it is built to.
+
   N-10 A TIME INSIDE THE LEAD-TIME HOUR RENDERS GREYED, WITH NO LABEL. get_my_card_slots
        derives state 'past' at `starts_at <= now() + interval '60 minutes'` (0038b:598), so a
        5:40 time returns 'past' at 5:05. The STATE IS CORRECT — the lead-time rule makes it

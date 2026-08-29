@@ -486,3 +486,19 @@ Cross-repo: spans hearth-pos (app download, caller verify, caller-as-new-owner) 
   drift from the row it claims to describe.
 - **Adjacent and deliberately NOT deferred:** nothing about the polling cadence. That is the
   spec's two-phase 5s/30s and is correct as built.
+
+### P5 — the practice card's "up, but paused" banner on Profile (logged 2026-08-28 — Session 2b)
+- **Trigger: a clinician asks why their card is up but nobody can book.** Small follow-on, cut
+  from 2b deliberately rather than descoped silently.
+- **What it would be.** S5's P5: a banner on the practice card in the Profile list — *"Your
+  card is up, but paused / People can find you. Nobody can request a visit until you post open
+  times."* — pointing at Settings › PlexMed per N-8.
+- **Why it was cut.** S1's empty state already tells the same truth the moment the board is
+  opened (*"No open times. Your card is paused until you post some."*), so P5 is a second
+  telling, not the only one. Rendering it costs ProfileScreen — already the app's busiest, with
+  three sheets and two async reads — a THIRD async read (one `get_my_card_slots` per practice
+  card) for a banner that duplicates an existing state.
+- **What it needs when it fires:** a slot count per practice card on Profile, plus
+  `ProfileCard` gaining the banner. Two files, neither touched by 2b.
+- **Adjacent and NOT deferred:** the board's own empty state (S1) ships in 2b and is the
+  honest floor. Nothing about the card is silently paused with no explanation anywhere.
