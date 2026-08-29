@@ -2707,10 +2707,32 @@ vertical. These five rulings are the answer. They are canon; the specs bend to t
        shapes. This is an RPC-RESULT type, and nothing swept those. Session 0's sweep was
        correct and incomplete — the same widening discipline owes a pass over RPC results.
 
+       PROMOTED TO CLAUDE.md RULE ON 2026-08-28 (SPEC-CONTRACT RULE), with N-13 and S6's
+       modality gap as the other instances.
+
        credential_class STAYS UNEXPOSED. It is on the table (0036 §2, 'doctoral' | 'other')
        and no RPC returns it. That is the honorific entitlement, a DIFFERENT need from the
        licence detail row, and nothing in S1–S4 asks for it. Logged as DEFERRED in
        hearth-network with trigger "the honorific surfaces on a screen".
+
+  N-15 SPEC-CONTRACT RULE PROMOTED (2026-08-28). A spec's rendered example may only use
+       columns its own data contract returns; a mismatch is a SPEC DEFECT to report, never a
+       read to widen. Written into BOTH CLAUDE.md files — hearth-pos's as a consumer rule
+       (report and omit), hearth-network's as an author rule (cite the migration a contract
+       table is true at, and check every example against the returns block before emitting).
+       FOUR INSTANCES, and the pattern in all four is the same: a contract copied from a
+       migration at one moment, examples written from intent, and nobody comparing them again.
+         (a) CRED S3's contract table, frozen at 0035 — N-6-CORRECTED.
+         (b) PLEXMED S5's error list, naming a raise that does not exist — N-13.
+         (c) PLEXMED S6's time row, rendering a modality no read returns — shipped omitted.
+         (d) PLEXMED S7's A3 identity chip, which has NO SOURCE AT ALL: get_my_day returns no
+             verification flag and neither does get_my_thread_peers. Found by the promotion
+             sweep BEFORE Session 4 rather than during it, which is the rule working.
+       ALL FOUR WERE FOUND AT BUILD OR SWEEP TIME BY AN AGENT, none at design time. That is
+       the fact that made this a rule rather than a habit.
+       SWEEP: all four specs in hearth-network/docs/ checked against their migrations
+       2026-08-28. One further benign case — S7 A2's derived state names cancelled_at, which
+       get_my_day does not return; status = 'cancelled' covers it, so nothing is owed.
 
   N-14 THE ADD-TIMES GRID HAS NO HOUR WINDOW — A FULL 24 HOURS (2026-08-28).
        Session 2b shipped a 07:00–21:00 grid as a flagged screen choice (the spec says "a
@@ -2745,6 +2767,7 @@ vertical. These five rulings are the answer. They are canon; the specs bend to t
        describing behaviour the migration does not have. This is the second instance in two
        days. The migration files are ground truth; a spec's contract or error table is a
        snapshot and must be checked against the function before it is built to.
+       PROMOTED TO CLAUDE.md RULE ON 2026-08-28 (SPEC-CONTRACT RULE).
 
   N-10 A TIME INSIDE THE LEAD-TIME HOUR RENDERS GREYED, WITH NO LABEL. get_my_card_slots
        derives state 'past' at `starts_at <= now() + interval '60 minutes'` (0038b:598), so a

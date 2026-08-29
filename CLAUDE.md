@@ -228,6 +228,54 @@ Every business rule stated in the system prompt MUST also be enforced in code at
 
 For actions with side-effects (profile writes, payment, template selection, transaction recording), force `tool_choice: { type: 'tool', name: '<tool>' }` from middleware-detected intent rather than relying on voluntary tool selection. Pair with explicit trigger phrases in the system prompt using emphatic language (MUST / NEVER / ALWAYS / CRITICAL). After each model response, validate that any side-effect-claiming text corresponds to an actually-called tool; block the response if it claims an action no tool performed.
 
+**SPEC-CONTRACT RULE — MANDATORY**
+
+A spec's rendered example may only use columns its own data contract returns. A mismatch is a
+SPEC DEFECT to report, never a read to widen.
+
+Specs carry two halves: a data contract (the RPC and its columns) and rendered examples (a
+detail row, a chip, a time row, an error list). The halves drift, because the contract is
+copied from a migration at one moment and the examples are written from intent. When they
+disagree, the migration is right — canon rule 1 — and the correct move is to REPORT and OMIT:
+render the parts that have a source, leave the rest out, and raise the spec defect. Widening
+the read to satisfy the example is forbidden: those reads are usually narrow by ruling (S6-6,
+R2), and "the screen needed it" is exactly the pressure those rulings exist to resist. Never
+substitute a plausible value for a missing column either — an invented `Video` on the row a
+clinician decides from is a placeholder in the worst possible place.
+
+CHECK AT STEP 1, NOT AT BUILD TIME. For every RPC a session will call:
+
+```bash
+# the true contract — what the function actually returns
+sed -n '/create or replace function public.<fn>/,/) language/p' ../hearth-network/migrations/*.sql
+# every spec that renders from it
+grep -rn "Detail row:\|Time row:\|Hold row:\|chip\|Errors surface" ../hearth-network/docs/*_SPEC.md
+```
+
+Compare column by column. A rendered example naming a column absent from the `returns table`
+block is the defect.
+
+EVIDENCE — four instances, ALL found at build or sweep time by an agent rather than at design
+time, which is why this is a rule and not a habit:
+
+- **CRED S3's data-contract table** was frozen at migration `0035` and never updated when
+  `0036` widened `get_my_verifications` to eleven columns. The app's type file mirrored the
+  SPEC rather than the database, so the two agreed with each other while both disagreed with
+  the live schema. A session was nearly spent building an RPC for a column that already
+  existed. (DEUS_DAY_BY_DAY.md N-6-CORRECTED.)
+- **PLEXMED S5's error list** named a `slot_overlap` raise. `post_card_slots` pre-checks
+  overlap and skips-and-counts it; it never raises. (N-13.)
+- **PLEXMED S6's time row** renders `Video · Tue 25 Aug · 4:40 PM PDT`. Neither `inbound` nor
+  `get_my_pending_requests` carries modality, and that column list is ruling S6-6. Shipped with
+  the modality omitted.
+- **PLEXMED S7's A3 identity chip** says it renders "exactly as on Incoming". `get_my_day`
+  returns no verification flag and neither does `get_my_thread_peers`, so on Today the chip has
+  no source at all.
+
+SWEEP PERFORMED 2026-08-28 across all four specs in `hearth-network/docs/` against their
+migrations; the four above are the complete result, plus one benign case (S7 A2's derivation
+names `cancelled_at`, which `get_my_day` does not return — `status = 'cancelled'` covers it).
+
 **DATE/TIME DISPLAY RULE — MANDATORY**
 
 All vendor-facing and admin-facing date formatting MUST go through `src/datetime.ts`. Never use raw `toLocaleDateString()`, `toLocaleString()`, date-fns `format()` without TZ, or inline timezone math at display sites.
