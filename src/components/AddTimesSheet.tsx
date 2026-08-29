@@ -33,14 +33,27 @@ import { MODALITY_LABEL, SESSION_LENGTHS } from '../services/practice';
 // EngagementCalendar already established that this app builds its own rather
 // than take a dependency for a surface whose styling is bespoke anyway.
 //
-// THE HOUR WINDOW IS NOT RULED. The spec shows a chip grid "of the day" without
-// naming its bounds. 07:00–21:00 is this screen's choice, wide enough not to
-// exclude a real practice and narrow enough to stay scannable. It claims
-// nothing about the clinician's hours: it is the range OFFERED, not a range
-// asserted anywhere a patient can see.
+// THE GRID IS A FULL 24 HOURS, AND THERE IS NO WINDOW (ruling N-14).
+// An earlier draft offered 07:00–21:00. That is a working-day assumption, and
+// it quietly tells a night-shift doctor, a clinician serving another timezone,
+// and anyone doing early mornings that this product is not for them. The grid
+// offers every hour; which of them a clinician works is their business.
+//
+// A SLOT MAY CROSS MIDNIGHT. Starts run to 23:xx and the end is simply
+// start + length, so a 23:30 start ends at 00:15 the next day. Cutting the last
+// starts off at midnight would be the same working-day assumption in a smaller
+// disguise.
+//
+// THE ONLY CONSTRAINTS ARE THE RULED ONES, both enforced server-side and both
+// mirrored here for fast feedback, never as the guarantee: at least 60 minutes
+// out (VL-2), and no overlap with a time already on the board.
+//
+// SHAPE: a flat wrapping grid inside the existing scroll. Going from 14 hours
+// to 24 adds ten to nineteen chips depending on length — 24 at 60 min, 32 at
+// 45, 48 at 30. That is a longer scroll, not a different component, so no new
+// layout was invented for it.
 
-const GRID_START_HOUR = 7;
-const GRID_END_HOUR = 21;
+const MINUTES_IN_DAY = 24 * 60;
 /** How many days forward the chooser offers. Today plus three weeks. */
 const CHOOSER_DAYS = 22;
 /** Nothing inside this window can be posted (VL-2, enforced server-side too). */
@@ -96,7 +109,7 @@ export default function AddTimesSheet({
   /** The day's chip grid, in the chosen length. `hh:mm` keys. */
   const gridTimes = useMemo(() => {
     const out: { key: string; hour: number; minute: number; label: string }[] = [];
-    for (let m = GRID_START_HOUR * 60; m + minutes <= GRID_END_HOUR * 60; m += minutes) {
+    for (let m = 0; m < MINUTES_IN_DAY; m += minutes) {
       const hour = Math.floor(m / 60);
       const minute = m % 60;
       out.push({

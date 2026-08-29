@@ -2712,6 +2712,27 @@ vertical. These five rulings are the answer. They are canon; the specs bend to t
        licence detail row, and nothing in S1–S4 asks for it. Logged as DEFERRED in
        hearth-network with trigger "the honorific surfaces on a screen".
 
+  N-14 THE ADD-TIMES GRID HAS NO HOUR WINDOW — A FULL 24 HOURS (2026-08-28).
+       Session 2b shipped a 07:00–21:00 grid as a flagged screen choice (the spec says "a
+       chip grid of the day" and names no bounds). OVERTURNED before it settled, and recorded
+       here as the rule rather than as a reversal: it was never a ruling, it was a default
+       nobody had ruled on, which is exactly the kind of choice that hardens if it is not
+       caught.
+       WHY THE WINDOW WAS WRONG. It is a working-day assumption wearing a UI. A night-shift
+       doctor, a clinician serving another timezone, and anyone doing early mornings all
+       exist, and a grid that starts at 07:00 quietly tells all three that this product is not
+       for them. The grid is not a statement about when medicine happens.
+       A SLOT MAY CROSS MIDNIGHT. Starts run to 23:xx and the end is start + length, so 23:30
+       at 45 minutes ends at 00:15. Truncating the last starts at midnight would be the same
+       assumption in a smaller disguise.
+       THE ONLY CONSTRAINTS ON A TIME ARE THE ONES ALREADY RULED, both enforced server-side:
+       at least 60 minutes out (VL-2), and no overlap with a time already on the board.
+       Everything else is the clinician's business. The client mirrors both for fast feedback
+       and neither as the guarantee (PROMPT-CODE CONTRACT).
+       SHAPE: unchanged. A flat wrapping grid inside the existing scroll — 24 chips at 60
+       minutes, 32 at 45, 48 at 30. Ten to nineteen more chips is a longer scroll, not a
+       different component, so no new layout was invented and none was needed.
+
   N-13 THERE IS NO slot_overlap ERROR — SPEC CORRECTED (2026-08-28). PLEXMED S5's error list
        named `slot_overlap` alongside the raises. post_card_slots PRE-CHECKS overlap and
        SKIPS-AND-COUNTS it (0038b:469-482); so does the unique-index conflict. An overlapping
