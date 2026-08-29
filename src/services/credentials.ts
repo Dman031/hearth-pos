@@ -174,10 +174,11 @@ export async function requestCredentialVerification(
 }
 
 /**
- * Reads the owner's verification receipts via get_my_verifications() (0035),
- * newest first. Status columns only — scoped server-side to
- * current_entity_id(). Returns an Error rather than throwing so the polling
- * hook can surface it without unmounting.
+ * Reads the owner's verification receipts via get_my_verifications(), newest
+ * first — ELEVEN columns per 0036 SECTION 1, scoped server-side to
+ * current_entity_id(). `snapshot` is never selected and is structurally
+ * unreachable. Returns an Error rather than throwing so the polling hook can
+ * surface it without unmounting.
  */
 export async function fetchMyVerifications(): Promise<
   { ok: true; verifications: Verification[] } | { ok: false; error: Error }
@@ -187,4 +188,37 @@ export async function fetchMyVerifications(): Promise<
     return { ok: false, error: toError(error, 'load verifications') };
   }
   return { ok: true, verifications: (data ?? []) as Verification[] };
+}
+
+/** The state and number carried inside a licence row's `registry_ref`. */
+export interface LicenceRef {
+  /** Two-letter state, e.g. 'OR'. Feeds PLEXMED S5's `{ST} license` chip. */
+  state: string;
+  /** The board slug — INTERNAL. Never rendered: discipline rule 7 makes the
+   *  user-facing string "the Oregon licensing board", never the initials. */
+  board: string;
+  /** The licence number as issued. Feeds CRED S3's S5 detail row. */
+  number: string;
+}
+
+/**
+ * Parses a licence row's `registry_ref`, which the database constrains to
+ * '<ST>:<board>:<NUMBER>' (0035:90, verifications_license_ref_qualified).
+ *
+ * ONE column carries both the state and the number, which is why no second RPC
+ * exists to fetch them (DEUS_DAY_BY_DAY.md N-6-CORRECTED). Lives here rather
+ * than at a display site so the two screens that need it — this flow's verified
+ * state and S5's practice chip — cannot parse it two different ways.
+ *
+ * Returns null for a non-licence ref or a shape the constraint would reject.
+ * Callers OMIT the detail on null; they never fall back to a placeholder.
+ */
+export function parseLicenceRef(registryRef: string | null | undefined): LicenceRef | null {
+  if (!registryRef) return null;
+  const parts = registryRef.split(':');
+  if (parts.length !== 3) return null;
+  const [state, board, number] = parts;
+  if (!/^[A-Z]{2}$/.test(state)) return null;
+  if (board.length === 0 || number.length === 0) return null;
+  return { state, board, number };
 }

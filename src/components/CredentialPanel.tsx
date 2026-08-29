@@ -5,6 +5,7 @@ import { formatForDisplay } from '../datetime';
 import useEntity from '../hooks/useEntity';
 import useMyVerifications from '../hooks/useMyVerifications';
 import {
+  parseLicenceRef,
   requestCredentialVerification,
   type CredentialBoard,
   type CredentialRequestStatus,
@@ -149,15 +150,24 @@ export default function CredentialPanel({ onClose }: CredentialPanelProps) {
 
   // ─── S5 · verified ────────────────────────────────────────────────────────
   if (status === 'verified') {
-    // N-6: the licence NUMBER is deliberately absent. get_my_verifications is a
-    // status view and is not widened; the number arrives in Session 2 via
-    // get_my_credential_detail(). An omission, never an invented source.
+    // The detail row, built from parts so a missing one drops its clause rather
+    // than printing an empty label. The NUMBER comes from registry_ref, which
+    // 0036 already returns — see N-6-CORRECTED; there is no second RPC for it.
+    // An unparseable ref omits the licence clause; it never invents a number.
+    const licence = parseLicenceRef(licenceRow?.registry_ref);
     const verifiedAt = licenceRow?.checked_at
       ? formatForDisplay(licenceRow.checked_at, 'monthYear')
       : null;
     const renewsAt = licenceRow?.expires_at
       ? formatForDisplay(licenceRow.expires_at, 'monthYear')
       : null;
+    const detail = [
+      licence ? `License ${licence.number}` : null,
+      verifiedAt ? `verified ${verifiedAt}` : null,
+      renewsAt ? `renews ${renewsAt}` : null,
+    ]
+      .filter((part): part is string => part !== null)
+      .join(' · ');
     return (
       <View style={styles.block}>
         <Text style={styles.check}>✓</Text>
@@ -166,12 +176,7 @@ export default function CredentialPanel({ onClose }: CredentialPanelProps) {
           Your license is verified with the Oregon licensing board. Your cards now carry the
           stamp.
         </Text>
-        {verifiedAt ? (
-          <Text style={styles.detail}>
-            {`verified ${verifiedAt}`}
-            {renewsAt ? ` · renews ${renewsAt}` : ''}
-          </Text>
-        ) : null}
+        {detail.length > 0 ? <Text style={styles.detail}>{detail}</Text> : null}
         <Pressable style={styles.primary} onPress={onClose} accessibilityRole="button">
           <Text style={styles.primaryLabel}>See my card</Text>
         </Pressable>

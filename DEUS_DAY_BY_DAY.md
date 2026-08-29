@@ -2675,11 +2675,48 @@ vertical. These five rulings are the answer. They are canon; the specs bend to t
        the same column, which is the rule that holds everywhere else in this system
        (state-transition writes go through one canonical function).
 
+  N-6-CORRECTED  (2026-08-28) — N-6 WAS WRONG AND IS SUPERSEDED. NO MIGRATION IS OWED.
+       N-6 ruled that get_my_verifications "is NOT widened — a status view stays a status
+       view", and that a new self-scoped RPC (get_my_credential_detail) should return
+       registry_ref. BOTH HALVES ARE FALSE AGAINST THE DATABASE: migration 0036 SECTION 1
+       already DROPPED and recreated get_my_verifications with ELEVEN columns, `source` and
+       `registry_ref` among them, under the same reasoning N-6 later gave as if it were new
+       — "the OWNER's own data, read under their own session". 0036 is in the ledger.
+       A SECOND RPC WOULD BE A SECOND READ PATH for a column already exposed, which is the
+       drift the single-source rule exists to prevent. Option C rejected; no 0045 is written.
+       WHAT WAS ALREADY REACHABLE, and is what the specs asked for: registry_ref on a licence
+       is '<ST>:<board>:<NUMBER>' (0035:90, verifications_license_ref_qualified). ONE column
+       carries both the state that S5's P1 chip needs and the number that CRED S3's S5 detail
+       row needs. Session 1's omission of the number was unnecessary and is now closed.
+
+       THE CAUSE, STATED PLAINLY SO IT IS NOT REPEATED — DOCUMENTATION CROSS-VALIDATING
+       DOCUMENTATION. Three artifacts agreed with each other and none of them agreed with the
+       live schema:
+         (i)   CRED_S3_COLD_FLOW_SPEC.md's data-contract table was frozen at 0035, headed
+               "already shipped, migration 0035", and listed nine columns. It was never
+               updated when 0036 landed.
+         (ii)  hearth-pos src/types/verification.ts mirrored THE SPEC rather than the
+               database, so it inherited the same nine columns.
+         (iii) Every reading of the contract then checked one against the other and found
+               agreement — which proved only that they were copied from a common ancestor.
+       THE RULE THAT FOLLOWS: THE MIGRATION FILES ARE GROUND TRUTH (canon rule 1). A spec's
+       contract table is a SNAPSHOT, never the contract, and must cite the migration number
+       it was true at so a reader can tell whether it has since moved. A type file mirrors
+       THE DATABASE, never a document about the database.
+       WHY SESSION 0'S SWEEP DID NOT CATCH IT: that pass swept TABLE types against live table
+       shapes. This is an RPC-RESULT type, and nothing swept those. Session 0's sweep was
+       correct and incomplete — the same widening discipline owes a pass over RPC results.
+
+       credential_class STAYS UNEXPOSED. It is on the table (0036 §2, 'doctoral' | 'other')
+       and no RPC returns it. That is the honorific entitlement, a DIFFERENT need from the
+       licence detail row, and nothing in S1–S4 asks for it. Logged as DEFERRED in
+       hearth-network with trigger "the honorific surfaces on a screen".
+
   N-9  SESSION 2 CARRIES THREE THINGS OUT OF SESSION 1, recorded so they are not rediscovered:
-       (a) get_my_credential_detail() — the N-6 migration. It lands in hearth-network BEFORE
-           any pos screen work in Session 2, because the S5 practice chip reads it and the S3
-           verified detail row is waiting on it. Session 1 shipped `verified {Mon YYYY}` with
-           the number OMITTED, which is the correct interim and not a bug to "fix" elsewhere.
+       (a) SUPERSEDED by N-6-CORRECTED — there is no get_my_credential_detail() and no
+           migration. registry_ref was already on get_my_verifications from 0036; the S5
+           practice chip and the S3 detail row both read it. Session 1's omission of the
+           number was closed the same day.
        (b) "See my card" (CRED S3 S5) currently only CLOSES the sheet. Wiring it to the
            Profile tab needs useNavigation inside AccountChip — a component rendered in ALL
            FOUR headers, so an unavailable navigation context there breaks every header at

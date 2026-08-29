@@ -1,13 +1,22 @@
 /**
- * Verification — one row of get_my_verifications() (hearth-network migration
- * 0035). Shape is authoritative per that migration. Do NOT add app-only
- * fields — derive display state in hooks/components.
+ * Verification — one row of get_my_verifications(). Shape is authoritative per
+ * hearth-network migration **0036 SECTION 1**, which DROPPED and recreated the
+ * function with eleven columns. Do NOT add app-only fields — derive display
+ * state in hooks/components.
  *
- * The helper is owner-scoped server-side (current_entity_id()) and returns
- * STATUS COLUMNS ONLY. The `snapshot` column — the verbatim primary-source
- * payload — is deliberately absent and structurally unreachable:
- * public.verifications has RLS enabled with NO select policy, so there is no
- * client read path to it at all. Never add it here.
+ * MIRROR THE DATABASE, NEVER A DOCUMENT ABOUT IT. This file previously mirrored
+ * the CRED S3 spec's contract table, which was frozen at 0035; the two then
+ * agreed with each other while both disagreed with the live schema, and a
+ * session was nearly spent building an RPC for a column that already existed.
+ * See DEUS_DAY_BY_DAY.md N-6-CORRECTED. When this shape is in doubt, read the
+ * migration, not the spec.
+ *
+ * The helper is owner-scoped server-side (current_entity_id()). The `snapshot`
+ * column — the verbatim primary-source payload — is deliberately absent and
+ * structurally unreachable: public.verifications has RLS enabled with NO select
+ * policy, so there is no client read path to it at all. Never add it here.
+ * `credential_class` is on the table and deliberately NOT returned — it is the
+ * honorific entitlement, a different need; do not add it here either.
  *
  * status:
  *   pending       — the row is queued; the ceremony drains it (~1 min).
@@ -42,6 +51,15 @@ export type VerificationMethod = 'psv_api' | 'concordance' | 'manual_fallback';
 export interface Verification {
   id: string;
   type: VerificationType;
+  /** nppes | oig | state_board:<ST>:<board> | vendor:<name>. NEVER rendered to
+   *  a vendor — the user-facing string is "the Oregon licensing board", never
+   *  the board's initials and never a vendor name (discipline rule 7). */
+  source: string;
+  /** npi: the 10 digits · license: '<ST>:<board>:<NUMBER>' · exclusions: the
+   *  checked NPI or 'name' · identity: the Stripe vs_ id. The owner's own data,
+   *  read under their own session. Parse a licence with parseLicenceRef()
+   *  (services/credentials.ts) rather than splitting it at a display site. */
+  registry_ref: string;
   status: VerificationStatus;
   method: VerificationMethod;
   checked_at: string | null;
