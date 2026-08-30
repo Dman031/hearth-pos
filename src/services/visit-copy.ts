@@ -123,6 +123,15 @@ export const WRAP_FOOTER =
 // own words and POINTS AT THE CREDENTIAL SURFACE, because it is the one skip
 // they can fix.
 //
+// EVERYTHING ELSE IN THIS SECTION IS ALSO RATIFIED (2026-08-30): the button
+// labels, the alert strings and the toasts, as written. NOTHING BELOW IS
+// PROVISIONAL — including the sent+omission hint, whose ratified wording said
+// "then send it again" and was changed here because 0045:254-259 makes a 'sent'
+// row a no-op, so the approved line instructed a clinician to do something the
+// code refuses. Ratified copy that promises an action the code declines is a
+// defect in the copy; the change was signed off on that reasoning. Same rule as
+// the rest of this file: approved as written, and a screen may not paraphrase.
+//
 // AN OMISSION IS NOT A SKIP (S10-9; 0045:144-147). `superbill_object_missing`
 // and `superbill_lookup_failed` ride on a row whose status is 'sent' — the
 // record moved and one part of it did not. Rendering either as "Not sent"
