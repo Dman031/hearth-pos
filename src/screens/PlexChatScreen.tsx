@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Linking,
@@ -23,6 +24,8 @@ import useContacts from '../hooks/useContacts';
 import ConversationBubble from '../components/ConversationBubble';
 import MessageComposer from '../components/MessageComposer';
 import ThreadDecisionBanner from '../components/ThreadDecisionBanner';
+import { signedSuperbillUrl } from '../services/superbill';
+import { SUPERBILL_LINK_FAILED, SUPERBILL_OPEN, SUPERBILL_OPEN_FAILED } from '../services/visit-copy';
 import type { Message } from '../types/message';
 
 // PlexChatScreen — the conversation that follows an accepted knock. 16b item 1
@@ -48,7 +51,11 @@ interface PendingMessage {
 
 type Row =
   | { kind: 'message'; key: string; body: string; mine: boolean }
-  | { kind: 'system'; key: string; body: string; url: string | null }
+  // `path` is the SUPERBILL row's storage path, from the message payload
+  // (0042:139-146). It is mutually exclusive with `url` in practice: the room
+  // link's URL is in the BODY, the superbill's pointer is in the PAYLOAD, and
+  // neither message carries the other's shape.
+  | { kind: 'system'; key: string; body: string; url: string | null; path: string | null }
   | { kind: 'pending'; key: string; tempId: string; body: string; status: 'sending' | 'failed' };
 
 // Header-right "Add to contacts": saves the OTHER participant to the owner's
@@ -261,6 +268,29 @@ export default function PlexChatScreen() {
     [pending, findCanonicalTwin, doSend],
   );
 
+  /**
+   * Opens an issued superbill from the path in its message payload.
+   *
+   * A FRESH LINK EVERY TAP. Nothing is cached and no countdown is shown: the
+   * 600-second expiry is the link's, not the document's, and minting per tap is
+   * what makes it a detail nobody meets (0042:134-138).
+   *
+   * TAP-OUT — the OS renders the PDF and its own share sheet and "Save to
+   * Files" are the platform's. This app ships no viewer and no download.
+   */
+  const openSuperbill = useCallback(async (storagePath: string) => {
+    const url = await signedSuperbillUrl(storagePath);
+    if (!url) {
+      Alert.alert('Couldn’t open that', SUPERBILL_LINK_FAILED);
+      return;
+    }
+    if (!(await Linking.canOpenURL(url))) {
+      Alert.alert('Couldn’t open that', SUPERBILL_OPEN_FAILED);
+      return;
+    }
+    await Linking.openURL(url);
+  }, []);
+
   // The list (no threadId) is a sibling Stack screen now; this screen is always
   // mounted with a threadId. Defensive guard only.
   if (!threadId) return null;
@@ -291,6 +321,7 @@ export default function PlexChatScreen() {
             key: m.id,
             body: m.body,
             url: extractUrl(m.body),
+            path: superbillPath(m),
           }
         : {
             kind: 'message' as const,
@@ -310,6 +341,28 @@ export default function PlexChatScreen() {
 
   const renderRow = ({ item }: { item: Row }) => {
     if (item.kind === 'system') {
+      // THE SUPERBILL ROW. Until this branch existed the announcement rendered
+      // as inert grey text: `payload` was never read and extractUrl found
+      // nothing, because the body deliberately carries no URL. A message saying
+      // a document is ready, with no way to open it, is worse than no message.
+      //
+      // THE LINK IS MINTED PER TAP AND NEVER STORED. A signed URL lives 600
+      // seconds and a message lives forever, which is exactly why the payload
+      // carries the PATH (0042:134-138). Both participants may open it —
+      // pos-0005 scopes the read to either side of the engagement.
+      if (item.path) {
+        const path = item.path;
+        return (
+          <Pressable
+            style={styles.systemRow}
+            onPress={() => void openSuperbill(path)}
+            accessibilityRole="link"
+          >
+            <Text style={styles.systemText}>{item.body}</Text>
+            <Text style={styles.systemAction}>{SUPERBILL_OPEN}</Text>
+          </Pressable>
+        );
+      }
       // Not a bubble, and attributed to nobody. A link row when it carries one
       // — the room link's URL lives in the BODY, not the payload (0041).
       if (item.url) {
@@ -399,6 +452,25 @@ function extractUrl(body: string): string | null {
   return /https?:\/\/[^\s]+/.exec(body)?.[0] ?? null;
 }
 
+/**
+ * The storage path on a `superbill` message, or null.
+ *
+ * GATED ON kind, NOT ON THE PRESENCE OF A PATH. Any future payload that happens
+ * to carry a `storage_path` would otherwise render as a superbill link, which is
+ * the kind of accident a closed check prevents and an open one invites.
+ */
+function superbillPath(m: Message): string | null {
+  if (m.kind !== 'superbill') return null;
+  const path = (m.payload ?? {}).storage_path;
+  if (typeof path !== 'string' || path.length === 0) {
+    // The row exists and its pointer does not — say nothing rather than render
+    // a tap that cannot work. Logged, never silent.
+    console.warn('[PlexChat] superbill message with no storage_path', { messageId: m.id });
+    return null;
+  }
+  return path;
+}
+
 const styles = StyleSheet.create({
   // System rows are NOT bubbles. A bubble on either side is an authorship
   // claim, and origin='system' means nobody wrote it.
@@ -417,6 +489,15 @@ const styles = StyleSheet.create({
     ...theme.typography.bodyMuted,
     color: theme.colors.textSecondary,
     textAlign: 'center',
+  },
+  // The affordance on a document row. Said out loud rather than implied by a
+  // tint: a system row is not a bubble and carries no other tap cue.
+  systemAction: {
+    ...theme.typography.caption,
+    color: theme.colors.accent,
+    fontFamily: theme.fonts.semiBold,
+    textAlign: 'center',
+    marginTop: theme.spacing.xs,
   },
   flex: {
     flex: 1,

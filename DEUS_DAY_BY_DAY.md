@@ -3014,3 +3014,30 @@ S10-18 A FIFTH REFUSAL: no_practitioner_identifier (ratified 2026-08-29, after t
     and a refusal that gates who may appear in it is the same kind of decision. NO MIGRATION
     IS OWED: 0045 carries skipped_reason's vocabulary by comment rather than CHECK (0043's
     posture), precisely so a refusal learned at build time does not need one.
+
+S10-19 (S10-BAA, ENFORCED) THE MEDPLUM SECRETS ARE UNSET UNTIL THE BAA SIGNS. Ruled
+    2026-08-30 on the POS TAP session's finding, which is the reason and is recorded as given:
+    `npx wrangler secret list` shows MEDPLUM_CLIENT_ID and MEDPLUM_CLIENT_SECRET LIVE on the
+    deployed Worker. So resolveFhirProvider returns a provider, sweepEhrPushes does NOT return
+    'no_provider', and S10-4's synthetic-only gate was enforced by EXACTLY ONE THING: the
+    absence of a caller — which is the thing that session builds.
+    DERRICK'S REASONING, RECORDED AS GIVEN: "A compliance gate belongs where the credential is.
+    The drain returns no_provider before a query, rows pend, and they drain when the secrets
+    return."
+    THE GATE IS NOT A SCREEN, and that is the load-bearing half. queue_ehr_push is granted to
+    `authenticated` (0045:276), so a PostgREST call from any seller session bypasses every
+    affordance the app could hide — a disabled button is the PROMPT-CODE CONTRACT rule's
+    "suggestion", and the disclosure it would fail to prevent is a patient's name and date of
+    birth to a third party with no agreement in place.
+    ACTION: `npx wrangler secret delete MEDPLUM_CLIENT_ID` and the same for
+    MEDPLUM_CLIENT_SECRET, run by hand. NOTHING IS LOST BY UNSETTING THEM — medplum.ts:12-14
+    designed for exactly this state: not an error, not logged as one, costs nothing per tick.
+    Queued rows sit at 'pending' and drain on the first tick after the secrets return.
+    VERIFY RUNS SET THEM LOCALLY. scripts/verify-fhir-push.mjs PART 7 is opt-in and synthetic by
+    construction (:77, :253, :275); it reads no row from the database to build its fixtures, so
+    a local re-set of the two keys never puts a real patient anywhere near api.medplum.com.
+    THE APP SAYS SO HONESTLY RATHER THAN HIDING THE TAP. With the secrets unset the status row
+    reads "Waiting to send", which is what get_my_ehr_pushes actually returns and needs no
+    special case. The tap is NOT hidden: an affordance that vanishes and a feature that does not
+    exist look alike, which is the failure mode the room row is already ruled against
+    (TodayTile.tsx:32-35). App copy is additive; the secret is the gate.

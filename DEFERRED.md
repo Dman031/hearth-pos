@@ -524,6 +524,11 @@ Cross-repo: spans hearth-pos (app download, caller verify, caller-as-new-owner) 
   A clinician can always see when a hold runs out; what is deferred is only what happens after.
 
 ### S8 — the superbill has NO CALLER IN THE APP (logged 2026-08-29 — found during PLEXMED S10-INVESTIGATE)
+- **TRIGGER FIRED, AND BUILT — 2026-08-30, the POS TAP session.** `src/services/superbill.ts`
+  invokes the function with the clinician's own session; the affordance is on the wrapped
+  TodayTile; the four refusals render BY MESSAGE. The S10 push tap shipped in the same commit,
+  as ruled. A fired trigger gets a home, never left fired — the residual surface question is
+  its own entry below ("the Past list").
 - **Trigger: THE POS SESSION THAT CARRIES THE S10 TAP.** Ruled 2026-08-29. Both affordances
   land in the same place, in the same session, and NEITHER SHIPS WITHOUT THE OTHER.
 - **What is missing.** `supabase/functions/superbill/` is built, deployed and verified live
@@ -554,3 +559,44 @@ Cross-repo: spans hearth-pos (app download, caller verify, caller-as-new-owner) 
   DISCIPLINE rule's first clause, which was written about this exact function).
 - **Adjacent and NOT deferred:** the S10 push itself is hearth-network work (migration 0045 +
   `src/fhir/`) and does not wait on this. Only the two TAPS share a session.
+
+### S8/S10 — the two taps reach ONLY Today (logged 2026-08-30 — POS TAP session)
+- **Trigger: THE FIRST CLINICIAN WHO ASKS FOR A SUPERBILL FROM A PREVIOUS DAY.** Ruled
+  2026-08-30 by Derrick, with the reason recorded as given: *"A visit unreachable the day after
+  the wrap is a broken feature, but widening ENGAGEMENT_SELECT for card_kind is a
+  SPEC-CONTRACT-shaped ruling I am not making inside a build."*
+- **What shipped.** Both taps live on the wrapped `TodayTile` (`src/components/TodayTile.tsx`),
+  reached from the Today section of the Engagement tab.
+- **What that leaves.** `useMyDay.ts:43-49` computes a SAME-DAY window in the entity's zone and
+  captures the date at mount. **A visit wrapped yesterday has no tile, so neither tap is
+  reachable for it.** The superbill message stays tappable in the thread forever
+  (`PlexChatScreen`, from the payload path), so a superbill ALREADY ISSUED is never lost — but
+  one never issued cannot be issued after midnight, and a push never tapped cannot be tapped.
+- **Why it was not simply fixed.** The Past list is the obvious host and it cannot gate a
+  clinical affordance: `ENGAGEMENT_SELECT` (`src/hooks/useMyEngagements.ts:39-43`) carries no
+  `card_kind`, and `src/types/engagement.ts:16-38` mirrors a network-owned contract whose header
+  forbids app-only fields. `card_kind` reaches the app through `get_my_day` alone
+  (`src/services/visits.ts:36`). Widening the read is the decision, not the diff.
+- **What it needs when it fires.** A ruling on where `card_kind` comes from for a past visit —
+  widen `ENGAGEMENT_SELECT` via the card FK embed, or a second narrow RPC, or extend
+  `get_my_day`'s window with an explicit "recent" argument. Then the same two affordances,
+  unchanged, on whatever row results.
+- **Adjacent and NOT deferred:** `get_my_ehr_pushes(null)` already returns EVERY push the
+  caller owns (`0045:283`), so the status half needs no new read — only a row to render on.
+
+### S10 — `superbill_lookup_failed` is missing from the S10 spec (logged 2026-08-30 — POS TAP session)
+- **BLOCKED: this is a hearth-network file and this session is hearth-pos.** Reported, never
+  silently dropped.
+- **The defect.** `hearth-network/docs/PLEXMED_S10_FHIR_PUSH_SPEC.md:132-135` says of
+  `omissions`: *"Today one value: `superbill_object_missing`."* `src/fhir/push.ts:210` writes a
+  SECOND — `superbill_lookup_failed` — when the `superbills` read itself errors. A row can carry
+  it, so a renderer built from the spec alone would leave a real omission unrendered: a
+  clinician would read "Sent to your record" on a push whose document did not go.
+- **The fix, one line.** In §3, replace *"Today one value"* with *"Today two values:
+  `superbill_object_missing` (the row exists, the object does not) and `superbill_lookup_failed`
+  (the `superbills` read itself failed)."* — and the same in `0045`'s
+  `comment on column public.ehr_push_outbox.omissions`, which repeats the claim (`0045:144-147`).
+  The COMMENT needs a `comment on column` statement, not a migration to the table.
+- **Already handled app-side.** `src/services/visit-copy.ts` treats both values as the document
+  omission, so hearth-pos renders correctly today regardless of when the spec is corrected.
+  The spec is still wrong and is still the thing the next reader will build from.

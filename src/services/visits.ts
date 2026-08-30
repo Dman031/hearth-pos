@@ -84,6 +84,11 @@ export type VisitFailure =
   | 'already_wrapped'
   | 'no_plan'
   | 'plan_too_many'
+  // queue_ehr_push's own two (0045:220-229). NOT_WRAPPED is gated at enqueue
+  // rather than in the drain, deliberately — 0045:183-186: the drain has no
+  // user to tell, and a raise here reaches the finger that tapped.
+  | 'not_wrapped'
+  | 'cancelled'
   | 'request_failed';
 
 export type VisitResult<T> = { ok: true; value: T } | { ok: false; reason: VisitFailure };
@@ -107,13 +112,16 @@ function classify(err: unknown): VisitFailure {
       return 'already_wrapped';
     case 'NO_PLAN':
       return 'no_plan';
+    case 'NOT_WRAPPED':
+      return 'not_wrapped';
     default:
       break;
   }
-  // These three raise without a code token; matched on the message, which is
+  // These four raise without a code token; matched on the message, which is
   // stable in the migration and not user-facing either way.
   if (/caller is not the seller/i.test(message)) return 'not_seller';
   if (/at most 20 items/i.test(message)) return 'plan_too_many';
+  if (/is cancelled \(terminal\)/i.test(message)) return 'cancelled';
   return 'request_failed';
 }
 
@@ -241,4 +249,95 @@ export async function fetchFollowupsDue(): Promise<VisitResult<FollowupDue[]>> {
     return { ok: false, reason };
   }
   return { ok: true, value: (data ?? []) as FollowupDue[] };
+}
+
+// ─── PLEXMED S10 · THE PUSH ─────────────────────────────────────────────────
+//
+// TAPPED, NEVER TRIGGERED (S10-5). There is no trigger on visit_wraps, no
+// enqueue inside wrap_visit and no auto-push on the fulfilled transition. This
+// module exists so that the ONLY way a patient's name, date of birth and
+// diagnoses reach a third-party server is a clinician's finger. A future caller
+// that queues from anything other than a tap breaks the ruling, not the code.
+//
+// STATUS IS A ROW, NOT A MESSAGE (S10-14). Nothing about a push reaches the
+// patient's conversation — that would put clinician operational noise into a
+// clinical thread. get_my_ehr_pushes is the ONE read of it.
+
+/** One row of get_my_ehr_pushes. Column list is authoritative per 0045:290-303. */
+export interface EhrPush {
+  outbox_id: string;
+  engagement_id: string;
+  target: string;
+  /** pending | sending | sent | failed | skipped (0045:134-135). */
+  status: string;
+  attempts: number;
+  pushed_at: string | null;
+  /** One of SEVEN values; see visit-copy.ts. Null on every non-skipped row. */
+  skipped_reason: string | null;
+  /** Rides on a row that SUCCEEDED. An omission is NOT a skip (S10-9). */
+  omissions: string[] | null;
+  /** The target server's own text, capped and scrubbed — safe to show. */
+  last_error: string | null;
+  remote_ids: Record<string, unknown> | null;
+  requested_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QueuedPush {
+  outbox_id: string;
+  status: string;
+  /** True when a terminal failed/skipped row was reset to pending (0045:245-253). */
+  requeued: boolean;
+}
+
+/**
+ * The tap. Seller-only, and a SECOND TAP IS NOT A SECOND PUSH — dedupe_key's
+ * UNIQUE makes the insert a no-op and the existing row comes back (0045:233-260).
+ * A `failed` or `skipped` row is re-queued; a `sent` row is a DELIBERATE no-op,
+ * so the caller must read `status` back rather than assume it sent something.
+ */
+export async function queueEhrPush(engagementId: string): Promise<VisitResult<QueuedPush>> {
+  // p_target is left to its default: 'medplum' is the only value 0045's CHECK
+  // admits, and naming a vendor at a call site is what S10-2 keeps out of the
+  // app. Pointing at another server is a migration, never a screen.
+  const { data, error } = await supabase.rpc('queue_ehr_push', {
+    p_engagement_id: engagementId,
+  });
+  if (error) {
+    const reason = classify(error);
+    console.warn('[visits] queue_ehr_push failed:', { reason, engagementId, error });
+    return { ok: false, reason };
+  }
+  const row = (data ?? {}) as { outbox_id?: string; status?: string; requeued?: boolean };
+  // NO `??` FALLBACK ON THE ID (BUG-016's D1). A null result with no error is a
+  // failure, and dressing it as a queued push would be a plausible placeholder
+  // in the one place a clinician reads to learn whether anything happened.
+  if (!row.outbox_id || !row.status) {
+    console.error('[visits] queue_ehr_push returned no row', { engagementId, data });
+    return { ok: false, reason: 'request_failed' };
+  }
+  return {
+    ok: true,
+    value: { outbox_id: row.outbox_id, status: row.status, requeued: row.requeued === true },
+  };
+}
+
+/**
+ * Every push the caller owns, newest first. The null argument is the shape
+ * 0045:283 names for exactly this — "what a Today strip needs" — so the screen
+ * makes ONE call and indexes it, rather than one call per wrapped tile.
+ */
+export async function fetchEhrPushes(
+  engagementId?: string,
+): Promise<VisitResult<EhrPush[]>> {
+  const { data, error } = await supabase.rpc('get_my_ehr_pushes', {
+    p_engagement_id: engagementId ?? null,
+  });
+  if (error) {
+    const reason = classify(error);
+    console.warn('[visits] get_my_ehr_pushes failed:', { reason, engagementId, error });
+    return { ok: false, reason };
+  }
+  return { ok: true, value: (data ?? []) as EhrPush[] };
 }

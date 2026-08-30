@@ -17,7 +17,13 @@ import useMyDay from '../hooks/useMyDay';
 import TodayTile from '../components/TodayTile';
 import WrapSheet from '../components/WrapSheet';
 import { FOLLOWUPS_DUE_HEADER } from '../services/visit-copy';
-import { fetchFollowupsDue, type DayVisit, type FollowupDue } from '../services/visits';
+import {
+  fetchEhrPushes,
+  fetchFollowupsDue,
+  type DayVisit,
+  type EhrPush,
+  type FollowupDue,
+} from '../services/visits';
 import EngagementCalendar from '../components/EngagementCalendar';
 import { notifyEngagementsChanged } from '../utils/engagement-refresh';
 import { ENGAGEMENT_KIND_LABEL, STATUS_LABEL, formatCents } from '../utils/format';
@@ -201,6 +207,34 @@ export default function EngagementScreen() {
   const { visits: todayVisits, tz: dayTz, zoneUnset, refresh: refreshDay } = useMyDay();
   const [wrapping, setWrapping] = useState<DayVisit | null>(null);
   const [followups, setFollowups] = useState<FollowupDue[]>([]);
+  // PLEXMED S10: ONE read for the whole strip. 0045:283 names this shape —
+  // "p_engagement_id is OPTIONAL — null returns every push the caller owns,
+  // which is what a Today strip needs" — so the screen fetches once and indexes
+  // it, rather than one RPC per wrapped tile.
+  const [pushes, setPushes] = useState<Map<string, EhrPush>>(new Map());
+
+  const refreshPushes = useCallback(async () => {
+    const result = await fetchEhrPushes();
+    if (!result.ok) {
+      // A failed read and an empty outbox must not look alike: the map is left
+      // as it was rather than cleared, so a transient failure cannot silently
+      // erase a status a clinician is reading.
+      console.warn('[EngagementScreen] get_my_ehr_pushes failed', { reason: result.reason });
+      return;
+    }
+    // Newest first (0045:323), so the FIRST row per engagement wins. There is
+    // one row per (target, engagement) by dedupe_key today; this stays correct
+    // if a second target is ever added.
+    const next = new Map<string, EhrPush>();
+    for (const row of result.value) {
+      if (!next.has(row.engagement_id)) next.set(row.engagement_id, row);
+    }
+    setPushes(next);
+  }, []);
+
+  useEffect(() => {
+    void refreshPushes();
+  }, [refreshPushes]);
 
   const peerNameForThread = useCallback(
     (threadId: string) => engagements.find((e) => e.thread_id === threadId)?.peerName ?? null,
@@ -534,10 +568,12 @@ export default function EngagementScreen() {
                       engagements.find((e) => e.id === v.engagement_id)?.peerName ?? null
                     }
                     tz={dayTz}
+                    push={pushes.get(v.engagement_id) ?? null}
                     onWrap={setWrapping}
                     onChanged={() => {
                       void refreshDay();
                       void refresh();
+                      void refreshPushes();
                     }}
                   />
                 ))}

@@ -5,15 +5,33 @@ import { formatDayMonth, formatForDisplay, shortWeekday, toDateKey } from '../da
 import { formatCents } from '../utils/format';
 import HonestyChips from './HonestyChips';
 import Toast from './Toast';
-import { deriveVisitState, startVisit, type DayVisit } from '../services/visits';
+import {
+  deriveVisitState,
+  queueEhrPush,
+  startVisit,
+  type DayVisit,
+  type EhrPush,
+} from '../services/visits';
+import { issueSuperbill } from '../services/superbill';
 import {
   CHIP_FIRST_VISIT,
+  PUSH_ACTION,
+  PUSH_ACTION_RETRY,
+  PUSH_ACTION_SENT,
+  PUSH_QUEUED,
+  SUPERBILL_ACTION,
+  SUPERBILL_ALREADY,
+  SUPERBILL_BODY,
+  SUPERBILL_OPEN,
+  SUPERBILL_OPEN_FAILED,
+  SUPERBILL_READY,
   VISIT_ROOM_PENDING,
   VISIT_ROOM_PENDING_BODY,
   VISIT_ROOM_READY,
   VISIT_ROOM_READY_BODY,
   VISIT_STATE_LABELS,
   planProgress,
+  pushStatusCopy,
 } from '../services/visit-copy';
 import { MODALITY_LABEL } from '../services/practice';
 
@@ -40,12 +58,24 @@ interface TodayTileProps {
    *  thread. Null renders the kind noun rather than a placeholder. */
   peerName: string | null;
   tz: string;
+  /** This visit's push row, from the screen's single get_my_ehr_pushes read.
+   *  Null means NO ROW — nobody has tapped — never "we could not tell". */
+  push: EhrPush | null;
   onWrap: (visit: DayVisit) => void;
   onChanged: () => void;
 }
 
-export default function TodayTile({ visit, peerName, tz, onWrap, onChanged }: TodayTileProps) {
+export default function TodayTile({
+  visit,
+  peerName,
+  tz,
+  push,
+  onWrap,
+  onChanged,
+}: TodayTileProps) {
   const [busy, setBusy] = useState(false);
+  const [superbillBusy, setSuperbillBusy] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   const state = deriveVisitState(visit);
@@ -77,6 +107,130 @@ export default function TodayTile({ visit, peerName, tz, onWrap, onChanged }: To
     }
     await Linking.openURL(visit.room_url);
   }, [visit.room_url]);
+
+  // TAP-OUT, the room row's own pattern (above). The OS renders the PDF, and
+  // ITS share sheet and "Save to Files" are the platform's — this app ships no
+  // viewer, no download and no share intent of its own, none of which the two
+  // taps imply.
+  const openDocument = async (url: string): Promise<void> => {
+    const can = await Linking.canOpenURL(url);
+    if (!can) {
+      setToast(SUPERBILL_OPEN_FAILED);
+      return;
+    }
+    await Linking.openURL(url);
+  };
+
+  /**
+   * A plain function rather than a useCallback because the `file_missing`
+   * branch calls it again with recover=true, and a memoized closure cannot
+   * name itself in its own dependency list.
+   *
+   * RECOVER IS NEVER PASSED SPECULATIVELY. The function names the missing file
+   * first and the clinician chooses the re-print; re-printing behind their back
+   * would change bytes they may already have handed to a patient.
+   */
+  const runSuperbill = async (recover: boolean): Promise<void> => {
+    if (superbillBusy) return;
+    setSuperbillBusy(true);
+    const result = await issueSuperbill(visit.engagement_id, { recover });
+    setSuperbillBusy(false);
+
+    if (!result.ok) {
+      if (result.reason === 'file_missing') {
+        Alert.alert('That file is no longer there', result.message, [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Print it again', onPress: () => void runSuperbill(true) },
+        ]);
+        return;
+      }
+      // BY MESSAGE, NEVER BY STATUS CODE. notSeller / notWrapped / notPaid /
+      // unrecoverable all arrive here carrying their own approved sentence, and
+      // the sentence is the whole point — a generic "couldn't do that" would
+      // tell a clinician nothing about which of four things went wrong.
+      if (result.reason === 'refused') {
+        Alert.alert('No superbill was issued', result.message);
+        return;
+      }
+      setToast(
+        result.reason === 'unauthenticated'
+          ? 'Sign in again to do that.'
+          : 'Couldn’t make that just now. Nothing was changed — try again.',
+      );
+      return;
+    }
+
+    // issue_superbill posted the message that carries the document (0042:139-146),
+    // so the conversation changed even when the receipt did not.
+    onChanged();
+    const { signedUrl, alreadyIssued } = result.value;
+    Alert.alert(
+      alreadyIssued ? SUPERBILL_ALREADY : SUPERBILL_READY,
+      SUPERBILL_BODY,
+      signedUrl
+        ? [
+            { text: 'Close', style: 'cancel' as const },
+            { text: SUPERBILL_OPEN, onPress: () => void openDocument(signedUrl) },
+          ]
+        : [{ text: 'Close', style: 'cancel' as const }],
+    );
+  };
+
+  /**
+   * The tap that authorises a PHI disclosure to a third party (S10-5). It is
+   * the ONLY way a push is ever enqueued — no trigger, no auto-send on wrap.
+   *
+   * The RETURNED status decides what is said, never the status that was on
+   * screen when the finger landed: a `sent` row is a deliberate no-op
+   * (0045:254-259) and must not be reported as a fresh send.
+   */
+  const sendToRecord = async (): Promise<void> => {
+    if (pushBusy) return;
+    setPushBusy(true);
+    const result = await queueEhrPush(visit.engagement_id);
+    setPushBusy(false);
+
+    if (!result.ok) {
+      setToast(
+        result.reason === 'not_wrapped'
+          ? 'Wrap the visit first — there is nothing to send yet.'
+          : result.reason === 'cancelled'
+            ? 'This visit was cancelled, so nothing can be sent.'
+            : result.reason === 'not_seller'
+              ? 'Only the clinician who provided the visit can send it.'
+              : result.reason === 'unauthenticated'
+                ? 'Sign in again to do that.'
+                : 'Couldn’t send that just now. Nothing was changed — try again.',
+      );
+      return;
+    }
+    setToast(
+      result.value.status === 'sent' && !result.value.requeued
+        ? 'This visit is already in your record.'
+        : PUSH_QUEUED,
+    );
+    onChanged();
+  };
+
+  // The push row, as a clinician reads it. pushed_at is formatted HERE, through
+  // src/datetime.ts and in the practice's own zone — the copy module holds no
+  // timezone, and the DATE/TIME rule forbids formatting at a display site.
+  //
+  // NOTE the spec's rendered example (§4) shows "29 Aug 2026, 17:34 UTC". This
+  // renders the same instant in the zone the rest of the tile already uses,
+  // labelled, because VL-4 makes an unlabelled or foreign-zone time a bug on a
+  // clinical surface. Same fact, the tile's own zone discipline.
+  const pushLine = push
+    ? pushStatusCopy(push.status, {
+        attempts: push.attempts,
+        skippedReason: push.skipped_reason,
+        omissions: push.omissions,
+        lastError: push.last_error,
+        pushedAtLabel: push.pushed_at
+          ? `${formatDayMonth(push.pushed_at, tz)} · ${formatForDisplay(push.pushed_at, 'timeWithZone', tz)}`
+          : null,
+      })
+    : null;
 
   return (
     <View style={styles.tile}>
@@ -172,6 +326,71 @@ export default function TodayTile({ visit, peerName, tz, onWrap, onChanged }: To
         </View>
       ) : null}
 
+      {/* WRAPPED — the two taps (PLEXMED S8 + S10). This block is the answer to
+          a tile that, until now, rendered NO actions at all the moment the wrap
+          succeeded: `state !== 'wrapped'` above gated off the affordances at
+          exactly the point both features become relevant.
+
+          THE SUPERBILL LABEL IS NEUTRAL because the app cannot know whether one
+          exists — public.superbills is RLS-on with zero policies and no client
+          can read it (0042:137-138). Issue-once (S8-3) is what makes that
+          honest: a second tap returns the SAME receipt, and the alert says
+          which of the two just happened.
+
+          THE PUSH IS A SEPARATE TAP AND MUST STAY ONE. Making the superbill
+          does not send it, and sending does not make it. Folding them into one
+          button would make a PHI disclosure to a third party a side effect of
+          printing a page — the exact thing S10-5's "tapped, never triggered"
+          exists to prevent. */}
+      {isPractice && state === 'wrapped' ? (
+        <View style={styles.actions}>
+          {pushLine ? (
+            <View>
+              <Text style={styles.pushLine}>{pushLine.line}</Text>
+              {pushLine.hint ? <Text style={styles.pushHint}>{pushLine.hint}</Text> : null}
+            </View>
+          ) : null}
+          <View style={styles.actionRow}>
+            <Pressable
+              style={[styles.outline, superbillBusy && styles.off]}
+              disabled={superbillBusy}
+              onPress={() => void runSuperbill(false)}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: superbillBusy }}
+            >
+              {superbillBusy ? (
+                <ActivityIndicator size="small" color={theme.colors.accent} />
+              ) : (
+                <Text style={styles.outlineLabel}>{SUPERBILL_ACTION}</Text>
+              )}
+            </Pressable>
+            {/* A settled row's tap is a no-op in the database, so the button
+                says so and does not offer one. Announcing "sent" for a call
+                that changes nothing is the claim-without-an-action this
+                codebase blocks everywhere else. */}
+            <Pressable
+              style={[styles.outline, (pushBusy || pushLine?.settled === true) && styles.off]}
+              disabled={pushBusy || pushLine?.settled === true}
+              onPress={() => void sendToRecord()}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: pushBusy || pushLine?.settled === true }}
+            >
+              {pushBusy ? (
+                <ActivityIndicator size="small" color={theme.colors.accent} />
+              ) : (
+                <Text style={styles.outlineLabel}>
+                  {pushLine?.settled
+                    ? PUSH_ACTION_SENT
+                    : pushLine?.retryable
+                      ? PUSH_ACTION_RETRY
+                      : PUSH_ACTION}
+                </Text>
+              )}
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+
       <Toast message={toast} onDismiss={() => setToast(null)} />
     </View>
   );
@@ -185,6 +404,12 @@ const styles = StyleSheet.create({
   timeRow: { ...theme.typography.body, color: theme.colors.textSecondary },
   amount: { ...theme.typography.body, color: theme.colors.textPrimary },
   plan: { ...theme.typography.caption, color: theme.colors.textMuted },
+  // The push status row. Deliberately NOT colour-coded by outcome: a skip is a
+  // decision, not an error (0045 / S10-9), and painting it red would tell a
+  // clinician something went wrong when the system refused on purpose. The
+  // words carry the difference; the colour does not pretend to.
+  pushLine: { ...theme.typography.caption, color: theme.colors.textSecondary },
+  pushHint: { ...theme.typography.caption, color: theme.colors.textMuted },
   roomRow: {
     alignSelf: 'flex-start',
     paddingVertical: 4,

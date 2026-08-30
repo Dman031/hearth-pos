@@ -28,7 +28,13 @@
 --     what keeps issue-once (S8-3) meaningful: a client that could overwrite the
 --     object could change a receipt after it was handed over.
 --
--- PATH: {engagement_id}/{superbill_id}.pdf. The FIRST segment is the engagement,
+-- PATH: {engagement_id}/superbill.pdf (superbill/index.ts:361 — CORRECTED IN
+-- PLACE 2026-08-30: this line read {engagement_id}/{superbill_id}.pdf, which the
+-- function has never written. Benign, because the policy scopes on the FIRST
+-- segment only and the id was never part of the predicate — but a wrong name in
+-- a comment is how PROSE BECOMES AN ASSUMED IDENTIFIER, and the SPEC-CONTRACT
+-- rule's own evidence is an agent doing exactly that with a table name from a
+-- paragraph it had written itself.) The FIRST segment is the engagement,
 -- which is what the policy scopes on — the same first-segment-is-the-owner idea
 -- as pos-0002, with the engagement standing in for the entity because a
 -- superbill has two rightful readers, not one.
