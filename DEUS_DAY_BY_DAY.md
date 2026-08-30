@@ -2841,3 +2841,148 @@ vertical. These five rulings are the answer. They are canon; the specs bend to t
        inside the card editor's sheet (no stacked modals, ProfileScreen.tsx:312). It refuses
        and names where the thing lives — the pattern S5's own approved copy already uses for
        Incoming ("That request lives in Incoming, where it is answered"). Note for SESSION 2.
+
+## RULINGS — 2026-08-29 (PLEXMED S10 retargeted: Canvas → Medplum) — approved for 10-BUILD
+Source: the S10-INVESTIGATE report (hearth-network main @ 55df0ff, tree clean), five decisions
+ruled the same day, the BAA gate, and one pre-ruling issued AGAINST A PROBE NOT YET RUN.
+Binds PLEXMED_CARE_LOOP_BUILD.md Session 10, which names Canvas throughout — that file is
+superseded by this block wherever the two disagree. Prior rulings unchanged: S7-9 (codes are
+typed, never suggested), S8-1..S8-7 (the superbill and its provenance split), TP-1..TP-3 (the
+three token planes), VL-1 (no scheduler writes state), and the CARE_LOOP cut list's
+"auto-sent nudges, auto-coding, auto-diagnosis: never".
+
+S10-1 THE TARGET IS MEDPLUM, NOT CANVAS. DERRICK'S REASONING, RECORDED AS GIVEN: "Canvas is a
+    one-business-day sales conversation; Medplum is a FHIR server, self-serve, already
+    provisioned." Project "Teleoplexy", hosted tier, API base https://api.medplum.com, OAuth2
+    client-credentials at /oauth2/token (verified live 2026-08-29: server 5.1.36, fhirVersion
+    4.0.1, system interactions transaction+batch, conditionalCreate true on Patient, Encounter,
+    Condition, DocumentReference and Practitioner). MEDPLUM_CLIENT_ID and MEDPLUM_CLIENT_SECRET
+    are WORKER SECRETS and deliberately NOT in .dev.vars.
+S10-2 THE BUNDLE IS THE DELIVERABLE, AND IT IS SERVER-AGNOSTIC. Composition is pure and
+    vendor-free; pointing it at Canvas, Epic or a hospital's own server is credentials and a
+    base URL, never code. NO MEDPLUM-SPECIFIC EXTENSION, PROFILE OR RESOURCE MAY ENTER THE
+    COMPOSER. This is what makes S10-1 a low-cost decision rather than a bet, and it is the
+    reason the composer must stay a pure module the way superbill/compose.ts is.
+S10-3 THE TESTING PLAN IN 10-INVESTIGATE ITEM 4 IS SUPERSEDED. The Docker/Synthea local rig
+    existed because Canvas could not be touched by CI; the hosted Medplum project is now the
+    conformance target directly. SYNTHETIC FIXTURES ONLY, and that is a hard gate rather than a
+    preference — see S10-4.
+S10-4 (S10-BAA) NO REAL PATIENT DATA REACHES api.medplum.com BEFORE A SIGNED BAA. The
+    compliance checklist's "sandbox = synthetic only; BAA before any real patient" was written
+    for Canvas and binds Medplum identically. HOSTED MEDPLUM IS PRODUCTION INFRASTRUCTURE, NOT
+    A SANDBOX. visit_wraps.patient_name_for_billing and patient_dob are PHI the moment a real
+    patient is wrapped (S8-2 says so in the schema comment), so every probe, every BUILD run
+    and every verify script uses synthetic fixtures until the BAA is signed. This is a ruling,
+    not a comment, and it does not relax for a demo.
+S10-5 THE PUSH IS TAPPED, NEVER TRIGGERED. No trigger on visit_wraps, no enqueue inside
+    wrap_visit, no auto-push on the fulfilled transition. "Clinician taps, selects, decides —
+    every time" covers sending a record to a third party at least as strongly as it covers a
+    code. 0043's trigger-over-restatement argument does NOT carry here: that was about not
+    losing an enqueue a fifth writer would forget, and this enqueue is supposed to be
+    forgettable — a clinician who does not tap has not consented to the push.
+S10-6 ENCOUNTER.CLASS REFUSES BY NAME WHEN THERE IS NO SLOT. Encounter.class is 1..1 in R4 and
+    card_slots holds no row for a slotless engagement (wrap_visit's own duration COALESCE,
+    0041 SECTION 5, proves the case is real). The push refuses with `no_modality`. DERRICK'S
+    REASONING, RECORDED AS GIVEN: "Defaulting invents a fact about how care was delivered, and
+    inferring it from a room URL that exists for reasons unrelated to modality is the same
+    invention wearing a signal. A REFUSAL IS RECOVERABLE; A WRONG CLASS IN SOMEONE'S CHART IS
+    NOT." Mapping where a slot exists: modality 'video' → VR, 'in_person' → AMB, both under
+    http://terminology.hl7.org/CodeSystem/v3-ActCode (verified 2026-08-29).
+S10-7 THE 8-ENTRY CONDITIONAL-TRANSACTION CAP REFUSES BY NAME. Medplum, quoted: "A transaction
+    that contains conditional operations (a conditional create using ifNoneExist, a conditional
+    update, or a conditional delete) runs under serializable database isolation and is limited
+    to 8 entries." Our bundle is Practitioner + Patient + Encounter + N Conditions + (0|1)
+    DocumentReference, so with a superbill N <= 4. Over the cap the push refuses with
+    `too_many_conditions`. DERRICK'S REASONING: "Loud, nobody has hit it, and the two-phase
+    alternative buys atomicity's loss for a case that does not exist yet. WHEN SOMEONE HITS IT,
+    THAT IS A REAL SIGNAL AND IT EARNS ITS OWN RULING." Truncation was rejected outright: it is
+    silent data loss in a clinical record.
+S10-8 CONDITION CODING IS coding + userSelected + text. code.coding[0] carries system
+    http://hl7.org/fhir/sid/icd-10-cm with the clinician's string as the code AND
+    userSelected: true, and code.text carries the same string verbatim. DERRICK'S REASONING:
+    "userSelected is FHIR's own marker for 'a person picked this directly', which is exactly
+    what S7-9 makes true. The receiving system gets something actionable and an honest
+    provenance flag." THE SYSTEM URI ASSERTS WHICH VOCABULARY THE CLINICIAN MEANT, NEVER THAT
+    THE STRING IS A VALID MEMBER OF IT — no copy, comment or spec may state otherwise.
+S10-9 THE CLINICAL RECORD IS NOT CONTINGENT ON PAYMENT; ONLY THE SUPERBILL IS. An unpaid wrap
+    pushes Patient, Encounter and Conditions with NO DocumentReference. The document rides only
+    where a superbills row exists — which is paid-only, inherited from S8-4 and not restated
+    here (S5-11: one rule, one place). The object is STATTED BEFORE IT IS ENCODED (BUG-016):
+    a row whose file is gone drops the DocumentReference by name, `superbill_object_missing`,
+    and never ships an empty attachment. The PDF travels INLINE as base64
+    content[0].attachment.data, never as a URL — a signed URL lives 600 seconds and a URL in a
+    durable third-party record is structurally the dead-link bug.
+S10-10 CPT RIDES ON Encounter.type FOR v1. A separate Procedure resource is the purist shape
+    and is not v1. DERRICK: "Procedure is purist and this is v1." System
+    http://www.ama-assn.org/go/cpt (verified 2026-08-29).
+S10-11 THE PATIENT IS MATCHED ON entities.deus_id ALONE, AND WHAT THAT CANNOT GUARANTEE IS
+    STATED IN THE SPEC. ifNoneExist on identifier
+    https://teleoplexy.ai/fhir/identifier/deus-id|<deus_id>. Name and DOB are NEVER a match key:
+    both are clinician-typed and unverified (S8-2), so a typo would fork a chart and a
+    coincidence would merge two humans. A buyer with a null deus_id (0000:45 — unique, NOT
+    not-null) refuses with `no_patient_identifier` and never gets a synthesized key. FOUR
+    THINGS THE SPEC MUST SAY PLAINLY, because they are limits and not details: (a) we match to
+    OUR Patient, never to a pre-existing chart in the target system, and must never claim
+    otherwise; (b) HumanName.use is 'usual', never 'official'; (c) codes travel as typed;
+    (d) two Deus entities for one human are two Patients, and there is no merge concept.
+S10-12 PATIENT.GENDER — RULED IN ADVANCE OF THE PROBE. No source column exists anywhere in the
+    schema. Base R4 does not require it; US Core does, and whether Medplum enforces US Core on
+    WRITE is unproven — the CapabilityStatement's instantiates: us-core-server line is a search
+    conformance claim, not a write one. IF THE PROBE SHOWS ENFORCEMENT, the value is "unknown",
+    which is R4's own value for exactly this case, and it is ruled here so the build does not
+    have to stop and ask. If the probe shows no enforcement, the field is OMITTED. Nothing is
+    ever inferred from a name.
+S10-13 THE PUSH RUNS IN THE WORKER'S CRON TICK AND ADDS NO TOKEN PLANE. Enqueue is a Supabase
+    RPC the app taps with its own session (queue_ehr_push, seller-only, definer); the drain is
+    a FIFTH step in the existing scheduled handler, running LAST after email so a Medplum
+    outage never delays a stamp, a room or a message. THE PLANE COUNT IS UNCHANGED AND THAT IS
+    THE POINT: src/index.ts:78-79 already states "a scheduled handler is not a route — no path,
+    no token plane", so no new hostname, path or credential type is introduced and TP-1's
+    "a fourth is a ruling" is not triggered. NOT the superbill's edge function, for three
+    reasons in order of weight: the credentials are ALREADY Worker secrets and duplicating a
+    live credential into a second vendor buys nothing; the superbill is synchronous by
+    necessity (a screen waits on a signed URL) while a fire-and-report push has no caller
+    waiting; and 0043 + src/email/dispatch.ts is already this exact enqueue-in-Postgres,
+    drain-in-the-Worker shape. Absent credentials the drain returns 'no_provider' before it
+    queries anything — the S7-10 / E-3 posture, and the reason the keys are OPTIONAL bindings
+    and NOT in REQUIRED_KEYS.
+S10-14 FAILURE IS A ROW, NOT A MESSAGE, AND IT NEVER REACHES THE WRAP. wrap_visit (0041
+    SECTION 5) is untouched and there is no code path from a Medplum failure back into it.
+    Status lives on the outbox row in 0043's vocabulary (pending / sending / sent / failed /
+    skipped, with attempts, last_error, skipped_reason) and is read by one narrow RPC. IT IS
+    NOT A THREAD MESSAGE: that would widen messages_kind_vocab (0041) and put clinician
+    operational noise into a patient's conversation. RETRY IS BOUNDED AND SAFE BY
+    CONSTRUCTION — every resource in the bundle carries an identifier under OUR OWN system with
+    ifNoneExist, so the whole bundle is re-runnable and a retry after a partial apply converges
+    instead of duplicating. Five attempts with backoff, then terminal 'failed' with the error
+    named. Never infinite. THE SUPERBILL PDF REMAINS THE FALLBACK AND THE UNIVERSAL ANSWER for
+    every non-Medplum EHR, unchanged.
+S10-15 THE BUNDLE'S SURFACE IS CLOSED, NOT FILTERED. Only the columns named in the S10 spec's
+    mapping table may appear in a bundle; anything not listed is forbidden by default, which is
+    the honest direction for this rule to point. Named explicitly because each is a live
+    temptation: ALL of transactions (the amount reaches an EHR only as ink inside the superbill
+    PDF, where S8-7 governs what it says — a structured money field is a claim we did not
+    agree to make), entity_stripe_accounts, verifications.snapshot / name_hash / void_reason /
+    reviewed_by / method / source (registry_ref and checked_at are the ONLY fields that ever
+    travel, the superbill's precedent), entities.user_id / email / phone / id_verified /
+    business_verified / credential_verified / status, engagements.room_url (TP-3: the link
+    carries the admission credential, and a durable third-party copy is what expiry and
+    use_count exist to bound), visit_access_tokens and visit_link_attempts, ALL message bodies
+    and payloads and plan items and threads (THE RECORD IS WHAT THE CLINICIAN DELIBERATELY
+    WROTE AT WRAP — shipping thread content to an EHR is the transcript the no-scribe canon
+    refuses, arriving by a different door), superbills.snapshot (the PDF goes, the auditable
+    original does not), mcp_oauth_* , mcp_call_log, audit_log, device_tokens, contacts, inbound.
+S10-16 THE SPEC IS OWED AT BUILD AND THE SPEC-CONTRACT RULE BINDS IT. docs/ gets the S10 spec
+    with the mapping table; EVERY contract section heads with the migration it is TRUE AT
+    (visit_wraps @ 0041, engagements @ 0017+0041, card_slots @ 0038b, verifications @
+    0035/0036, entities @ 0000+0038b, superbills @ 0041 + pos-0005), and no rendered example
+    may name a column its own read does not return. This repo has six recorded instances of
+    that class and S10 writes the first spec since the rule was promoted.
+S10-17 MIGRATION 0045, ONE FILE, NO SPLIT-ENUM PAIR OWED. Ledger verified 2026-08-29: 0000-0044
+    less the known 0015 gap, plus pos-0001..pos-0005. ehr_push_outbox carries status, target
+    and skipped_reason as text + CHECK deliberately, so no `alter type ... add value` exists in
+    the file and the SPLIT-ENUM RULE has no target — stated, not skipped. RLS on with ZERO
+    POLICIES and table grants revoked (the visit_wraps / superbills posture, 0041 SECTION 1):
+    the table holds no PHI itself but it points at rows that do. queue_ehr_push and
+    get_my_ehr_pushes each ship the full MIGRATION FUNCTION GRANT BLOCK. Receipt as the final
+    statement.
