@@ -2932,6 +2932,16 @@ S10-12 PATIENT.GENDER — RULED IN ADVANCE OF THE PROBE. No source column exists
     which is R4's own value for exactly this case, and it is ruled here so the build does not
     have to stop and ask. If the probe shows no enforcement, the field is OMITTED. Nothing is
     ever inferred from a name.
+    PROBE RUN 2026-08-29 AGAINST THE LIVE SERVER, AND IT ANSWERED: a Patient with no gender
+    was accepted 201 Created and stored with gender absent; a name carrying only .text (no
+    family/given) was accepted; and ifNoneExist returned the EXISTING id (entry status 200,
+    same id, not a second Patient), so S10-14's retry story is PROVEN RATHER THAN ASSUMED.
+    US CORE IS NOT ENFORCED ON WRITE — Medplum validates against base R4, exactly as the
+    StructureDefinition cardinalities predicted. THE FIELD IS OMITTED; the "unknown" branch
+    stands UNFIRED and is kept because S10-2 requires this bundle to be able to point at a
+    server that does enforce it. The probe created one synthetic Patient and deleted it; the
+    delete was confirmed by a READ RETURNING 410 GONE and two searches returning zero, not by
+    the DELETE's own 200.
 S10-13 THE PUSH RUNS IN THE WORKER'S CRON TICK AND ADDS NO TOKEN PLANE. Enqueue is a Supabase
     RPC the app taps with its own session (queue_ehr_push, seller-only, definer); the drain is
     a FIFTH step in the existing scheduled handler, running LAST after email so a Medplum
