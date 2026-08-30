@@ -128,3 +128,111 @@ export function readPracticeFields(entries: FieldEntry[]): Partial<PracticeDraft
     slidingScale: byLabel.has(PRACTICE_FIELD.slidingScale),
   };
 }
+
+// ─── THE HOLD, AND WHAT HAPPENS WHEN IT RUNS OUT (PLEXMED S5 S4b / S6 T4) ────
+//
+// A request holds a time. When the hold lapses the time goes back on the board
+// and the request stays — the conversation outlives the hold, which is a real
+// state and not an edge case. `get_my_pending_requests` reports a lapsed hold
+// as a NULL `held_until` (0040 — "Live holds only: a lapsed hold reports null,
+// which is the same thing the claim predicate believes"), and this is the one
+// place that null is turned into a display state.
+//
+// IT IS NEVER AN ERROR STATE. The clinician did nothing wrong and neither did
+// the person who asked. Never say "expired" about a person's request, and never
+// imply they gave up: they asked, the clock ran, that is all that happened.
+
+/**
+ * Has this request's held time gone back on the board?
+ *
+ * THE PRACTICE GATE IS A CHECK, NOT A COMMENT, AND IT IS THE FIRST LINE.
+ * `held_until` is null for TWO different reasons — a practice hold that lapsed,
+ * and an ordinary booking or order that never had a hold at all. Deriving
+ * let-go from the null ALONE would make every non-practice pending row read as
+ * let-go, and T4 REMOVES Accept on a let-go row, so an ordinary booking would
+ * silently lose the only control that can act on it.
+ *
+ * That is why this returns false for a non-practice request before it looks at
+ * anything else, and why both surfaces call this rather than each writing the
+ * predicate. There is exactly one derivation of this state in the app.
+ */
+export function isTimeLetGo(input: {
+  /** The request's card is a practice card. FALSE can never yield let-go. */
+  isPracticeRequest: boolean;
+  /** The get_my_pending_requests row, or null when the read failed/not loaded. */
+  pending: { held_until: string | null } | null;
+}): boolean {
+  if (!input.isPracticeRequest) return false;
+  // A MISSING READ IS NOT A LAPSED HOLD. Null pending means we do not know —
+  // and "we do not know" must not remove a control, which is the same reason
+  // the chips are omitted rather than guessed when their read fails.
+  if (input.pending === null) return false;
+  return input.pending.held_until === null;
+}
+
+/** T4's banner. Shared so the two accept surfaces cannot drift apart. */
+export const LET_GO_TITLE = 'That time was let go';
+export const LET_GO_BODY =
+  'A request holds a time for a day, or until an hour before the visit — whichever comes ' +
+  'first. This one passed that point, so the time went back on your board. You can still ' +
+  'talk here; to book, they need to ask for a time again.';
+
+/**
+ * The race: the hold was live when the screen painted and gone when the finger
+ * landed. Distinct from the banner above, which is the state BEFORE a tap.
+ */
+export const LET_GO_RACE =
+  'That time went to someone else. They can ask for another; nothing was charged.';
+
+/**
+ * Is this refusal the lapsed/taken hold?
+ *
+ * MATCHED BY MESSAGE, NEVER BY THE ABSENCE OF SUCCESS. The raise is
+ * `respond_to_inbound: that held time has lapsed or was taken (code:
+ * SLOT_NO_LONGER_HELD)` (0038b:767). A bare `catch` that reports the race on
+ * ANY failure tells a clinician on a dropped connection that their patient's
+ * time went to someone else — a fallback string describing the opposite of what
+ * happened, which is the VERIFICATION DISCIPLINE clause this very copy was
+ * written about.
+ */
+export function isSlotNoLongerHeld(err: unknown): boolean {
+  const message =
+    typeof (err as { message?: unknown })?.message === 'string'
+      ? String((err as { message: string }).message)
+      : '';
+  return /SLOT_NO_LONGER_HELD/.test(message);
+}
+
+// ─── THE PRACTICE CARD'S PAUSED STATES (PLEXMED S5 P5) ──────────────────────
+//
+// "Paused" means NOBODY CAN ASK — not that nobody has an opening left. A card
+// whose every future time is booked is the person doing best on this network,
+// and telling them their card is paused would be a false alarm on exactly the
+// wrong clinician. The predicate is therefore ZERO FUTURE SLOTS OF ANY STATE.
+//
+// TWO CAUSES, TWO DIFFERENT FIXES, AND THE COPY MUST NOT CONFLATE THEM. With
+// the stamp off, posting more times changes nothing — sending someone to the
+// board would cost them ten minutes on the wrong fix.
+
+export type PracticePaused = 'no_times' | 'stamp_off';
+
+export const PAUSED_TITLE = 'Your card is up, but paused';
+
+/** Stamp live, board empty. Posting times is the fix, so it points at them. */
+export const PAUSED_NO_TIMES_BODY =
+  'People can find you. Nobody can request a visit until you post open times.';
+export const PAUSED_NO_TIMES_POINTER = 'Post them in Settings › PlexMed.';
+
+/**
+ * Stamp off. THE SECOND SENTENCE IS THE POINT OF THIS VARIANT — ratified
+ * verbatim 2026-08-30 and not to be trimmed: it is what stops someone spending
+ * ten minutes on the fix that cannot work.
+ */
+export const PAUSED_STAMP_OFF_BODY =
+  'While your Verified Clinician stamp is off, your times are not shown and nobody can ' +
+  'request a visit. Posting more will not change that — the stamp is what is missing.';
+export const PAUSED_STAMP_OFF_POINTER =
+  'Verify your license in your account, under Verify my license.';
+
+/** The board's own horizon (OpenTimesBoard reads a rolling window). */
+export const PAUSED_HORIZON_DAYS = 90;

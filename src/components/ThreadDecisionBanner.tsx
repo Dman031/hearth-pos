@@ -5,7 +5,15 @@ import { supabase } from '../services/supabase';
 import useCards from '../hooks/useCards';
 import useEntity from '../hooks/useEntity';
 import useThreadPendingInbound from '../hooks/useThreadPendingInbound';
+import usePendingRequests from '../hooks/usePendingRequests';
 import useThreadEngagements from '../hooks/useThreadEngagements';
+import {
+  isSlotNoLongerHeld,
+  isTimeLetGo,
+  LET_GO_BODY,
+  LET_GO_RACE,
+  LET_GO_TITLE,
+} from '../services/practice';
 import { formatAcceptLabel, formatCents, ENGAGEMENT_KIND_LABEL, KIND_LABEL } from '../utils/format';
 import { formatForDisplay } from '../datetime';
 import type { Inbound } from '../types/inbound';
@@ -43,31 +51,68 @@ import type { Engagement } from '../types/engagement';
 // always with the EXPLICIT id of the item being decided, never a
 // newest-pending-wins resolution. No opening-line composer here: the vendor is
 // already inside the conversation.
+//
+// T4 BINDS THIS SURFACE (ruled 2026-08-30). A practice request whose hold has
+// lapsed loses its Accept HERE too, not only on Incoming: a control that cannot
+// act teaches that controls are decorative, and a refusal in a different tab is
+// the same failure. That is why this component now reads held_until.
+//
+// THE PRACTICE GATE IS THE LOAD-BEARING PART, AND IT IS A CHECK. held_until is
+// null for a lapsed practice hold AND for every ordinary booking or order,
+// which never had a hold at all. Deriving let-go from the null alone would
+// remove Accept from ordinary rows — the control that is the whole point of
+// this slot. isTimeLetGo (services/practice.ts) refuses a non-practice request
+// on its first line, and DecisionPanel asserts the same invariant below rather
+// than trusting its caller.
 
 type Busy = 'accepting' | 'declining';
 
 function DecisionPanel({
   item,
+  isPracticeRequest,
   cardTitle,
   cardTerms,
   priceCents,
   currency,
   busy,
   error,
+  letGo,
   onAccept,
   onDecline,
 }: {
   item: Inbound;
+  /** Gates every let-go behaviour. See the assertion below. */
+  isPracticeRequest: boolean;
   cardTitle: string | null;
   cardTerms: string | null;
   priceCents: number | null;
   currency: string;
   busy: Busy | null;
   error: string | null;
+  /** T4: the held time went back on the board. Accept is REMOVED, not greyed. */
+  letGo: boolean;
   onAccept: (item: Inbound) => void;
   onDecline: (item: Inbound) => void;
 }) {
   const acceptLabel = formatAcceptLabel(item.kind, priceCents, currency);
+
+  // THE INVARIANT, STATED AS A CHECK RATHER THAN A COMMENT (ruled 2026-08-30).
+  //
+  // A NON-PRACTICE PENDING ROW MUST KEEP ITS ACCEPT BUTTON. This panel removes
+  // Accept on `letGo`, and `letGo` may only ever be true for a practice
+  // request — an ordinary booking has no hold, so its null held_until means
+  // "there was never a hold", not "the hold lapsed". If the two are ever
+  // conflated upstream, this catches it HERE, where the control is removed,
+  // and renders Accept anyway rather than trusting the flag.
+  const letGoAllowed = letGo && isPracticeRequest;
+  if (letGo && !isPracticeRequest) {
+    console.error('[ThreadDecisionBanner] let-go on a NON-PRACTICE request — Accept kept', {
+      inboundId: item.id,
+      kind: item.kind,
+      cardId: item.card_id,
+    });
+  }
+
   return (
     <View style={styles.panel}>
       <View style={styles.panelHeader}>
@@ -78,6 +123,17 @@ function DecisionPanel({
       </View>
       {cardTitle ? <Text style={styles.titleText}>{cardTitle}</Text> : null}
       {cardTerms ? <Text style={styles.termsText}>{cardTerms}</Text> : null}
+
+      {/* NOT AN ERROR STATE, and not styled as one — the clinician did nothing
+          wrong and neither did the person who asked. Never "expired", and
+          never a suggestion that they gave up: they asked, the clock ran. */}
+      {letGoAllowed ? (
+        <View style={styles.letGoBanner}>
+          <Text style={styles.letGoTitle}>{LET_GO_TITLE}</Text>
+          <Text style={styles.letGoBody}>{LET_GO_BODY}</Text>
+        </View>
+      ) : null}
+
       <View style={styles.actionRow}>
         <Pressable
           style={[styles.declineBtn, busy && styles.btnDisabled]}
@@ -88,15 +144,21 @@ function DecisionPanel({
         >
           <Text style={styles.declineText}>{busy === 'declining' ? 'Declining…' : 'Decline'}</Text>
         </Pressable>
-        <Pressable
-          style={[styles.acceptBtn, busy && styles.btnDisabled]}
-          onPress={() => onAccept(item)}
-          disabled={busy !== null}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: busy !== null }}
-        >
-          <Text style={styles.acceptText}>{busy === 'accepting' ? 'Accepting…' : acceptLabel}</Text>
-        </Pressable>
+        {/* T4 REMOVES Accept, never greys it: a greyed control invites a tap
+            that will be refused, which is the same lesson as a control that
+            cannot act. Decline stays — passing on a request whose time is gone
+            is still a thing a person may want to do. */}
+        {!letGoAllowed ? (
+          <Pressable
+            style={[styles.acceptBtn, busy && styles.btnDisabled]}
+            onPress={() => onAccept(item)}
+            disabled={busy !== null}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: busy !== null }}
+          >
+            <Text style={styles.acceptText}>{busy === 'accepting' ? 'Accepting…' : acceptLabel}</Text>
+          </Pressable>
+        ) : null}
       </View>
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
@@ -105,6 +167,16 @@ function DecisionPanel({
 
 export default function ThreadDecisionBanner({ threadId }: { threadId: string }) {
   const { pending, refresh } = useThreadPendingInbound(threadId);
+  // THE HONEST COST OF T4 BINDING THIS SURFACE: a second read. It is the same
+  // RPC Incoming already calls (get_my_pending_requests, owner-scoped, narrow),
+  // asked for one thread instead of the whole list. held_until reaches no other
+  // surface, so there is no cheaper place to get it.
+  //
+  // A FAILED READ RETURNS AN EMPTY MAP, NOT A LET-GO. isTimeLetGo refuses a
+  // null row, so the panel keeps Accept when we do not know — the same posture
+  // the chips take when their read fails: omit, never guess. The failure mode
+  // that matters here is removing a control we had no evidence to remove.
+  const { byInboundId: holds, refresh: refreshHolds } = usePendingRequests([threadId]);
   const { engagements } = useThreadEngagements(threadId); // accepted-only (ruling 1)
   const { cards } = useCards();
   const { entity } = useEntity();
@@ -129,17 +201,32 @@ export default function ThreadDecisionBanner({ threadId }: { threadId: string })
           decision,
           error: rpcErr.message,
         });
+        // BY MESSAGE. "Could not accept. Try again." was the whole of this
+        // branch, and on a lapsed hold it told a clinician to retry something
+        // TERMINAL — the time is back on the board and no number of taps
+        // returns it. The race is named; everything else keeps the retry
+        // advice, which is true for everything else.
+        const raced = decision === 'accepted' && isSlotNoLongerHeld(rpcErr);
         setErrorById((prev) => ({
           ...prev,
-          [item.id]: decision === 'accepted' ? 'Could not accept. Try again.' : 'Could not decline. Try again.',
+          [item.id]: raced
+            ? LET_GO_RACE
+            : decision === 'accepted'
+              ? 'Could not accept. Try again.'
+              : 'Could not decline. Try again.',
         }));
+        // The hold is gone server-side; re-read THE HOLDS so the panel drops
+        // Accept rather than offering the tap that just failed. `refresh` above
+        // is the pending-inbound read and does not carry held_until — refreshing
+        // the wrong one would leave the button standing.
+        if (raced) void refreshHolds();
         return;
       }
       // The realtime stream drops the pending row and (on accept) adds the
       // commitment; this refresh just tightens the gap.
       void refresh();
     },
-    [refresh],
+    [refresh, refreshHolds],
   );
 
   const handleAccept = useCallback((item: Inbound) => void decide(item, 'accepted'), [decide]);
@@ -175,10 +262,20 @@ export default function ThreadDecisionBanner({ threadId }: { threadId: string })
     <View style={styles.slot}>
       {pending.map((item) => {
         const card = item.card_id ? (cards.find((c) => c.id === item.card_id) ?? null) : null;
+        // The SAME test InboundTile:71 uses to route a clinical request. A card
+        // we cannot find is NOT a practice card — unknown must not unlock a
+        // behaviour that removes a control.
+        const isPracticeRequest = card?.kind === 'practice';
+        const letGo = isTimeLetGo({
+          isPracticeRequest,
+          pending: holds.get(item.id) ?? null,
+        });
         return (
           <DecisionPanel
             key={item.id}
             item={item}
+            isPracticeRequest={isPracticeRequest}
+            letGo={letGo}
             cardTitle={card?.title ?? null}
             cardTerms={card?.commerce_terms ?? null}
             priceCents={card?.price_cents ?? null}
@@ -292,6 +389,23 @@ const styles = StyleSheet.create({
   btnDisabled: {
     opacity: 0.5,
   },
+  // NOT the error style, deliberately. A lapsed hold is not a mistake anyone
+  // made, and clay-red on this panel would say it was.
+  letGoBanner: {
+    borderRadius: theme.borderRadius.card,
+    borderWidth: 1,
+    borderColor: theme.colors.hairline,
+    backgroundColor: theme.colors.surfaceInset,
+    padding: theme.spacing.md,
+    gap: 2,
+    marginBottom: theme.spacing.sm,
+  },
+  letGoTitle: {
+    ...theme.typography.bodyMuted,
+    fontFamily: theme.fonts.semiBold,
+    color: theme.colors.textPrimary,
+  },
+  letGoBody: { ...theme.typography.caption, color: theme.colors.textSecondary },
   errorText: {
     ...theme.typography.caption,
     color: theme.colors.danger,

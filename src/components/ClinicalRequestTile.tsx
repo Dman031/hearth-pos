@@ -6,6 +6,13 @@ import { formatCents } from '../utils/format';
 import HonestyChips from './HonestyChips';
 import Toast from './Toast';
 import { postInquiryMessage, type PendingRequest } from '../services/inquiry';
+import {
+  isSlotNoLongerHeld,
+  isTimeLetGo,
+  LET_GO_BODY,
+  LET_GO_RACE,
+  LET_GO_TITLE,
+} from '../services/practice';
 import type { Inbound } from '../types/inbound';
 
 // ClinicalRequestTile — PLEXMED S6 PART B, the clinician's tile for a request
@@ -60,7 +67,11 @@ export default function ClinicalRequestTile({
   // The hold has lapsed once held_until is null. The conversation outlives it:
   // that is a real state, not an edge case.
   const heldUntil = pending?.held_until ?? null;
-  const letGo = pending !== null && heldUntil === null;
+  // ONE DERIVATION, SHARED WITH THE DECISION BANNER. This tile only ever renders
+  // practice requests (InboundTile:102 routes here on card.kind === 'practice'),
+  // so the gate is trivially true here — it is passed explicitly anyway so the
+  // two surfaces call the SAME predicate and cannot drift.
+  const letGo = isTimeLetGo({ isPracticeRequest: true, pending });
 
   const acceptLabel =
     priceCents === null ? 'Accept' : `Accept — ${formatCents(priceCents, currency)}`;
@@ -89,10 +100,17 @@ export default function ClinicalRequestTile({
     setBusy(true);
     try {
       await onAccept(inbound, '');
-    } catch {
-      // T-ERR. The time went while they were deciding — nothing was charged,
-      // and the person can ask for another.
-      setToast('That time went to someone else. They can ask for another; nothing was charged.');
+    } catch (err) {
+      // T-ERR, AND ONLY T-ERR. This was a bare `catch` that reported the race on
+      // ANY failure — so a dropped connection told a clinician their patient's
+      // time had gone to someone else. That is a fallback string describing the
+      // opposite of what happened, in the copy the rule was written about.
+      // Matched by message now; anything else says what it is.
+      setToast(
+        isSlotNoLongerHeld(err)
+          ? LET_GO_RACE
+          : 'Couldn’t accept just now. Nothing was changed — try again.',
+      );
     } finally {
       setBusy(false);
     }
@@ -111,12 +129,8 @@ export default function ClinicalRequestTile({
       {/* T2 / T3 / T4 banners. */}
       {letGo ? (
         <View style={styles.banner}>
-          <Text style={styles.bannerTitle}>That time was let go</Text>
-          <Text style={styles.bannerBody}>
-            A request holds a time for a day, or until an hour before the visit — whichever
-            comes first. This one passed that point, so the time went back on your board. You
-            can still talk here; to book, they need to ask for a time again.
-          </Text>
+          <Text style={styles.bannerTitle}>{LET_GO_TITLE}</Text>
+          <Text style={styles.bannerBody}>{LET_GO_BODY}</Text>
         </View>
       ) : conversation === 'awaiting_them' ? (
         <View style={styles.banner}>
