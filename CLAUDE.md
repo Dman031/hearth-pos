@@ -230,6 +230,13 @@ Per harvest-once-app BUG-022's workflow failure analysis: post-promotion codebas
 
 Every `await supabase.from().update()`, `.insert()`, or `.delete()` call MUST destructure `{ error }` or `{ data, error }`. Updates that need confirmation of effect MUST chain `.select()` to verify rows affected. Zero rows affected on a primary-key match is an RLS silent-block signature and MUST be treated as failure, not success. Never use fire-and-forget writes. Applies equally to anon-key vendor sessions (where RLS is the most common silent-block cause) and service-role-key writes (where triggers/constraints still produce silent no-ops).
 
+EVIDENCE (2026-08-29): verify-care-loop.mjs — THE SCRIPT WRITTEN TO CATCH THIS CLASS — contained
+an unchecked `threads` insert. It violated a check constraint on about half of runs; `data` came
+back null, the failure was invisible, and the run produced a nine-line cascade of downstream
+skips with the cause NOWHERE IN THE OUTPUT. That is precisely what this rule predicts, and it
+took a deliberate hunt to find something the destructured error would have printed on line one.
+Recorded as evidence, not as an apology: the rule holds against the people who know it.
+
 **PROMPT-CODE CONTRACT — MANDATORY**
 
 Every business rule stated in the system prompt MUST also be enforced in code at the tool boundary. Prompts are suggestions to the model; code is the guarantee to the vendor. If the prompt says "never X", the tool that could do X must reject X server-side. Applies to: required-field checkpoints, value enums, template-gated feature visibility, paywall trigger thresholds, allergen/dietary confirmations, and any "must call tool Y when Z" rule. LLMs ignore prompt instructions probabilistically; code does not.
@@ -237,6 +244,30 @@ Every business rule stated in the system prompt MUST also be enforced in code at
 **AI TOOL-CALLING DISCIPLINE — MANDATORY**
 
 For actions with side-effects (profile writes, payment, template selection, transaction recording), force `tool_choice: { type: 'tool', name: '<tool>' }` from middleware-detected intent rather than relying on voluntary tool selection. Pair with explicit trigger phrases in the system prompt using emphatic language (MUST / NEVER / ALWAYS / CRITICAL). After each model response, validate that any side-effect-claiming text corresponds to an actually-called tool; block the response if it claims an action no tool performed.
+
+**VERIFICATION DISCIPLINE — MANDATORY**
+
+A check that can pass without the thing being true is worse than no check: it converts an
+unknown into a false green, and nobody re-examines a green line.
+
+- **A STATUS CODE IS NOT AN ASSERTION. Refusals match BY MESSAGE.** `expect 409` passed on a
+  `409 file_missing` when the assertion meant `409 notWrapped` — a real refusal, the wrong one,
+  reported as proof of the right one. Assert the reason: `status === 409 && /wrap/i.test(body.message)`.
+- **A FALLBACK STRING MUST NOT DESCRIBE THE OPPOSITE OF WHAT HAPPENED.** `err?.message ?? 'refused'`
+  printed "refused" on a NULL error — i.e. on acceptance. Detail text is read as evidence; write
+  the branch, not a default that reads well.
+- **ABSENCE OF EVIDENCE IS REPORTED AS FAILURE.** A step whose input is missing must print and
+  COUNT a failure, never vanish. A run that is SHORT rather than BROKEN is the one a person
+  skims past. (proof-standard.mjs already does this for missing assertion checks.)
+- **A DIAGNOSIS IS A CLAIM AND CARRIES A COMPLETION REPORT'S EVIDENCE BURDEN.** A nine-failure
+  cascade was attributed, in a script header, to a global sweep's blast radius. The real cause
+  was an unchecked insert violating a check constraint. The wrong cause was plausible, written
+  down, and would have misdirected the next reader. Diagnose from output, not from the most
+  interesting hypothesis available — and when a written cause turns out wrong, CORRECT IT IN
+  PLACE. A plausible wrong cause in a comment is worse than no comment.
+
+Origin: verify-care-loop.mjs, 2026-08-29 — all four found while building the end-to-end script,
+three of them in that script's own assertions.
 
 **SPEC-CONTRACT RULE — MANDATORY**
 
