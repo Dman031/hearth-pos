@@ -61,7 +61,23 @@ export default function ProfileScreen() {
   // licence row is what the database itself requires
   // (cards_practice_requires_licence), so the picker offers a path the write
   // will accept — never one it will reject.
-  const { verifications } = useMyVerifications();
+  const { verifications, isLoading: verificationsLoading, error: verificationsError } =
+    useMyVerifications();
+  // P5: the same predicate OpenTimesBoard:101-103 uses, so the banner and the
+  // board it points at cannot disagree about whether the stamp is live.
+  //
+  // UNDEFINED WHILE THE READ IS IN FLIGHT OR FAILED, never while it is merely
+  // EMPTY. An empty list is a real answer — no stamp — and a clinician who has
+  // never verified should see the stamp-off banner, not silence. What must not
+  // become "paused" is a fact we do not have: ProfileCard renders nothing on
+  // undefined. Keyed on the hook's own flags rather than on length, because
+  // length cannot tell those two apart.
+  const licenceLive: boolean | undefined =
+    verificationsLoading || verificationsError !== null
+      ? undefined
+      : verifications.some(
+          (v) => v.type === 'license' && v.status === 'verified' && v.voided_at === null,
+        );
   const practiceAvailable = verifications.some(
     (v) => v.type === 'license' && v.status === 'verified' && v.voided_at === null,
   );
@@ -289,6 +305,7 @@ export default function ProfileScreen() {
               <ProfileCard
                 key={card.id}
                 card={card}
+                licenceLive={licenceLive}
                 onPress={() =>
                   card.kind === 'practice' ? setPracticeCard(card) : setEditingCard(card)
                 }
