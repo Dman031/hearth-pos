@@ -2874,6 +2874,10 @@ S10-4 (S10-BAA) NO REAL PATIENT DATA REACHES api.medplum.com BEFORE A SIGNED BAA
     patient is wrapped (S8-2 says so in the schema comment), so every probe, every BUILD run
     and every verify script uses synthetic fixtures until the BAA is signed. This is a ruling,
     not a comment, and it does not relax for a demo.
+    AMENDED BY S10-19 (2026-08-30) — READ THAT BLOCK WITH THIS ONE. The synthetic-only
+    requirement above is UNCHANGED and absolute. What S10-19 corrects is the CONDITION: on
+    Medplum's Free tier there is no BAA to sign, so "until the BAA is signed" names a state this
+    tier cannot reach. S10-19 carries the three paths that can, and the launch gate.
 S10-5 THE PUSH IS TAPPED, NEVER TRIGGERED. No trigger on visit_wraps, no enqueue inside
     wrap_visit, no auto-push on the fulfilled transition. "Clinician taps, selects, decides —
     every time" covers sending a record to a third party at least as strongly as it covers a
@@ -3015,28 +3019,55 @@ S10-18 A FIFTH REFUSAL: no_practitioner_identifier (ratified 2026-08-29, after t
     IS OWED: 0045 carries skipped_reason's vocabulary by comment rather than CHECK (0043's
     posture), precisely so a refusal learned at build time does not need one.
 
-S10-19 (S10-BAA, ENFORCED) THE MEDPLUM SECRETS ARE UNSET UNTIL THE BAA SIGNS. Ruled
-    2026-08-30 on the POS TAP session's finding, which is the reason and is recorded as given:
-    `npx wrangler secret list` shows MEDPLUM_CLIENT_ID and MEDPLUM_CLIENT_SECRET LIVE on the
-    deployed Worker. So resolveFhirProvider returns a provider, sweepEhrPushes does NOT return
-    'no_provider', and S10-4's synthetic-only gate was enforced by EXACTLY ONE THING: the
-    absence of a caller — which is the thing that session builds.
-    DERRICK'S REASONING, RECORDED AS GIVEN: "A compliance gate belongs where the credential is.
-    The drain returns no_provider before a query, rows pend, and they drain when the secrets
-    return."
-    THE GATE IS NOT A SCREEN, and that is the load-bearing half. queue_ehr_push is granted to
-    `authenticated` (0045:276), so a PostgREST call from any seller session bypasses every
-    affordance the app could hide — a disabled button is the PROMPT-CODE CONTRACT rule's
-    "suggestion", and the disclosure it would fail to prevent is a patient's name and date of
-    birth to a third party with no agreement in place.
-    ACTION: `npx wrangler secret delete MEDPLUM_CLIENT_ID` and the same for
-    MEDPLUM_CLIENT_SECRET, run by hand. NOTHING IS LOST BY UNSETTING THEM — medplum.ts:12-14
-    designed for exactly this state: not an error, not logged as one, costs nothing per tick.
-    Queued rows sit at 'pending' and drain on the first tick after the secrets return.
+S10-19 (S10-BAA, ENFORCED) THE MEDPLUM SECRETS COME OUT AFTER FILM #3, AND THEY DO NOT
+    RETURN UNTIL ONE OF THREE PATHS IS CHOSEN. Ruled 2026-08-30; AMENDED THE SAME DAY, and the
+    amendment is the substance — the first draft of this ruling said "unset until the BAA
+    signs", WHICH IS NOT A REACHABLE STATE ON THE TIER WE ARE ON.
+    THE FINDING THAT MADE THIS A RULING. `npx wrangler secret list` shows MEDPLUM_CLIENT_ID and
+    MEDPLUM_CLIENT_SECRET LIVE on the deployed Worker. So resolveFhirProvider returns a
+    provider, sweepEhrPushes does NOT return 'no_provider', and S10-4's synthetic-only gate was
+    enforced by EXACTLY ONE THING: the absence of an app caller — which is the thing the POS TAP
+    session built (hearth-pos c995bd5). The gate had to become real the moment the caller did.
+    WHY "UNTIL THE BAA SIGNS" IS THE WRONG SENTENCE. DERRICK, RECORDED AS GIVEN: "Medplum's Free
+    tier has NO BAA — Standard BAA is Production, $2,000/mo and up; blank on Free and Community.
+    So the gate is not 'until the BAA signs' — on this tier there is nothing to sign." A ruling
+    whose condition cannot be met is not a gate, it is a sentence that reads like one. Corrected
+    in place rather than left standing, per the VERIFICATION DISCIPLINE rule's fourth clause: a
+    plausible wrong cause written down is worse than none.
+    WHY THE KEYS STAY LIVE THROUGH FILM #3. THE GATE'S SUBJECT IS REAL PATIENT DATA, AND FILM
+    #3's CAST IS SYNTHETIC — invented names, invented dates of birth, fixture entities. No PHI
+    crosses the wire, so nothing S10-4 protects is at stake and the final beat works. This is
+    S10-4 applied exactly as written ("every probe, every BUILD run and every verify script uses
+    synthetic fixtures"), not an exception carved out of it.
+    THE ACTION, AND ITS TIMING. `npx wrangler secret delete MEDPLUM_CLIENT_ID` and the same for
+    MEDPLUM_CLIENT_SECRET, run by hand IMMEDIATELY AFTER THE FILM SESSION — not before, not "at
+    some point after". NOTHING IS LOST BY REMOVING THEM: medplum.ts:12-14 was designed for this
+    state — not an error, not logged as one, costs nothing per tick. Queued rows sit at
+    'pending' and drain on the first tick after the keys return.
+    THE THREE PATHS BACK, ALL THREE RECORDED SO NONE IS QUIETLY FORECLOSED:
+      (a) THE CLINICIAN'S OWN EHR, UNDER THEIR OWN BAA. The agreement is theirs and already
+          exists; we are a source pushing into a record they are the covered entity for.
+      (b) SELF-HOSTED MEDPLUM WITH AN AWS BAA. The BAA is with the infrastructure provider
+          rather than with Medplum, and the server is ours.
+      (c) MEDPLUM PRODUCTION, with the Standard BAA that tier carries.
+    S10-2 IS WHAT KEEPS ALL THREE OPEN, and this is the ruling that shows why S10-2 was worth
+    holding: the bundle is server-agnostic and vendor-free, so each path is credentials and a
+    base URL, never code. NO MEDPLUM-SPECIFIC EXTENSION, PROFILE OR RESOURCE MAY ENTER THE
+    COMPOSER — restated here because a deadline is exactly when one would.
+    THE LAUNCH GATE, ABSOLUTE: NO REAL PATIENT'S NAME OR DATE OF BIRTH REACHES api.medplum.com
+    UNDER ANY CIRCUMSTANCE. Not for a demo, not for a pilot, not for one cooperative patient who
+    said yes. The only traffic that host ever sees is synthetic. When a path above is chosen the
+    destination changes with it, and this line follows the hostname it names.
+    THE GATE IS THE CREDENTIAL, NOT A SCREEN, and that half is unchanged. queue_ehr_push is
+    granted to `authenticated` (0045:276), so a PostgREST call from any seller session bypasses
+    every affordance the app could hide — a disabled button is the PROMPT-CODE CONTRACT rule's
+    "suggestion", and what it would fail to prevent is a patient's name and date of birth
+    leaving for a third party. DERRICK, RECORDED AS GIVEN: "A compliance gate belongs where the
+    credential is."
     VERIFY RUNS SET THEM LOCALLY. scripts/verify-fhir-push.mjs PART 7 is opt-in and synthetic by
     construction (:77, :253, :275); it reads no row from the database to build its fixtures, so
     a local re-set of the two keys never puts a real patient anywhere near api.medplum.com.
-    THE APP SAYS SO HONESTLY RATHER THAN HIDING THE TAP. With the secrets unset the status row
+    THE APP SAYS SO HONESTLY RATHER THAN HIDING THE TAP. With the keys removed the status row
     reads "Waiting to send", which is what get_my_ehr_pushes actually returns and needs no
     special case. The tap is NOT hidden: an affordance that vanishes and a feature that does not
     exist look alike, which is the failure mode the room row is already ruled against
