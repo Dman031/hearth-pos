@@ -2996,3 +2996,21 @@ S10-17 MIGRATION 0045, ONE FILE, NO SPLIT-ENUM PAIR OWED. Ledger verified 2026-0
     the table holds no PHI itself but it points at rows that do. queue_ehr_push and
     get_my_ehr_pushes each ship the full MIGRATION FUNCTION GRANT BLOCK. Receipt as the final
     statement.
+
+S10-18 A FIFTH REFUSAL: no_practitioner_identifier (ratified 2026-08-29, after the build
+    surfaced it). The push refuses BY NAME when the seller has no live verified NPI. TWO
+    REASONS, and either alone would be enough:
+    (a) THE RETRY MODEL DEPENDS ON IT. Every resource in the bundle is matched by an
+        identifier under our own system with ifNoneExist, which is what makes S10-14's
+        "the whole bundle is re-runnable" true rather than hopeful. A Practitioner with NO
+        identifier has no ifNoneExist key, so the second attempt MINTS A SECOND CLINICIAN in
+        the chart — the exact duplication the model is built not to do, arriving through the
+        one resource nobody was watching.
+    (b) IT INVERTS S8-2. The provenance split says the stamps are the network's claim and the
+        patient's name and DOB are the clinician's. A clinical record pushed under a
+        practitioner the network never verified makes the network the author of an
+        unverified provenance claim, which is the split running backwards.
+    Recorded as a ruling rather than left in code because S10-15 closes the bundle's surface
+    and a refusal that gates who may appear in it is the same kind of decision. NO MIGRATION
+    IS OWED: 0045 carries skipped_reason's vocabulary by comment rather than CHECK (0043's
+    posture), precisely so a refusal learned at build time does not need one.
