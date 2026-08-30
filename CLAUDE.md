@@ -265,7 +265,7 @@ grep -rn "Detail row:\|Time row:\|Hold row:\|chip\|Errors surface" ../hearth-net
 Compare column by column. A rendered example naming a column absent from the `returns table`
 block is the defect.
 
-EVIDENCE — four instances, ALL found at build or sweep time by an agent rather than at design
+EVIDENCE — six instances, ALL found at build or sweep time by an agent rather than at design
 time, which is why this is a rule and not a habit:
 
 - **CRED S3's data-contract table** was frozen at migration `0035` and never updated when
@@ -281,6 +281,20 @@ time, which is why this is a rule and not a habit:
 - **PLEXMED S7's A3 identity chip** says it renders "exactly as on Incoming". `get_my_day`
   returns no verification flag and neither does `get_my_thread_peers`, so on Today the chip has
   no source at all.
+- **The rule caught its own author, one day after promotion.** Writing the care-loop proposal,
+  an agent named the wrap's table `visit_records` — taken from the S7 spec's PROSE ("it upserts
+  the record") rather than from `0041:157`, where it is `visit_wraps`. The database refused it:
+  `PGRST205 — Could not find the table 'public.visit_records'. Perhaps you meant
+  'public.visit_wraps'`. **PROSE BECAME AN ASSUMED IDENTIFIER**, and only the schema stopped it.
+  This is the most useful evidence the rule has: the failure is not carelessness about a
+  contract table, it is how readily a name in a sentence is carried forward as a fact. Read the
+  migration, not the paragraph that describes it — including when you wrote the paragraph.
+
+- **A verification script asserted refusals its own migration never had.** verify-care-loop's
+  first draft checked that `issue_superbill` refuses an unwrapped or unpaid visit — because the
+  chain was DESCRIBED to its author in prose. The migration guards neither; the gate is the edge
+  function. PROSE BECAME AN ASSERTION, and a script written to catch this class committed it.
+  The rule cuts toward whoever writes the description as much as whoever reads it.
 
 SWEEP PERFORMED 2026-08-28 across all four specs in `hearth-network/docs/` against their
 migrations; the four above are the complete result, plus one benign case (S7 A2's derivation
