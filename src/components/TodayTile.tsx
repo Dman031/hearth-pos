@@ -12,7 +12,7 @@ import {
   type DayVisit,
   type EhrPush,
 } from '../services/visits';
-import { issueSuperbill } from '../services/superbill';
+import { issueSuperbill, signedSuperbillUrl } from '../services/superbill';
 import {
   CHIP_FIRST_VISIT,
   PUSH_ACTION,
@@ -22,6 +22,7 @@ import {
   SUPERBILL_ACTION,
   SUPERBILL_ALREADY,
   SUPERBILL_BODY,
+  SUPERBILL_LINK_FAILED,
   SUPERBILL_OPEN,
   SUPERBILL_OPEN_FAILED,
   SUPERBILL_READY,
@@ -163,17 +164,27 @@ export default function TodayTile({
     // issue_superbill posted the message that carries the document (0042:139-146),
     // so the conversation changed even when the receipt did not.
     onChanged();
-    const { signedUrl, alreadyIssued } = result.value;
-    Alert.alert(
-      alreadyIssued ? SUPERBILL_ALREADY : SUPERBILL_READY,
-      SUPERBILL_BODY,
-      signedUrl
-        ? [
-            { text: 'Close', style: 'cancel' as const },
-            { text: SUPERBILL_OPEN, onPress: () => void openDocument(signedUrl) },
-          ]
-        : [{ text: 'Close', style: 'cancel' as const }],
-    );
+    const { storagePath, alreadyIssued } = result.value;
+    Alert.alert(alreadyIssued ? SUPERBILL_ALREADY : SUPERBILL_READY, SUPERBILL_BODY, [
+      { text: 'Close', style: 'cancel' as const },
+      // MINTED WHEN THE FINGER LANDS, not when the alert opened. The call's own
+      // `signed_url` is already a few seconds old and an alert can sit on screen
+      // far longer than the 600 s it lives — tapping a captured link would open
+      // an expired signature, which is the dead-link failure BUG-016 is about,
+      // arriving through the one path that looked too short to matter. This is
+      // also what superbill.ts's own "never store a link" rule requires.
+      { text: SUPERBILL_OPEN, onPress: () => void openIssuedSuperbill(storagePath) },
+    ]);
+  };
+
+  /** Fresh link, then tap-out. Used by the alert above and nothing else. */
+  const openIssuedSuperbill = async (storagePath: string): Promise<void> => {
+    const url = await signedSuperbillUrl(storagePath);
+    if (!url) {
+      setToast(SUPERBILL_LINK_FAILED);
+      return;
+    }
+    await openDocument(url);
   };
 
   /**
