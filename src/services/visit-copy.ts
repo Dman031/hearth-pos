@@ -101,6 +101,23 @@ export const FOLLOW_UP_HELP =
   'This puts the time on your board and tells them it is there. They choose whether to take ' +
   'it, the same as the first visit.';
 
+// C5 · THE HANDOFF (ratified 2026-08-30, replacing the pointer at WrapSheet's
+// C5 — "Post the time on your open times board, in Settings › PlexMed.").
+//
+// THE POINTER WAS RIGHT AGAINST A STACKED MODAL AND ONLY AGAINST THAT. Opening
+// AddTimesSheet from inside WrapSheet is two pageSheets deep, which N-8 forbids
+// and which this codebase has refused three times. Opening it AFTER the wrap
+// sheet has dismissed is not a stacked modal — it is the next thing, on the
+// screen that owns both. DERRICK, RECORDED AS GIVEN: "a clinician who just saw
+// a patient is exactly who should offer the next time."
+//
+// OPT-IN, AND ONLY ON A WRAP THAT LANDED. A times board that opened after every
+// wrap would be an unbidden modal; one that opened after a FAILED wrap would
+// imply the wrap succeeded. Both are worse than the pointer this replaces.
+export const FOLLOW_UP_OFFER_TOGGLE = 'Offer another time when I’m done';
+/** What happens from the clinician's side — not what the app does. */
+export const FOLLOW_UP_OFFER_NOTE = 'Your times board opens when you’re done.';
+
 // The billing block. That sentence is the whole ruling in one place: the stamps
 // are the network's claim; the name and DOB are the clinician's.
 export const BILLING_HEADER = 'For the superbill';

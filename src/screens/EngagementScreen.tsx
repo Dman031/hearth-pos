@@ -16,6 +16,7 @@ import useMyEngagements, { type MyEngagement } from '../hooks/useMyEngagements';
 import useMyDay from '../hooks/useMyDay';
 import TodayTile from '../components/TodayTile';
 import WrapSheet from '../components/WrapSheet';
+import AddTimesSheet from '../components/AddTimesSheet';
 import { FOLLOWUPS_DUE_HEADER } from '../services/visit-copy';
 import {
   fetchEhrPushes,
@@ -25,6 +26,7 @@ import {
   type FollowupDue,
 } from '../services/visits';
 import EngagementCalendar from '../components/EngagementCalendar';
+import Toast from '../components/Toast';
 import { notifyEngagementsChanged } from '../utils/engagement-refresh';
 import { ENGAGEMENT_KIND_LABEL, STATUS_LABEL, formatCents } from '../utils/format';
 import { formatForDisplay, formatRelativeDay, parseUTCTimestamp, toDateKey } from '../datetime';
@@ -212,6 +214,11 @@ export default function EngagementScreen() {
   // which is what a Today strip needs" — so the screen fetches once and indexes
   // it, rather than one RPC per wrapped tile.
   const [pushes, setPushes] = useState<Map<string, EhrPush>>(new Map());
+  // C5's handoff target. Holds the practice CARD id, not the visit — the times
+  // board posts against a card. Null means no board is open, which is the state
+  // after every wrap where the clinician did not ask for one.
+  const [offeringOnCardId, setOfferingOnCardId] = useState<string | null>(null);
+  const [offerToast, setOfferToast] = useState<string | null>(null);
 
   const refreshPushes = useCallback(async () => {
     const result = await fetchEhrPushes();
@@ -637,8 +644,47 @@ export default function EngagementScreen() {
         onWrapped={() => {
           void refreshDay();
           void refresh();
+          void refreshPushes();
+        }}
+        // C5. Opened HERE, on the screen, after WrapSheet has dismissed —
+        // never from inside it (N-8: no stacked modals).
+        onOfferTime={(visit) => {
+          // THE NULL GUARD IS THE WHOLE CHECK. DayVisit.card_id is nullable, and
+          // AddTimesSheet posts against a card: with no id there is nothing to
+          // post to. Say so rather than opening a board that cannot save.
+          if (!visit.card_id) {
+            console.warn('[EngagementScreen] offer-time skipped: visit has no card', {
+              engagementId: visit.engagement_id,
+            });
+            setOfferToast('This visit has no card, so there is no board to post a time on.');
+            return;
+          }
+          setOfferingOnCardId(visit.card_id);
         }}
       />
+
+      {/* C5's board. Mounted on the SCREEN so it opens after the wrap sheet is
+          gone. `visible` is derived from the card id, so closing it clears the
+          id and a second wrap opens a fresh sheet rather than a stale one. */}
+      <AddTimesSheet
+        visible={offeringOnCardId !== null}
+        cardId={offeringOnCardId ?? ''}
+        tz={dayTz}
+        defaultModality="video"
+        defaultMinutes={45}
+        onClose={() => setOfferingOnCardId(null)}
+        onPosted={(outcome) => {
+          setOfferingOnCardId(null);
+          // The board's own wording, so posting from here and posting from
+          // Settings report the same thing in the same words.
+          setOfferToast(
+            outcome.skipped > 0
+              ? `Posted ${outcome.posted} times. ${outcome.skipped} were already on your board.`
+              : `Posted ${outcome.posted} times.`,
+          );
+        }}
+      />
+      <Toast message={offerToast} onDismiss={() => setOfferToast(null)} />
     </View>
   );
 }

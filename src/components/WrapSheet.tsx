@@ -21,6 +21,8 @@ import {
   CPT_SHORT_LIST,
   FOLLOW_UP_HEADER,
   FOLLOW_UP_HELP,
+  FOLLOW_UP_OFFER_NOTE,
+  FOLLOW_UP_OFFER_TOGGLE,
   ICD_HEADER,
   ICD_HELP,
   PLAN_HEADER,
@@ -62,9 +64,23 @@ interface WrapSheetProps {
   peerName: string | null;
   onClose: () => void;
   onWrapped: () => void;
+  /**
+   * C5's handoff. Fired ONLY after a wrap that landed, and only when the
+   * clinician asked for it — the screen opens its times board once this sheet
+   * has dismissed. Never called on a refusal: nothing happened, so nothing
+   * follows, and a times board appearing after a failed wrap would imply the
+   * wrap went through.
+   */
+  onOfferTime?: (visit: DayVisit) => void;
 }
 
-export default function WrapSheet({ visit, peerName, onClose, onWrapped }: WrapSheetProps) {
+export default function WrapSheet({
+  visit,
+  peerName,
+  onClose,
+  onWrapped,
+  onOfferTime,
+}: WrapSheetProps) {
   const [planText, setPlanText] = useState('');
   const [visitKind, setVisitKind] = useState<'new' | 'follow_up' | null>(null);
   const [cpt, setCpt] = useState<string | null>(null);
@@ -73,6 +89,7 @@ export default function WrapSheet({ visit, peerName, onClose, onWrapped }: WrapS
   const [patientName, setPatientName] = useState('');
   const [patientDob, setPatientDob] = useState('');
   const [cadence, setCadence] = useState<number | null>(null);
+  const [offerTime, setOfferTime] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -97,6 +114,7 @@ export default function WrapSheet({ visit, peerName, onClose, onWrapped }: WrapS
     setPatientName(peerName ?? '');
     setPatientDob('');
     setCadence(null);
+    setOfferTime(false);
     setError(null);
     setBusy(false);
   }, [visible, visit, peerName]);
@@ -154,9 +172,13 @@ export default function WrapSheet({ visit, peerName, onClose, onWrapped }: WrapS
     }
     onWrapped();
     onClose();
+    // C5. AFTER onClose, and only here — inside the success branch. The screen
+    // opens its times board once this sheet has dismissed, which is what keeps
+    // the handoff out of N-8's stacked-modal refusal.
+    if (offerTime && onOfferTime) onOfferTime(visit);
   }, [
     visit, busy, planTooMany, duration, icd, visitKind, cpt, patientName, patientDob,
-    planItems, cadence, onWrapped, onClose,
+    planItems, cadence, offerTime, onWrapped, onClose, onOfferTime,
   ]);
 
   return (
@@ -308,9 +330,30 @@ export default function WrapSheet({ visit, peerName, onClose, onWrapped }: WrapS
               their consent. */}
           <Text style={styles.label}>{FOLLOW_UP_HEADER}</Text>
           <Text style={styles.helper}>{FOLLOW_UP_HELP}</Text>
-          <Text style={styles.helper}>
-            Post the time on your open times board, in Settings › PlexMed.
-          </Text>
+          {/* C5's handoff replaces the pointer that used to sit here. The
+              pointer was right against a STACKED MODAL and only against that:
+              opening the times board from inside this sheet is two pageSheets
+              deep (N-8, refused three times in this codebase). Opening it once
+              this sheet has dismissed is not a stacked modal.
+
+              OPT-IN. Off every time the sheet opens, and the board appears only
+              on a wrap that landed — a board after every wrap is unbidden, and
+              one after a FAILED wrap would say the wrap went through. */}
+          <Pressable
+            style={[styles.offerRow, offerTime && styles.offerRowOn]}
+            onPress={() => setOfferTime(!offerTime)}
+            disabled={busy}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: offerTime, disabled: busy }}
+          >
+            <View style={[styles.checkbox, offerTime && styles.checkboxOn]}>
+              {offerTime ? <Text style={styles.checkMark}>✓</Text> : null}
+            </View>
+            <Text style={[styles.offerLabel, offerTime && styles.offerLabelOn]}>
+              {FOLLOW_UP_OFFER_TOGGLE}
+            </Text>
+          </Pressable>
+          {offerTime ? <Text style={styles.helper}>{FOLLOW_UP_OFFER_NOTE}</Text> : null}
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -383,6 +426,32 @@ const styles = StyleSheet.create({
   chipOn: { borderColor: theme.colors.accentBorder, backgroundColor: theme.colors.accentFill },
   chipLabel: { ...theme.typography.bodyMuted, color: theme.colors.textSecondary },
   chipLabelOn: { color: theme.colors.accent, fontFamily: theme.fonts.semiBold },
+  offerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.card,
+    borderWidth: 1,
+    borderColor: theme.colors.hairline,
+    backgroundColor: theme.colors.surface,
+    marginTop: theme.spacing.xs,
+  },
+  offerRowOn: { borderColor: theme.colors.accentBorder, backgroundColor: theme.colors.accentFill },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: theme.colors.hairline,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.surface,
+  },
+  checkboxOn: { borderColor: theme.colors.accent, backgroundColor: theme.colors.accent },
+  checkMark: { color: theme.colors.onAccent, fontSize: 14, lineHeight: 18 },
+  offerLabel: { ...theme.typography.bodyMuted, color: theme.colors.textSecondary, flexShrink: 1 },
+  offerLabelOn: { color: theme.colors.accent, fontFamily: theme.fonts.semiBold },
   cptList: { gap: theme.spacing.xs },
   cptRow: {
     flexDirection: 'row',
