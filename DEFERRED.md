@@ -459,6 +459,52 @@ Cross-repo: spans hearth-pos (app download, caller verify, caller-as-new-owner) 
   a NEW native module; (2) redeploy `embed-card` + `backfill-embeddings`; (3) run backfill
   `{ force_all: true }`, paging `next_cursor` until null, to clean existing `media_url`-polluted
   vectors. Deferred follow-ons logged above (see_perm-gated access, drag-reorder, orphan cleanup).
+- **PLEXMED S4b — the let-go state on BOTH accept paths** — built 2026-08-30. `isTimeLetGo` and
+  the shared copy now live in `src/services/practice.ts`, so the two surfaces cannot drift.
+  `ThreadDecisionBanner` gained the T4 state (ruled 2026-08-30: **T4 binds the conversation
+  banner** — *"a control that cannot act teaches that controls are decorative, and a refusal in
+  a different tab is the same failure"*), which cost it a second read of
+  `get_my_pending_requests` for `held_until`; that is the honest price and it is stated at the
+  call site. **The practice gate is a CHECK, not a comment** (ruled): `held_until` is null both
+  for a lapsed practice hold and for every ordinary booking that never had one, so deriving
+  let-go from the null alone would strip Accept from ordinary rows. `isTimeLetGo` refuses a
+  non-practice request on its first line and `DecisionPanel` re-asserts it, logging and keeping
+  Accept if the invariant is ever violated upstream. Both bare-catch/blind-retry defects fixed
+  by message match on `SLOT_NO_LONGER_HELD` (0038b:767).
+- **PLEXMED S5 P5 — the paused banner on Profile** — built 2026-08-30, both variants ratified.
+  Lives in `ProfileCard`, not `ProfileScreen`: nothing in the schema limits an entity to one
+  practice card (0038a adds the enum value and no uniqueness index), and a screen-level read
+  would have to loop — which React forbids — or silently answer for the first card only.
+  Non-practice cards pass a null id and cost nothing. **Paused means nobody CAN ask, not that
+  nobody has an opening left** (ruled): the predicate is ZERO FUTURE SLOTS OF ANY STATE, so a
+  fully-booked clinician gets no banner — *"a false alarm on the person doing best"*. Window is
+  `p_from = now()` (past-only times must not read as un-paused) and 90 days, matching the
+  board's own horizon, because two windows that disagree is how a banner contradicts the screen
+  it points at. The stamp-off variant is checked first and keeps its second sentence verbatim —
+  *"Posting more will not change that — the stamp is what is missing."* — which is the sentence
+  that stops someone spending ten minutes on the wrong fix.
+- **PLEXMED S7 C5 — the wrap → times-board handoff** — built 2026-08-30, replacing the ratified
+  pointer at WrapSheet's C5. **The pointer was right against a STACKED MODAL and only against
+  that**: `AddTimesSheet` and `WrapSheet` are both `presentationStyle="pageSheet"`, and N-8 has
+  refused that nesting three times (`ProfileScreen:329`, `PracticeCardSheet:47`,
+  `CardEditorSheet:140`). Opening the board AFTER the wrap sheet dismisses is not one — it is
+  hosted on `EngagementScreen`, which already owns both. DERRICK, RECORDED AS GIVEN: *"a
+  clinician who just saw a patient is exactly who should offer the next time."* OPT-IN (a
+  toggle, off on every open) and fired ONLY inside the success branch — *"nothing happened, so
+  nothing follows, and a times board opening after a failed wrap would imply the wrap landed."*
+  `DayVisit.card_id` is nullable, so the handler guards it and says so rather than opening a
+  board that cannot save.
+- **`verifications.credential_class` — CLOSED, NOT DEFERRED (2026-08-30).** Never built, and
+  deliberately never to be. The sweep's premise ("the column exists and nothing reads it") was
+  wrong by four live read sites: `hearth-network src/tools/query-cards.ts:740` →
+  `card-view.ts:738` (**the patient-facing "Dr." already ships**), `src/fhir/compose.ts:180`,
+  and `hearth-pos supabase/functions/superbill/compose.ts:108`. The honorific is live in every
+  surface a third party sees. The only gap is the clinician looking at themselves, which changes
+  no decision anyone makes — and closing it would mean widening `get_my_verifications`, a
+  network-owned contract that excludes the column on purpose (`src/types/verification.ts:18-19`:
+  *"do not add it here either"*). DERRICK, RECORDED AS GIVEN: *"A migration widening a network
+  contract to show someone a fact about themselves they already know is the shape I asked you
+  not to build."* Do not re-open this without a surface that changes a decision.
 - **Day 12.5 — Real media upload for content cards** — built in `78e48e6`. Picker
   (expo-image-picker) → `card-media` Storage bucket (owner-writes-own RLS keyed by
   `{entity_id}/` path, public-read) → public URL written into the existing `fields.media_url`
@@ -488,6 +534,11 @@ Cross-repo: spans hearth-pos (app download, caller verify, caller-as-new-owner) 
   spec's two-phase 5s/30s and is correct as built.
 
 ### P5 — the practice card's "up, but paused" banner on Profile (logged 2026-08-28 — Session 2b)
+- **BUILT 2026-08-30 — see the Done entry above.** The trigger never fired; the ruling did. The
+  cost objection below had genuinely weakened (ProfileScreen no longer has three competing
+  reads), and the sweep found a case the original spec did not cover: with the Verified
+  Clinician stamp off, posting times fixes nothing, so the one-variant copy would have sent a
+  clinician to do a useless thing. That case is what decided it.
 - **Trigger: a clinician asks why their card is up but nobody can book.** Small follow-on, cut
   from 2b deliberately rather than descoped silently.
 - **What it would be.** S5's P5: a banner on the practice card in the Profile list — *"Your
@@ -504,9 +555,17 @@ Cross-repo: spans hearth-pos (app download, caller verify, caller-as-new-owner) 
   honest floor. Nothing about the card is silently paused with no explanation anywhere.
 
 ### S4b — "That time was let go" (logged 2026-08-28 — Session 3; belongs to the accept path)
-- **Trigger: the accept-path work.** Not a date and not a cohort — this ships with whatever
-  session touches `respond_to_inbound`'s accept branch, because that is the only place it can
-  fire.
+- **CORRECTED AND CLOSED 2026-08-30 — THIS ENTRY WAS STALE, AND THE STALENESS WAS THE FINDING.**
+  The sheet SHIPPED IN SESSION 3 (`589d0d8`), inside `ClinicalRequestTile.tsx`: the derivation
+  at `:63`, the T4 banner at `:112-120`, Accept removed rather than greyed at `:188`. The entry
+  below sat here for two days describing work that already existed — a fired trigger left fired,
+  which canon rule 4 forbids. Nobody re-reads a deferred item to check whether it is still
+  deferred; that is the failure mode, not the omission.
+- **What was genuinely missing, found by the sweep and built 2026-08-30:** the SECOND accept
+  path had none of it (`ThreadDecisionBanner`, which renders any pending inbound and told a
+  clinician with a lapsed hold to *"Try again"* — retry advice on a terminal refusal), and
+  `ClinicalRequestTile`'s own race toast fired from a BARE CATCH, so a dropped connection
+  reported that a patient's time had gone to someone else. See the Done entry below.
 - **What it is.** PLEXMED S5's S4b and S6's T4: when an accept is refused with
   `SLOT_NO_LONGER_HELD` (`0038b:767`), the clinician sees *"That time was let go"* — a hold
   lapsed, the time went back on the board, and the request is still there to reply to.
