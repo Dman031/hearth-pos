@@ -522,3 +522,35 @@ Cross-repo: spans hearth-pos (app download, caller verify, caller-as-new-owner) 
   gave up. They asked; the clock ran; that is all that happened.
 - **Adjacent and NOT deferred:** the `held_until` row and the hold deadline ship in Session 3.
   A clinician can always see when a hold runs out; what is deferred is only what happens after.
+
+### S8 — the superbill has NO CALLER IN THE APP (logged 2026-08-29 — found during PLEXMED S10-INVESTIGATE)
+- **Trigger: THE POS SESSION THAT CARRIES THE S10 TAP.** Ruled 2026-08-29. Both affordances
+  land in the same place, in the same session, and NEITHER SHIPS WITHOUT THE OTHER.
+- **What is missing.** `supabase/functions/superbill/` is built, deployed and verified live
+  (S8-1..S8-7, BUG-016 closed, `scripts/verify-superbill.mjs` in hearth-network green). Nothing
+  in the app invokes it. The grep is the whole finding:
+  ```
+  $ grep -rn "functions.invoke" --include='*.ts' --include='*.tsx' src
+  src/context/CardContext.tsx:151   'embed-card'
+  src/services/stripe.ts:100,190    (connect)
+  src/services/followup.ts:44       'generate-followup'
+  src/services/menu-parse.ts:64     'parse-menu'
+  src/services/classifier.ts:67     (classify-business)
+  ```
+  No `'superbill'`. `WrapSheet.tsx:50` mentions the word only inside a comment.
+- **Consequence, stated plainly rather than discovered later: A CLINICIAN CANNOT PRODUCE A
+  SUPERBILL TODAY BY ANY MEANS.** The whole S8 session is reachable only from a verify script.
+  The CARE_LOOP definition of done ("$95 settles in thread → superbill PDF in thread") cannot
+  be filmed until this lands.
+- **Why it was not caught sooner.** Every S8 proof was server-side and correct — the function,
+  the RPC, the bucket, the bytes, the void proof. Nothing in that set asserts a caller exists,
+  and the verify script IS a caller, so the surface looked exercised. THE GAP IS BETWEEN A
+  GREEN VERIFY AND A REACHABLE FEATURE, which is exactly the seam verify-care-loop.mjs was
+  written to close and did not reach here.
+- **What it needs when it fires.** A `services/superbill.ts` invoking the function with the
+  clinician's own session (the function does `auth.getUser` on the forwarded header), the
+  issue affordance on the wrap surface, and the three refusals rendered BY MESSAGE and not by
+  status code (`notSeller` / `notWrapped` / `notPaid` / `file_missing` — the VERIFICATION
+  DISCIPLINE rule's first clause, which was written about this exact function).
+- **Adjacent and NOT deferred:** the S10 push itself is hearth-network work (migration 0045 +
+  `src/fhir/`) and does not wait on this. Only the two TAPS share a session.
