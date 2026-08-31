@@ -236,3 +236,40 @@ export const PAUSED_STAMP_OFF_POINTER =
 
 /** The board's own horizon (OpenTimesBoard reads a rolling window). */
 export const PAUSED_HORIZON_DAYS = 90;
+
+// ─── THE MODULE ROW (N-4-AMENDED, 2026-08-30) ───────────────────────────────
+//
+// FOUR ARMS, AND EVERY ONE OF THEM DOES SOMETHING WHEN TAPPED. That is the
+// whole test the amendment sets: nobody meets an inert control, and nobody is
+// prevented from discovering a product they would pay for.
+//
+// THE THREE STATES WERE DERRICK'S; THE FOURTH WAS FOUND BY TRACING THE GAP.
+// N-1's two conditions give unowned / owned-unverified / owned-verified. But
+// the board attaches to a CARD, so owned + verified + NO PRACTICE CARD falls
+// between them — and under the original reading the module would vanish there,
+// repeating N-4's error one condition later. It was found on the device pass by
+// walking the chain rather than by inferring it from the ruling, and ratified
+// 2026-08-30.
+//
+// THE ROW POINTS WITH ITS TEXT AND JUMPS WITH ITS TAP. The pointer line stays
+// because it explains WHERE the licence lives, which is worth knowing even when
+// the tap takes you there. N-8 is not violated: AccountChip owns Settings and
+// the ceremony as two views of ONE sheet, so this is a view switch and N-8's
+// target was the stacked modal. CardEditorSheet's P0 gate keeps its
+// pointer-ONLY form — it sits inside a different sheet, where the constraint is
+// real.
+
+/** Under the label on every arm. Says what the module IS, before it is owned. */
+export const MODULE_ROW_TITLE = 'PlexMed';
+
+/** Owned, licence not live. Taps THROUGH to the ceremony. */
+export const MODULE_UNVERIFIED_BODY = 'Verify your license to open your times board.';
+/** Kept even though the row jumps: knowing where it lives outlives this tap. */
+export const MODULE_UNVERIFIED_POINTER =
+  'Your license lives in your account menu, under My ID.';
+
+/** Owned and verified, but nothing to attach a board to. Taps to Profile. */
+export const MODULE_NO_CARD_BODY = 'Make a practice card to open your times board.';
+
+/** Not yet reachable — isModuleOwned() is true until the paywall (TODO(PAYWALL)). */
+export const MODULE_UNAVAILABLE = 'That isn’t on sale yet.';

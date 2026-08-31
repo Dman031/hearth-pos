@@ -659,3 +659,27 @@ Cross-repo: spans hearth-pos (app download, caller verify, caller-as-new-owner) 
 - **Already handled app-side.** `src/services/visit-copy.ts` treats both values as the document
   omission, so hearth-pos renders correctly today regardless of when the spec is corrected.
   The spec is still wrong and is still the thing the next reader will build from.
+
+### The module storefront's UNOWNED arm cannot fire (logged 2026-08-31 — N-4-AMENDED build)
+- **Trigger: THE PLEXMED PAYWALL SESSION.** Not a date — the arm becomes reachable the moment
+  `isModuleOwned()` stops returning true, and it must be walked on device in that same session.
+- **What is built and not reachable.** `SettingsPanel`'s first arm — the storefront row with its
+  price, whose tap calls `startModulePurchase('plexmed')`. `isModuleOwned()` returns true
+  unconditionally (`src/services/entitlements.ts`, TODO(PAYWALL), ruled in N-1), so `access.owned`
+  is always true and the row always renders the owned-unverified arm instead.
+- **Why it was built anyway.** N-4-AMENDED, verbatim: *"BUILD THE THREE-STATE SHAPE ANYWAY, so
+  the paywall drops into a structure that already fits it rather than becoming a refactor. A
+  branch that cannot fire yet is not a placeholder when the ruling says why it is there."*
+- **THE PRICE IS NULL AND THAT IS THE OTHER HALF OF THIS ENTRY.** No PlexMed price is ruled
+  anywhere — the `$50/mo` in CLAUDE.md is the POS subscription at transaction 10, a different
+  thing. `MODULE_CATALOGUE.plexmed.priceCents` is `null` and the price LINE IS OMITTED rather
+  than filled with a plausible number: an invented price on an offer is the placeholder class
+  that shipped fake "12 meals together" metrics to a first-time customer (harvest-once BUG-014).
+  DERRICK, RECORDED AS GIVEN: *"No price is ruled and I will not invent one on a storefront."*
+- **What it needs when it fires.** A ruled monthly price into `MODULE_CATALOGUE`; a real
+  `isModuleOwned()`; and `startModulePurchase` returning something other than
+  `{ ok: false, reason: 'not_available_yet' }`. The rendering does not change — that is the
+  point of having built it.
+- **Adjacent and NOT deferred:** the other three arms are live today. Owned-unverified taps into
+  the ceremony, owned-verified-no-card points at Profile, owned-verified-with-card opens the
+  board. Grep the seam: `grep -rn "TODO(PAYWALL)" src`.

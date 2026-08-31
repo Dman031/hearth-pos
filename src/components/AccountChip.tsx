@@ -159,7 +159,16 @@ export default function AccountChip() {
                 ) : view === 'contacts' ? (
                   <ContactsPanel />
                 ) : view === 'settings' ? (
-                  <SettingsPanel onDismiss={close} />
+                  // N-4-AMENDED ruling 3 — THE JUMP. Settings and the ceremony
+                  // are two views of THIS sheet, so switching between them is a
+                  // view change, not a stacked modal, and the stacked modal is
+                  // what N-8 targets. A clinician who taps a row reading
+                  // "verify your license" lands in the ceremony rather than
+                  // being told where to look for it. The back affordance
+                  // already returns 'credential' to 'identity' (:148) — that
+                  // stays; arriving from Settings still leaves via My ID, which
+                  // is where the licence lives and where the row said it was.
+                  <SettingsPanel onDismiss={close} onOpenCredential={() => setView('credential')} />
                 ) : view === 'credential' ? (
                   <CredentialPanel onClose={close} />
                 ) : (
