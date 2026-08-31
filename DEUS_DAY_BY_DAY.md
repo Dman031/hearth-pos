@@ -2622,6 +2622,9 @@ vertical. These five rulings are the answer. They are canon; the specs bend to t
        cannot have and invites a tap that will be refused. Same reasoning that killed the
        inert action (S1-5) and removed rather than greyed the Accept on a lapsed hold
        (S7 T4): a control that cannot act must not be rendered as though it could.
+       ⚑ OVER-APPLIED TO MODULES — SEE N-4-AMENDED (2026-08-30). The reasoning above is
+       intact and unchanged FOR CONTROLS. It never applied to a catalogue entry, and
+       reading it as though it did produced a storefront with no door.
 
   N-5  S7:68-69 IS AMENDED, NOT S5:120. Today staying on Engagement means that screen DOES
        change, so the spec line claiming "Nothing about that screen changes" is false and is
@@ -2630,6 +2633,41 @@ vertical. These five rulings are the answer. They are canon; the specs bend to t
        Upcoming/Past split itself keeps working untouched.
        S5:120 STANDS — "Booked-row tap → opens the visit in Engagement." One destination for
        a visit, and N-2 is what keeps that true.
+
+  N-4-AMENDED  THE MODULE ROW IS ALWAYS VISIBLE; THE BOARD IS WHAT HIDES. Amended
+       2026-08-30, and THE ERROR WAS DERRICK'S OWN, corrected by him rather than defended —
+       recorded that way because the amendment is only legible beside the mistake.
+       WHAT WENT WRONG. N-4 forbids visible-locked surfaces because a control that cannot
+       act teaches that controls are decorative. That is RIGHT ABOUT INERT CONTROLS and
+       WRONG ABOUT AN UNSOLD MODULE. DERRICK'S REASONING, RECORDED AS GIVEN: "A price is not
+       an inert control, it is an offer, and hiding it means the product cannot be discovered
+       or bought." As built, N-1's two conditions rendered TWO states, and a clinician who
+       had not verified saw no evidence PlexMed existed at all — a storefront with no door.
+       Found on the 2026-08-30 device pass, from the far end: the seven-chain trace showed
+       Settings offering NO pointer toward the board under any condition.
+       THREE STATES, FROM N-1'S SAME TWO CONDITIONS — nothing about the gate changes, only
+       what each combination renders:
+         unowned              → THE ROW APPEARS WITH ITS PRICE, tappable, and tapping buys
+                                it. This is the storefront, and it is the state that did not
+                                exist before.
+         owned, unverified    → the row appears and POINTS AT THE CREDENTIAL CEREMONY. No
+                                board: there is nothing to show until a stamp exists, and
+                                pointing rather than opening is N-8.
+         owned and verified   → the board.
+       NOBODY MEETS AN INERT CONTROL, and nobody is prevented from discovering a product they
+       would pay for. Every row does something when tapped; what differs is what.
+       N-1 IS UNCHANGED. Its two conditions and its refusal to collapse them are exactly what
+       make three states derivable — this amendment is what N-1 always implied and N-4's
+       over-reading suppressed.
+       PLEXLAW AND PLEXATS INHERIT THIS SHAPE. Getting it right now costs one ruling and
+       saves three rebuilds; that is the reason it is amended before the paywall rather than
+       with it.
+       CURRENT STATE, NOTED HONESTLY: isModuleOwned() returns true unconditionally
+       (TODO(PAYWALL), hearth-pos src/services/entitlements.ts) so the UNOWNED ARM IS NOT YET
+       REACHABLE — the row renders the owned-unverified state until the paywall ships. BUILD
+       THE THREE-STATE SHAPE ANYWAY, so the paywall drops into a structure that already fits
+       it rather than becoming a refactor. A branch that cannot fire yet is not a placeholder
+       when the ruling says why it is there.
 
   N-D  STANDING DISCIPLINE, recorded with the five because it is the condition they rest on:
        SHARED TABS REGISTER PER-KIND ROW COMPONENTS BY CARD KIND, NEVER BRANCH INLINE. The
