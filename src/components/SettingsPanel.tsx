@@ -79,8 +79,9 @@ import { MODULE_ROW_TITLE, MODULE_SETUP_LINE } from '../services/practice';
 // confirmation nobody receives is the worse failure.
 
 interface SettingsPanelProps {
-  /** Closes the whole account sheet. The board needs it before navigating —
-   *  a modal left open would cover the tab it just moved to. */
+  /** Closes the whole account sheet. The PlexMed row needs it before pushing —
+   *  a modal left open would cover the screen it just moved to. (Pre-N-19 this
+   *  said "the board needs it"; the board moved to the PlexMed screen.) */
   onDismiss?: () => void;
   /*
    * N-19 retired `onOpenCredential`. The ceremony was reached from here because

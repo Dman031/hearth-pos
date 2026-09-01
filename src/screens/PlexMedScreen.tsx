@@ -3,7 +3,6 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import useCards from '../hooks/useCards';
-import useEntity from '../hooks/useEntity';
 import useMyVerifications from '../hooks/useMyVerifications';
 import useCardSlots from '../hooks/useCardSlots';
 import useMyDay from '../hooks/useMyDay';
@@ -12,7 +11,6 @@ import PracticeCardSheet from '../components/PracticeCardSheet';
 import OpenTimesBoard from '../components/OpenTimesBoard';
 import { MODULE_CATALOGUE } from '../services/entitlements';
 import { PAUSED_HORIZON_DAYS } from '../services/practice';
-import { getDeviceTimeZone } from '../datetime';
 import { theme } from '../styles/theme';
 import type { Card } from '../types/card';
 
@@ -60,9 +58,13 @@ export default function PlexMedScreen() {
     goBack: () => void;
     navigate: (screen: string, params?: object) => void;
   }>();
-  const { entity } = useEntity();
   const { cards } = useCards();
-  const { verifications, isLoading: verLoading, error: verError } = useMyVerifications();
+  const {
+    verifications,
+    isLoading: verLoading,
+    error: verError,
+    refresh: refreshVerifications,
+  } = useMyVerifications();
 
   // The interior views. Only one is ever up.
   const [showCeremony, setShowCeremony] = useState(false);
@@ -86,8 +88,9 @@ export default function PlexMedScreen() {
 
   // The times window. The board paginates by week; this read only ever answers
   // "are there open times ahead", so it takes the same 90-day horizon the paused
-  // banner used before N-19 retired it.
-  const tz = entity?.timezone ?? getDeviceTimeZone();
+  // banner used before N-19 retired it. NO ZONE MATH HERE ON PURPOSE: the
+  // question is a COUNT over an absolute window, and the board owns zone-aware
+  // day bucketing for the rendering that actually needs it.
   const { from, to } = useMemo(() => {
     const now = new Date();
     return { from: now, to: new Date(now.getTime() + PAUSED_HORIZON_DAYS * 86_400_000) };
@@ -123,13 +126,27 @@ export default function PlexMedScreen() {
     setShowBoard(true);
   }, []);
 
+  // STATE 1 → 2 DEPENDS ON THIS, so it is not a tidy-up. useMyVerifications
+  // fetches on FOCUS, and the ceremony is a VIEW SWAP inside this same screen —
+  // closing it fires no focus event, so nothing would re-read. A clinician who
+  // finished verifying and tapped back would land on state 1 again, being told
+  // to verify a licence they had just verified: the exact wrong answer the
+  // tri-state guard exists to prevent, on the screen whose whole point is moving
+  // between these four states. The hook's pending-poll does not cover it either
+  // — this screen's pump ran at mount, found nothing pending and stopped; the
+  // pending row is minted afterwards by CredentialPanel's own hook instance.
+  const closeCeremony = useCallback(() => {
+    setShowCeremony(false);
+    void refreshVerifications();
+  }, [refreshVerifications]);
+
   // ── interior views ────────────────────────────────────────────────────────
   if (showCeremony) {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
-        <Header title="Verify my license" onBack={() => setShowCeremony(false)} />
+        <Header title="Verify my license" onBack={closeCeremony} />
         <ScrollView contentContainerStyle={styles.content}>
-          <CredentialPanel onClose={() => setShowCeremony(false)} />
+          <CredentialPanel onClose={closeCeremony} />
         </ScrollView>
       </SafeAreaView>
     );
