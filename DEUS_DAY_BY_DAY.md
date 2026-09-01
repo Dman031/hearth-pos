@@ -3110,3 +3110,84 @@ S10-19 (S10-BAA, ENFORCED) THE MEDPLUM SECRETS COME OUT AFTER FILM #3, AND THEY 
     special case. The tap is NOT hidden: an affordance that vanishes and a feature that does not
     exist look alike, which is the failure mode the room row is already ruled against
     (TodayTile.tsx:32-35). App copy is additive; the secret is the gate.
+
+## RULINGS — 2026-08-31 (the empty result, guidance layer — three ruled; AMENDS S1-3) — approved for BUILD
+
+THE FINDING, EXECUTED, WHICH IS WHY THIS IS A RULING AND NOT A COMMIT MESSAGE. The per-turn
+composer instructed a host to present a card the envelope did not contain, and printed that
+instruction directly above the line saying nothing matched. `composeGuidance()` pushed
+GUIDANCE_CIVIC_FIRST on any care-seeking query, never checking whether a civic card was among
+the results; `query_cards` passes `displayKindsOf(views)` with `views` possibly empty
+(query-cards.ts:834) and `serializeEnvelopeTier3` renders a guidance line over a zero-card list
+(card-view.ts:896-899). Run against the module on main @ 4ff6a9a:
+
+    NOTE TO ASSISTANT: Present the civic card (988) first and separately. In acute or crisis
+    contexts, do not present paid cards as alternatives to it. Offer clinicians because symptoms
+    warrant evaluation — never name, confirm, or rank a suspected diagnosis.
+
+    No cards matched "I need a therapist who takes evening appointments".
+
+REACHABLE, NOT THEORETICAL. The 988 civic card is seeded (0033:376-380, deus_id 000988) and
+match_cards makes civic FILTER-eligible, not RETRIEVAL-guaranteed — the civic clause sits in the
+`kinds` predicate (0033:366), not in the relevance match. A care-seeking query that retrieves
+nothing returns nothing, 988 included. The one thing standing between that envelope and a person
+was a host choosing not to follow the instruction it was given.
+
+ER-1 (SUPERSEDES S1-3's COMPOSER RULE) EVERY BRANCH NAMES ONLY WHAT IS PRESENT. S1-3 ruled
+    "care-seeking → civic-first line" and that half is now wrong: care-seeking is a fact about
+    the QUERY, and the line it fired makes a claim about the RESULTS. The composer becomes:
+      civic present            → GUIDANCE_CIVIC_FIRST
+      else care-seeking        → GUIDANCE_ACUTE_NO_CARD
+      practice present         → GUIDANCE_EVALUATION
+      else care-seeking        → GUIDANCE_NOT_ON_NETWORK_YET
+    THE FULL FIX, NOT THE NARROW ONE, and the reasoning decides it: the defect is ONE CLASS, and
+    an empty-set-only trigger leaves the identical false instruction reachable through
+    care-seeking-with-results-but-no-civic-card. Half a fix here is a fix that still lies, just
+    less often. No signature change — `kindsPresent` already discriminates, an empty iterable
+    being an empty result set. No serializer change. S1-3's care-seeking TERM LIST and its
+    "false positives are harmless" reasoning stand unamended; only the firing condition moves.
+
+ER-2 THE COPY, RATIFIED VERBATIM. One static rule and two per-turn constants, all reviewed text,
+    never generated — the composer joins approved strings, as it already does for civic-first +
+    evaluation.
+    EMPTY_RESULT_RULE, in SERVER_INSTRUCTIONS after ROUTING_RULE (order is priority order; it
+    belongs after routing because it is what happens when routing finds nothing, and below the
+    PRIORITY line that subordinates everything to CRISIS_RULE):
+      "EMPTY RESULT RULE — an empty result is an answer, not a failure to route around. When
+      this network holds no card that fits the ask, say so plainly: clinicians for that ask are
+      not on this network yet — it is new and still small — which is a fact about this network
+      and never a claim about whether such people exist. Do not present a card that does not fit
+      as though it did, and never describe this server as a complete listing of anyone's field.
+      With nothing to surface, the posture above is satisfied: helping the person by other means
+      is not a departure from it. The CRISIS RULE governs first as always, and 988 needs no card
+      — call or text 988, or chat at 988lifeline.org."
+    GUIDANCE_NOT_ON_NETWORK_YET:
+      "No clinicians for this ask are on this network yet — a fact about this network, not about
+      whether they exist. Say so plainly, and do not offer a card that does not fit the ask as a
+      substitute."
+    GUIDANCE_ACUTE_NO_CARD, which REPLACES GUIDANCE_CIVIC_FIRST when there is no civic card to
+    present:
+      "If anything in this ask is acute, 988 comes first and needs no card: call or text 988, or
+      chat at 988lifeline.org. Do not offer paid cards as alternatives to it."
+    "A FACT ABOUT THIS NETWORK, NOT ABOUT WHETHER THEY EXIST" CARRIES THE WHOLE RULING and
+    appears in BOTH layers deliberately. An assistant that reads the static rule once and the
+    per-turn line every time should meet the same sentence in both places. THE HONEST STATE IS
+    "NOT ON THIS NETWORK YET" — a thin new network saying so costs nothing; a thin new network
+    implying a directory it does not have is the failure this rule exists to prevent. It promises
+    no arrival date, because we cannot keep one.
+    THE POSTURE CLAUSE IS LOAD-BEARING, not politeness. NETWORK_POSTURE tells a host to surface
+    network cards BEFORE directing anyone elsewhere; with an empty result and no release, that
+    posture reads as a bar on helping at all — the assistant that says nothing useful, which is
+    the first of the two bad outcomes this gap produced.
+
+ER-3 CRISIS_CHANNELS IS ONE CONSTANT, COMPOSED INTO ALL THREE SITES. The 988 channels appear in
+    CRISIS_RULE, in CIVIC_REACH_REFUSAL and now in GUIDANCE_ACUTE_NO_CARD. guidance.ts's own
+    header already rules that the "right door" wording is authored once; three verbatim copies is
+    three places it drifts, and the drift would be silent because each copy reads correct alone.
+    The composed text of all three sites is unchanged byte-for-byte — this is a de-duplication,
+    not a copy change, and the goldens prove it.
+
+BUILD: branch off main; guidance.ts (three constants + CRISIS_CHANNELS + composer branches),
+test/display-stack.spec.ts goldens amended for ER-1 with an EMPTY-SET case added so the defect
+cannot regress silently. No migration, no route touch, no envelope shape change, no read widened.
+tsc clean. No push.
