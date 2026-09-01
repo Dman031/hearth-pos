@@ -271,5 +271,34 @@ export const MODULE_UNVERIFIED_POINTER =
 /** Owned and verified, but nothing to attach a board to. Taps to Profile. */
 export const MODULE_NO_CARD_BODY = 'Make a practice card to open your times board.';
 
-/** Not yet reachable — isModuleOwned() is true until the paywall (TODO(PAYWALL)). */
-export const MODULE_UNAVAILABLE = 'That isn’t on sale yet.';
+/**
+ * ARM 1's setup line — INLINE AND ALWAYS (ruling P-6, 2026-08-31). PlexMed is
+ * bought on the web, where the transaction is; the app names no figure, offers
+ * no destination and sells nothing (P-3, P-5).
+ *
+ * IT SAYS NEITHER "YET" NOR "SOON" ON PURPOSE. The sentence is true forever or
+ * it is the wrong sentence — see the invented-tense note on MODULE_UNAVAILABLE.
+ */
+export const MODULE_SETUP_LINE = 'PlexMed is set up outside the app.';
+
+/**
+ * DELIBERATELY UNREFERENCED. DO NOT DELETE, AND DO NOT WIRE A BUTTON BACK TO
+ * MAKE IT RENDER (ruling P-6, 2026-08-31).
+ *
+ * This is startModulePurchase()'s refusal text. That function is a PERMANENT
+ * honest guard with no caller — arm 1 lost its tap when the chevron went, because
+ * a control whose only possible outcome is a refusal cannot act (N-4's original
+ * reasoning, which was right). So nothing renders this string today, and nothing
+ * should: if it ever renders again, something is selling PlexMed inside the app.
+ *
+ * IT IS THE SAME SENTENCE as MODULE_SETUP_LINE and is defined FROM it rather than
+ * beside it — one string, two names, each with its own reason. A second copy is a
+ * second place for it to drift.
+ *
+ * WHAT IT USED TO SAY, and why that was wrong: "That isn't on sale yet." AN
+ * INVENTED TENSE — "yet" promised an in-app purchase that P-3 forbids and that
+ * nobody ever intended to build, and "on sale" is cost language the app may not
+ * carry. Neither was a lie anyone told; both were true while the paywall was
+ * merely unbuilt, and went false the moment it was ruled to live elsewhere.
+ */
+export const MODULE_UNAVAILABLE = MODULE_SETUP_LINE;

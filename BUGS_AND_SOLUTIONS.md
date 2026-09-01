@@ -617,3 +617,59 @@ Before writing any `postgres_changes` subscription, verify the table is in the p
 ### Prompt/Subagent Notes
 
 Introduced by the Day 21 STOP 5 build: the build prompt specified "realtime" badge/list behavior and the implementation subscribed to `engagements` without checking publication membership; the 0017 migration review focused on RLS and never asked whether the table publishes. Build prompts that specify realtime UI should require the publication grep as part of Step 1.
+
+## BUG-010: an invented tense — "That isn't on sale yet." promised an in-app purchase nobody ever intended to build
+
+**Category:** placeholder-data (tense, not value) · **Severity:** medium (copy shown to clinicians; no data effect) · **Status:** fixed
+**Introduced-by:** Claude-build, N-1 / N-4-AMENDED as implemented (2026-08-28 / 2026-08-30). Not a slip — every one of these strings was TRUE WHEN WRITTEN. The paywall was unbuilt, so "yet" was an accurate description of the world.
+**Found:** 2026-08-31, recording the PlexMed pricing rulings (P-1…P-6). P-3 put billing on the web permanently, and the moment it did, three pieces of copy and one render branch became false at once.
+
+### Symptoms
+
+None. Nothing errored, nothing rendered wrong, and the app said only things that had been true. A clinician who tapped the storefront row saw "That isn't on sale yet." — a sentence promising a future in-app purchase that P-3 forbids and that nobody had ever planned to build.
+
+### Root Cause
+
+**AN INVENTED TENSE. This is the placeholder pattern's quietest form, and it deserves its own name.**
+
+The Awareness Pattern this repo already carries — *don't ship plausible placeholder data* — was written about invented VALUES: `vendorRating = 4.7`, "12 meals together", a number that looks real and is not (harvest-once BUG-014). A reviewer can catch those, because a fabricated figure has a source you can go and fail to find.
+
+**A tense has no source to check.** "Yet", "soon", "not available *yet*", a field comment that says "until the paywall session rules the number" — each encodes a PROMISE ABOUT THE FUTURE that nobody ever made, and each reads as ordinary caution rather than as a claim. **A promise nobody made is harder to spot than a fake figure**, because there is no wrong value to notice: the sentence is grammatical, modest, and was accurate on the day it was written. It goes false silently, when a ruling elsewhere changes the future it assumed — and nothing recompiles a tense.
+
+Four instances, all of one decision:
+
+| Site | Said | Assumed |
+|---|---|---|
+| `practice.ts:275` | `MODULE_UNAVAILABLE = "That isn't on sale yet."` | it will go on sale, in the app |
+| `entitlements.ts:148,150` | `reason: 'not_available_yet'` | availability is coming |
+| `entitlements.ts:47-58` | priceCents null "until the paywall session rules the number" | a session will rule a number into this field |
+| `SettingsPanel.tsx:192-196` | `priceCents !== null ? <price/> : null` | a value will arrive to fill this branch |
+
+The fourth is the sharpest, because it is not prose: **a render branch waiting for a value that can never arrive is a claim about the future written into code.** It would have sat there indefinitely, one assignment away from putting a price in an app that may not carry one.
+
+### Solution
+
+Rulings P-5 and P-6 (DEUS_DAY_BY_DAY.md, 2026-08-31), built in one commit:
+
+- `MODULE_SETUP_LINE = 'PlexMed is set up outside the app.'` — ratified copy. True forever, names no figure, names no destination.
+- `reason: 'not_sold_in_app'` — the permanent fact, not a waiting state.
+- `priceCents`' comment now says RULED NULL, PERMANENTLY, and says why the app names no figure.
+- The `priceCents !== null` render branch is **removed**, along with the `modulePrice` style that made a figure look like a price.
+- Arm 1 is no longer a `Pressable` and has no chevron: with the purchase on the web, its tap could only ever produce a refusal, and a control whose only possible outcome is a refusal cannot act (N-4's original reasoning, restored — its later "a price is an offer" extension was withdrawn by Derrick and is written out as withdrawn in `entitlements.ts`).
+- `startModulePurchase()` and `MODULE_UNAVAILABLE` are **kept and deliberately unreferenced**, each carrying a comment saying so and why, so a future session does not "fix" the dead code by wiring a button back. `MODULE_UNAVAILABLE` is now defined FROM `MODULE_SETUP_LINE` — one string, two names, so the two cannot drift.
+
+### Cross-check Performed
+
+- **Every other "yet"/"soon"/"not yet" in `src/`**, swept for the same shape: `grep -rniE "\byet\b|\bsoon\b|coming later|for now|until the" src/`. Remaining hits are of two kinds and **both are correct**: (i) comments describing genuinely unbuilt work whose future is still open (PlexLaw/PlexATS `blurb: 'Coming later.'` — those modules ARE planned and unruled, so the tense is honest), and (ii) `TODO(PAYWALL)` markers on `isModuleOwned()`, which genuinely IS still coming — the entitlement read is real, ruled, and unbuilt. **A tense is only invented when the future it names has been ruled out**, which is the test this entry adds.
+- **`MODULE_UNVERIFIED_BODY` / `MODULE_UNVERIFIED_POINTER` / `MODULE_NO_CARD_BODY`** — the other three arms' copy. All describe present, actionable states ("Verify your license to open your times board"), none promises a future. Unchanged.
+- **`styles.failed`** — nearly removed as dead with `styles.modulePrice`. It is **not** dead: the email-preference save error at `SettingsPanel.tsx:274` still uses it. Checked before deleting; only `modulePrice` went.
+- **hearth-network's Stripe surface** — P-3's subscription webhook does not exist yet, so there is no sibling copy there to correct. Flagged for the paywall session: the new webhook must not name a tense either.
+- **Out-of-scope-but-flagged:** nothing.
+
+### Prevention
+
+**Name the pattern, because that is what makes it visible: AN INVENTED TENSE.** PROPOSED, NOT PROMOTED — it belongs beside "don't ship plausible placeholder data" in CLAUDE.md's Awareness Patterns, where it would ask a different question of a different kind of string. Promotion is its own ceremony (grep command + one-time sweep + a note on the origin entry) and one occurrence, however many instances it had, is not the bar. Recorded here so the second occurrence has something to recur against.
+
+The test, one line: **does this sentence, literal, or branch assume a future that has been ruled out?** If the future is genuinely open, the tense is honest. If a ruling has closed it, the tense is a promise nobody made — and the fix is never to soften the word, but to say the permanent thing instead.
+
+Sweep: `grep -rniE "\byet\b|\bsoon\b|not available|coming|until the" src/` — every hit gets read against the roadmap, not against intuition.

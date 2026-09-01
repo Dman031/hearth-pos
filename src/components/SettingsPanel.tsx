@@ -2,20 +2,17 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { theme } from '../styles/theme';
-import { formatCents } from '../utils/format';
 import useEntity from '../hooks/useEntity';
 import useCards from '../hooks/useCards';
 import { setEmailPreference } from '../services/settings';
-import {
-  MODULE_CATALOGUE,
-  getModuleAccess,
-  startModulePurchase,
-  type ModuleAccess,
-} from '../services/entitlements';
+import { MODULE_CATALOGUE, getModuleAccess, type ModuleAccess } from '../services/entitlements';
+// startModulePurchase is NOT imported, by ruling (P-6): arm 1 has no tap, so it
+// has no caller. Nor is MODULE_UNAVAILABLE, its refusal text. Both still exist and
+// must not be deleted — see their comments before wiring either back.
 import {
   MODULE_NO_CARD_BODY,
   MODULE_ROW_TITLE,
-  MODULE_UNAVAILABLE,
+  MODULE_SETUP_LINE,
   MODULE_UNVERIFIED_BODY,
   MODULE_UNVERIFIED_POINTER,
 } from '../services/practice';
@@ -100,15 +97,6 @@ export default function SettingsPanel({ onDismiss, onOpenCredential }: SettingsP
   // rather than as another AccountChip SheetView: the board is a module's
   // interior, not a peer of My ID / Contacts / Money.
   const [boardCard, setBoardCard] = useState<Card | null>(null);
-  // ARM 1's refusal. The purchase seam cannot succeed before commerce ships, so
-  // if that arm ever fires the tap says so rather than appearing to work.
-  const [buyFailed, setBuyFailed] = useState(false);
-
-  const handleBuy = useCallback(async () => {
-    const result = await startModulePurchase('plexmed');
-    setBuyFailed(!result.ok);
-  }, []);
-
   const practiceCards = cards.filter((c) => c.kind === 'practice');
 
   useEffect(() => {
@@ -179,25 +167,26 @@ export default function SettingsPanel({ onDismiss, onOpenCredential }: SettingsP
             /* ARM 1 · THE STOREFRONT. Not reachable today — isModuleOwned() is
                the TODO(PAYWALL) seam and returns true — and built anyway by
                ruling, so the paywall drops into a structure that fits it.
-               THE PRICE LINE IS OMITTED WHILE priceCents IS NULL: no PlexMed
-               price has been ruled, and an invented number on an offer is the
-               placeholder class that shipped fake metrics to a real customer. */
-            <Pressable
-              style={styles.moduleRow}
-              onPress={() => void handleBuy()}
-              accessibilityRole="button"
-            >
+
+               IT IS NOT PRESSABLE, AND HAS NO CHEVRON (P-6, 2026-08-31). PlexMed
+               is bought on the web, so a tap here could only ever produce a
+               refusal, and a control whose only possible outcome is a refusal
+               cannot act — N-4's original reasoning, restored. The setup line
+               renders INLINE AND ALWAYS instead of after a futile tap: it is the
+               answer to "how do I get this", not an error.
+
+               NO PRICE LINE, AND NO BRANCH THAT COULD GROW ONE. priceCents is
+               ruled null permanently (P-5) and the app names no figure (P-3).
+               The `priceCents !== null` render branch was removed with the tap:
+               a branch waiting for a value that can never arrive is a claim about
+               the future written into code. */
+            <View style={styles.moduleRow}>
               <View style={styles.moduleText}>
                 <Text style={styles.moduleLabel}>{MODULE_CATALOGUE.plexmed.label}</Text>
                 <Text style={styles.moduleBody}>{MODULE_CATALOGUE.plexmed.blurb}</Text>
-                {MODULE_CATALOGUE.plexmed.priceCents !== null ? (
-                  <Text style={styles.modulePrice}>
-                    {formatCents(MODULE_CATALOGUE.plexmed.priceCents, 'usd')} a month
-                  </Text>
-                ) : null}
+                <Text style={styles.moduleHint}>{MODULE_SETUP_LINE}</Text>
               </View>
-              <Text style={styles.chevron}>›</Text>
-            </Pressable>
+            </View>
           ) : !access.licensed ? (
             /* ARM 2 · owned, no live stamp. TAPS THROUGH to the ceremony — a
                sibling view of this same sheet. The pointer text stays: where
@@ -250,7 +239,6 @@ export default function SettingsPanel({ onDismiss, onOpenCredential }: SettingsP
               </Pressable>
             ))
           )}
-          {buyFailed ? <Text style={styles.failed}>{MODULE_UNAVAILABLE}</Text> : null}
         </View>
       ) : null}
 
@@ -284,11 +272,9 @@ const styles = StyleSheet.create({
   moduleText: { flex: 1, gap: 2, paddingRight: theme.spacing.md },
   moduleBody: { ...theme.typography.caption, color: theme.colors.textSecondary },
   moduleHint: { ...theme.typography.caption, color: theme.colors.textMuted },
-  modulePrice: {
-    ...theme.typography.caption,
-    color: theme.colors.accent,
-    fontFamily: theme.fonts.semiBold,
-  },
+  // modulePrice retired with the price line (P-5) — the app renders no figure, so
+  // the style that made one look like a price has no reason to exist. `failed`
+  // below is NOT dead: the email-preference save error still uses it.
   sectionLabel: {
     ...theme.typography.caption,
     color: theme.colors.textMuted,

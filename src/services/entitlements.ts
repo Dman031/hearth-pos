@@ -32,12 +32,22 @@ export type ModuleId = 'plexmed' | 'plexlaw' | 'plexats';
 //
 // THE MODULE ROW IS ALWAYS VISIBLE; THE BOARD IS WHAT HIDES. N-4 forbade
 // visible-locked surfaces because a control that cannot act teaches that
-// controls are decorative — right about INERT CONTROLS, wrong about an unsold
-// module. DERRICK, RECORDED AS GIVEN: "A price is not an inert control, it is
-// an offer, and hiding it means the product cannot be discovered or bought."
-// Read the old way, a clinician who had not verified saw no evidence PlexMed
-// existed at all: a storefront with no door. That is why this catalogue exists
-// — the row needs something to render before it is owned.
+// controls are decorative. Read the old way, a clinician who had not verified
+// saw no evidence PlexMed existed at all: a storefront with no door. That is why
+// this catalogue exists — the row needs something to render before it is owned.
+//
+// WITHDRAWN, AND WRITTEN OUT SO IT IS NOT RE-DERIVED FROM THIS FILE (ruling P-5,
+// 2026-08-31). N-4-AMENDED supported the finding above with a second sentence,
+// recorded here as given at the time: "A price is not an inert control, it is an
+// offer, and hiding it means the product cannot be discovered or bought." DERRICK
+// WITHDREW IT: "N-4-AMENDED was about the module ROW EXISTING so a clinician can
+// discover PlexMed at all; the problem it fixed was invisibility, not a missing
+// number. My phrase 'a price is an offer' overreached."
+// THE DOOR IS THE ROW. THE FIGURE IS NOT PART OF THE DOOR. The visibility finding
+// stands untouched; nothing about a price follows from it.
+//
+// N-4 WAS ALSO RIGHT ABOUT INERT CONTROLS, and P-6 restores that half: arm 1 is
+// not pressable, because its tap could only ever produce a refusal.
 
 export interface ModuleCatalogueEntry {
   /** How the module names itself to its owner. */
@@ -45,15 +55,28 @@ export interface ModuleCatalogueEntry {
   /** One line, under the label, on every arm. Says what the module IS. */
   blurb: string;
   /**
-   * Monthly price in cents, or NULL when no price has been ruled.
+   * Monthly price in cents. NULL FOR PLEXMED, PERMANENTLY — NOT PENDING.
    *
-   * IT IS NULL TODAY AND THAT IS DELIBERATE (ruled 2026-08-30). No PlexMed
-   * price exists in the roadmap or anywhere else, and the storefront row is the
-   * worst possible place for an invented one: a plausible number on an offer is
-   * the placeholder class that shipped fake "12 meals together" metrics to a
-   * first-time customer (harvest-once BUG-014). The row renders WITHOUT a price
-   * line until the paywall session rules the number. Structure right, number
-   * later — never a number that looks real and is not.
+   * RULED NULL (P-5, 2026-08-31), which is a different fact from the one this
+   * comment used to carry. PlexMed's price IS ruled — $15/month flat (P-1) — and
+   * it lives on the web, where the transaction is. THE APP NAMES NO FIGURE, SELLS
+   * NOTHING AND LINKS NOWHERE (P-3): a clinician subscribes from the web, and the
+   * app only ever reads the entitlement that purchase creates.
+   *
+   * WHY THAT IS THE STRONGER POSITION — DERRICK, RECORDED AS GIVEN: "That removes
+   * the Apple question rather than reasoning about where its line falls." A rule
+   * that depends on correctly locating someone else's boundary breaks when they
+   * move it. This one has no boundary to be on the wrong side of.
+   *
+   * DO NOT SET IT, AND DO NOT ADD A RENDER BRANCH FOR IT. SettingsPanel had a
+   * `priceCents !== null ? … : null` price line; it was REMOVED under P-5,
+   * because a branch waiting for a value that can never arrive is a claim about
+   * the future written into code. The field stays on the interface for the other
+   * modules, whose pricing is unruled.
+   *
+   * (The original reasoning still holds for any module that IS unpriced: never a
+   * plausible invented number on an offer — the class that shipped fake "12 meals
+   * together" metrics to a first-time customer, harvest-once BUG-014.)
    */
   priceCents: number | null;
 }
@@ -139,13 +162,25 @@ export async function getModuleAccess(
  * there.
  *
  * It returns a REFUSAL rather than throwing or silently doing nothing, so that
- * if the arm ever does fire before commerce ships, the caller has something
- * honest to render instead of a tap that appears to work.
+ * if it is ever called, the caller has something honest to render instead of a
+ * tap that appears to work.
  * Grep: `grep -rn "TODO(PAYWALL)" src`.
+ *
+ * DELIBERATELY UNREFERENCED SINCE P-6 (2026-08-31). DO NOT DELETE, AND DO NOT
+ * WIRE A BUTTON BACK TO GIVE IT A CALLER. Arm 1 lost its tap because a control
+ * whose only possible outcome is a refusal cannot act; this function is now a
+ * PERMANENT GUARD, not a stopgap. It is not waiting for commerce to ship — the
+ * app does not sell PlexMed and never will (P-3), so a caller appearing here
+ * would mean something had started to.
+ *
+ * THE REASON LITERAL LOST ITS "YET" (P-6). It read 'not_available_yet', which
+ * promised an in-app purchase that P-3 forbids and nobody intended to build — AN
+ * INVENTED TENSE, true while the paywall was merely unbuilt and false the moment
+ * it was ruled to live elsewhere. 'not_sold_in_app' is the permanent fact.
  */
 export async function startModulePurchase(
   module: ModuleId,
-): Promise<{ ok: false; reason: 'not_available_yet' }> {
-  console.warn('[entitlements] purchase attempted before the paywall exists', { module });
-  return { ok: false, reason: 'not_available_yet' };
+): Promise<{ ok: false; reason: 'not_sold_in_app' }> {
+  console.warn('[entitlements] purchase attempted in-app; PlexMed is sold on the web', { module });
+  return { ok: false, reason: 'not_sold_in_app' };
 }
