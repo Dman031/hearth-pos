@@ -3416,3 +3416,58 @@ tab, so the destination was the origin. THE DEFECT WAS THE SHAPE, NOT THE CODE.
         PLEXLAW AND PLEXATS INHERIT THIS SHAPE, exactly as they inherit N-4-AMENDED's.
         The four states are not medical; they are the states of any licensed module:
         unverified, verified-but-unconfigured, configured-but-idle, running.
+
+## RULING — 2026-09-01 (P-7: the price is set at setup, always) — STRIKES the Day 8 payout gate
+
+Source: Derrick, reviewing PLEXMED S5's P3 step as built. The step asked whether Stripe
+Connect was set up before it would show a price field at all, and offered "Publish without
+a price" to anyone who had not finished payouts.
+
+  P-7  THE PRICE IS SET AT SETUP, ALWAYS. A clinician states what a visit costs when they
+       create their practice, whether or not Stripe Connect is set up. Connect is HOW THEY
+       RECEIVE THE MONEY; it is not a precondition on saying the number.
+
+       THE STRIKE, AND THE REASON — DERRICK, RECORDED AS GIVEN: "I gated a stated price on
+       the ability to receive it, which conflates saying a number with collecting it."
+       The Day 8 payout gate is STRUCK. It was not a wrong implementation of a right rule;
+       the rule itself confused two different facts about a price.
+
+       P3 IS A PLAIN PRICE STEP: a dollar field, defaulted empty, REQUIRED. When payouts are
+       not yet set up, ONE line renders beneath the field —
+         "Set up payouts in your account menu, under Money, to receive payments."
+       — INFORMATIONAL, NEVER A GATE, NEVER A BRANCH. "Publish without a price" is removed
+       entirely: there is no such thing now.
+
+       WHAT P-7 DOES **NOT** STRIKE — the scope matters, because the ruling depends on it.
+       THE SERVER-SIDE ENABLE GATE IN set_card_commerce SURVIVES UNTOUCHED. Enabling
+       commerce still requires a completed Connect account (live version: migration 0033,
+       `if p_enabled then ... CONNECT_REQUIRED`). P-7 strikes the CLIENT gating of the price
+       FIELD, not the server's refusal to make a card chargeable to an entity that cannot be
+       paid. Those are the two facts the Day 8 ruling conflated, and keeping the second is
+       what makes striking the first safe.
+
+       THE CARD CARRIES ITS PRICE FROM DAY ONE and becomes chargeable the moment payouts
+       exist. NO MIGRATION IS REQUIRED, and the reason is a property the live function
+       already has: the Connect check sits INSIDE `if p_enabled then`, while the UPDATE
+       writes `price_cents` unconditionally. So `set_card_commerce(enabled => false,
+       price_cents => N)` stores the price today and is refused by nothing.
+
+       THE FLIP IS CLIENT-SIDE, THROUGH THE CANONICAL WRITER — a design decision, not a
+       convenience. A trigger on entities.business_verified, or the Connect webhook writing
+       cards directly, would be A SECOND WRITE PATH for commerce fields, which 0014 names
+       "the ONLY write path" and the single-canonical-write-path rule forbids. The webhook
+       cannot call set_card_commerce either: it is current_entity_id()-scoped, so a
+       service-role caller has a null actor. A service-role variant would be a new writer
+       AND a migration — that is a ruling, not a diff, and it is not this one.
+       CONSEQUENCE, RULED ACCEPTABLE: the flip happens on the next app open with payouts
+       ready, not at the instant the webhook lands. A visit booked in that window is not
+       charged. A literal-moment flip needs the server-side machinery above.
+
+  P-7a A BACK BUTTON ON EVERY STEP of the practice onboarding. A multi-step form with only
+       Cancel means a typo on step one starts over. Steps 2-4; step 1 has nowhere to go and
+       keeps Cancel alone.
+
+  SPEC AMENDED IN THE SAME WINDOW (spec-contract rule — this repo writes the specs):
+  docs/PLEXMED_S5_PRACTICE_AUTHORING_SPEC.md P3 described the struck gate and the removed
+  secondary button verbatim. Left alone it would have gone on describing a shape the ruling
+  had just deleted, which is exactly the drift that rule exists to catch.
