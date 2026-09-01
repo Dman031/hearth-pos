@@ -3,21 +3,12 @@ import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { theme } from '../styles/theme';
 import useEntity from '../hooks/useEntity';
-import useCards from '../hooks/useCards';
 import { setEmailPreference } from '../services/settings';
 import { MODULE_CATALOGUE, getModuleAccess, type ModuleAccess } from '../services/entitlements';
 // startModulePurchase is NOT imported, by ruling (P-6): arm 1 has no tap, so it
 // has no caller. Nor is MODULE_UNAVAILABLE, its refusal text. Both still exist and
 // must not be deleted — see their comments before wiring either back.
-import {
-  MODULE_NO_CARD_BODY,
-  MODULE_ROW_TITLE,
-  MODULE_SETUP_LINE,
-  MODULE_UNVERIFIED_BODY,
-  MODULE_UNVERIFIED_POINTER,
-} from '../services/practice';
-import OpenTimesBoard from './OpenTimesBoard';
-import type { Card } from '../types/card';
+import { MODULE_ROW_TITLE, MODULE_SETUP_LINE } from '../services/practice';
 
 // SettingsPanel — the account's own settings, as an embedded sheet panel
 // (ContactsPanel / MoneyPanel pattern: navigation-free, lives inside
@@ -25,6 +16,18 @@ import type { Card } from '../types/card';
 // there is NO modules section yet, on purpose — nothing is ownable until the
 // board ships, and an empty "Modules" heading is exactly the placeholder N-4
 // forbids. It appears when there is something in it.
+//
+// N-19 (2026-09-01) — PLEXMED IS ONE SCREEN, AND THIS ROW IS ITS DOOR.
+// This panel used to carry FOUR ARMS, three of which each pointed somewhere else
+// (the ceremony behind My ID, Profile's ＋ Add for the card, the board inline).
+// Arm 3 pointed at Profile — and from the Profile tab that tap did nothing
+// visible, which is the device finding that produced N-19. The three owned arms
+// collapse into ONE row that pushes PlexMedScreen, where the four states and
+// their single next actions now live. N-1's entry point is untouched: modules
+// are still in the account menu behind Settings.
+// ARM 1 (unowned) IS UNCHANGED and stays here — N-19's four states are all
+// OWNED states, and the storefront row is not one of them. It is still inert by
+// P-6 and still not reachable (the seam returns true).
 //
 // THE MODULE ROW IS ALWAYS VISIBLE; THE BOARD IS WHAT HIDES (N-4-AMENDED,
 // 2026-08-30). This section previously rendered ONLY when the module was
@@ -79,25 +82,18 @@ interface SettingsPanelProps {
   /** Closes the whole account sheet. The board needs it before navigating —
    *  a modal left open would cover the tab it just moved to. */
   onDismiss?: () => void;
-  /**
-   * Switches the ACCOUNT SHEET to its credential view. A sibling view of one
-   * sheet, not a second modal — which is why the unverified row may tap through
-   * rather than only point (N-4-AMENDED ruling 3). Absent → the row still
-   * renders and still carries its pointer text; it just does not jump.
+  /*
+   * N-19 retired `onOpenCredential`. The ceremony was reached from here because
+   * the unverified arm lived here; it is now STATE 1 of the PlexMed screen, which
+   * is the one place a clinician sets a practice up. AccountChip still owns the
+   * 'credential' view — the Credential pill inside My ID still opens it.
    */
-  onOpenCredential?: () => void;
 }
 
-export default function SettingsPanel({ onDismiss, onOpenCredential }: SettingsPanelProps) {
+export default function SettingsPanel({ onDismiss }: SettingsPanelProps) {
   const navigation = useNavigation<{ navigate: (screen: string) => void }>();
   const { entity, refresh } = useEntity();
-  const { cards } = useCards();
   const [access, setAccess] = useState<ModuleAccess | null>(null);
-  // The board this panel is showing, or null for the settings list. Kept HERE
-  // rather than as another AccountChip SheetView: the board is a module's
-  // interior, not a peer of My ID / Contacts / Money.
-  const [boardCard, setBoardCard] = useState<Card | null>(null);
-  const practiceCards = cards.filter((c) => c.kind === 'practice');
 
   useEffect(() => {
     if (!entity) {
@@ -144,16 +140,6 @@ export default function SettingsPanel({ onDismiss, onOpenCredential }: SettingsP
     [busy, refresh],
   );
 
-  if (boardCard) {
-    return (
-      <OpenTimesBoard
-        card={boardCard}
-        onBack={() => setBoardCard(null)}
-        onDismiss={onDismiss}
-      />
-    );
-  }
-
   return (
     <View style={styles.container}>
       {/* Modules. THE SECTION RENDERS AS SOON AS ACCESS IS KNOWN — never before
@@ -187,57 +173,27 @@ export default function SettingsPanel({ onDismiss, onOpenCredential }: SettingsP
                 <Text style={styles.moduleHint}>{MODULE_SETUP_LINE}</Text>
               </View>
             </View>
-          ) : !access.licensed ? (
-            /* ARM 2 · owned, no live stamp. TAPS THROUGH to the ceremony — a
-               sibling view of this same sheet. The pointer text stays: where
-               the licence lives outlives this one tap. */
-            <Pressable
-              style={styles.moduleRow}
-              onPress={onOpenCredential}
-              disabled={!onOpenCredential}
-              accessibilityRole="button"
-            >
-              <View style={styles.moduleText}>
-                <Text style={styles.moduleLabel}>{MODULE_CATALOGUE.plexmed.label}</Text>
-                <Text style={styles.moduleBody}>{MODULE_UNVERIFIED_BODY}</Text>
-                <Text style={styles.moduleHint}>{MODULE_UNVERIFIED_POINTER}</Text>
-              </View>
-              <Text style={styles.chevron}>›</Text>
-            </Pressable>
-          ) : practiceCards.length === 0 ? (
-            /* ARM 3 · THE FOURTH ARM. Owned and verified with nothing for a
-               board to attach to. Hiding the module here would repeat N-4's
-               error one condition later, so it points at Profile — where
-               ＋ Add → Practice is now an accepted path. */
+          ) : (
+            /* THE DOOR (N-19). One row, one destination. What used to be three
+               arms — verify your license / make a practice card / the board — are
+               now the first three STATES OF THAT SCREEN, which is the only place
+               they can each show exactly one next action.
+               DISMISS BEFORE PUSHING: this row lives in a Modal, and a modal left
+               open would cover the screen it just pushed. */
             <Pressable
               style={styles.moduleRow}
               onPress={() => {
-                // Close the sheet FIRST — a modal left open covers the tab it
-                // just moved to (the CredentialPanel "See my card" pattern).
                 onDismiss?.();
-                navigation.navigate('Profile');
+                navigation.navigate('PlexMed');
               }}
               accessibilityRole="button"
             >
               <View style={styles.moduleText}>
                 <Text style={styles.moduleLabel}>{MODULE_CATALOGUE.plexmed.label}</Text>
-                <Text style={styles.moduleBody}>{MODULE_NO_CARD_BODY}</Text>
+                <Text style={styles.moduleBody}>{MODULE_CATALOGUE.plexmed.blurb}</Text>
               </View>
               <Text style={styles.chevron}>›</Text>
             </Pressable>
-          ) : (
-            /* ARM 4 · the board. One row per practice card, unchanged. */
-            practiceCards.map((c) => (
-              <Pressable
-                key={c.id}
-                style={styles.moduleRow}
-                onPress={() => setBoardCard(c)}
-                accessibilityRole="button"
-              >
-                <Text style={styles.moduleLabel}>{`Open times · ${c.title}`}</Text>
-                <Text style={styles.chevron}>›</Text>
-              </Pressable>
-            ))
           )}
         </View>
       ) : null}

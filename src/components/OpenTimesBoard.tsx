@@ -50,8 +50,13 @@ import type { Card } from '../types/card';
 // THE SHEET STILL NEVER NAMES THE PERSON. That request lives in Incoming, and
 // this row's job is to take the clinician there — not to answer it in place.
 //
-// CLOSE BEFORE NAVIGATING. This renders inside the account sheet's Modal; a
-// modal left open would cover the tab it just moved to.
+// N-19 (2026-09-01) — THIS NO LONGER RENDERS INSIDE THE ACCOUNT SHEET. It is a
+// view of the PUSHED PlexMed screen, so there is no modal to close before a tab
+// change and `onDismiss` is gone. Navigation targets the tabs through their
+// parent: navigate('Shell', { screen: ... }) selects the tab and pops PlexMed in
+// one call. The old note read "close before navigating; a modal left open would
+// cover the tab it just moved to" — true of the sheet-nested board, false now,
+// and left here as the reason the prop disappeared rather than deleted silently.
 
 /** The zones the first-run confirm can offer as an alternative. */
 const ZONE_CHOICES = [
@@ -67,12 +72,17 @@ const ZONE_CHOICES = [
 interface OpenTimesBoardProps {
   card: Card;
   onBack: () => void;
-  /** Closes the whole account sheet, before a tab change. */
-  onDismiss?: () => void;
+  /**
+   * Opens AddTimesSheet as soon as the board mounts. N-19 state 3's "Post times"
+   * is ONE action; without this the clinician would land on an empty board and
+   * have to find "Add times" themselves, which is the extra step N-19 exists to
+   * remove. Latched on mount only — dismissing the sheet does not reopen it.
+   */
+  openAddOnMount?: boolean;
 }
 
-export default function OpenTimesBoard({ card, onBack, onDismiss }: OpenTimesBoardProps) {
-  const navigation = useNavigation<{ navigate: (screen: string) => void }>();
+export default function OpenTimesBoard({ card, onBack, openAddOnMount = false }: OpenTimesBoardProps) {
+  const navigation = useNavigation<{ navigate: (screen: string, params?: object) => void }>();
   const { entity, refresh: refreshEntity } = useEntity();
   const { verifications } = useMyVerifications();
 
@@ -84,7 +94,7 @@ export default function OpenTimesBoard({ card, onBack, onDismiss }: OpenTimesBoa
 
   const [anchorKey, setAnchorKey] = useState<string>(() => toDateKey(new Date(), tz));
   const [selectedKey, setSelectedKey] = useState<string>(() => toDateKey(new Date(), tz));
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState(openAddOnMount);
   const [toast, setToast] = useState<string | null>(null);
   const [toastTone, setToastTone] = useState<'default' | 'danger'>('default');
   const [pickingZone, setPickingZone] = useState(false);
@@ -149,8 +159,11 @@ export default function OpenTimesBoard({ card, onBack, onDismiss }: OpenTimesBoa
             {
               text: 'Go to Incoming',
               onPress: () => {
-                onDismiss?.();
-                navigation.navigate('Incoming');
+                // N-19: the board is a view of the PUSHED PlexMed screen, so the
+                // tabs are a child of 'Shell'. This selects the tab AND pops
+                // PlexMed — which is what the old onDismiss() did by hand back
+                // when this rendered inside the account sheet's Modal.
+                navigation.navigate('Shell', { screen: 'Incoming' });
               },
             },
           ],
@@ -161,8 +174,7 @@ export default function OpenTimesBoard({ card, onBack, onDismiss }: OpenTimesBoa
       // Booked-row tap opens the visit in Engagement (S5:120). The tab is as
       // deep as this can go — Engagement has no per-visit route to target.
       if (slot.state === 'booked') {
-        onDismiss?.();
-        navigation.navigate('Engagement');
+        navigation.navigate('Shell', { screen: 'Engagement' });
         return;
       }
 
@@ -194,7 +206,7 @@ export default function OpenTimesBoard({ card, onBack, onDismiss }: OpenTimesBoa
         ],
       );
     },
-    [refresh, showToast, navigation, onDismiss],
+    [refresh, showToast, navigation],
   );
 
   const defaultModality: SlotModality = 'video';

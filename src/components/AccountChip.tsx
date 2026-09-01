@@ -168,7 +168,7 @@ export default function AccountChip() {
                   // already returns 'credential' to 'identity' (:148) — that
                   // stays; arriving from Settings still leaves via My ID, which
                   // is where the licence lives and where the row said it was.
-                  <SettingsPanel onDismiss={close} onOpenCredential={() => setView('credential')} />
+                  <SettingsPanel onDismiss={close} />
                 ) : view === 'credential' ? (
                   <CredentialPanel onClose={close} />
                 ) : (

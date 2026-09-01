@@ -14,8 +14,6 @@ import useEntity from '../hooks/useEntity';
 import useCards from '../hooks/useCards';
 import VerifiedHumanBadge from '../components/VerifiedHumanBadge';
 import ProfileCard from '../components/ProfileCard';
-import PracticeCardSheet from '../components/PracticeCardSheet';
-import useMyVerifications from '../hooks/useMyVerifications';
 import CardEditorSheet, {
   type CardEditorSeed,
 } from '../components/CardEditorSheet';
@@ -57,35 +55,17 @@ const VERIFY_ERROR_COPY: Record<string, string> = {
 export default function ProfileScreen() {
   const { entity, refresh } = useEntity();
   const { cards, retiredCards, setFieldAvailability } = useCards();
-  // The licence gate for the Practice card type. A live verified, unvoided
-  // licence row is what the database itself requires
-  // (cards_practice_requires_licence), so the picker offers a path the write
-  // will accept — never one it will reject.
-  const { verifications, isLoading: verificationsLoading, error: verificationsError } =
-    useMyVerifications();
-  // P5: the same predicate OpenTimesBoard:101-103 uses, so the banner and the
-  // board it points at cannot disagree about whether the stamp is live.
+  // N-19 (2026-09-01) — NO LICENCE READ HERE ANY MORE. This screen carried two
+  // derivations of the live-stamp predicate: `licenceLive` for ProfileCard's
+  // paused banner and `practiceAvailable` for the editor's Practice chip. Both
+  // moved to the PlexMed screen with the surfaces that used them, so the screen
+  // no longer needs to know whether a stamp is live.
   //
-  // UNDEFINED WHILE THE READ IS IN FLIGHT OR FAILED, never while it is merely
-  // EMPTY. An empty list is a real answer — no stamp — and a clinician who has
-  // never verified should see the stamp-off banner, not silence. What must not
-  // become "paused" is a fact we do not have: ProfileCard renders nothing on
-  // undefined. Keyed on the hook's own flags rather than on length, because
-  // length cannot tell those two apart.
-  const licenceLive: boolean | undefined =
-    verificationsLoading || verificationsError !== null
-      ? undefined
-      : verifications.some(
-          (v) => v.type === 'license' && v.status === 'verified' && v.voided_at === null,
-        );
-  const practiceAvailable = verifications.some(
-    (v) => v.type === 'license' && v.status === 'verified' && v.voided_at === null,
-  );
-  // The practice sheet's own open-state. A practice card NEVER opens
-  // CardEditorSheet: its fields are canonical and that sheet's Details section
-  // is free-form, so the two would fight (PLEXMED S5 note 7).
-  const [practiceCard, setPracticeCard] = useState<Card | null>(null);
-  const [creatingPractice, setCreatingPractice] = useState(false);
+  // ONE FINDING DIES WITH THEM, RECORDED SO IT IS CLOSED RATHER THAN LOST:
+  // `practiceAvailable` had NO loading guard (unlike `licenceLive` beside it),
+  // so while the verifications read was in flight it was false, and a fast tap
+  // on Practice showed a verified clinician the "verify your license" refusal.
+  // PlexMedScreen carries the tri-state guard instead of reproducing the race.
   const [starting, setStarting] = useState(false);
   // Day 22E — the retired list sheet (ruling 4: a sheet, not a screen).
   const [showRetired, setShowRetired] = useState(false);
@@ -305,9 +285,13 @@ export default function ProfileScreen() {
               <ProfileCard
                 key={card.id}
                 card={card}
-                licenceLive={licenceLive}
                 onPress={() =>
-                  card.kind === 'practice' ? setPracticeCard(card) : setEditingCard(card)
+                  // N-19: a practice card is READ-ONLY here. It is a card on
+                  // the network and its owner sees it, but editing lives in the
+                  // module. Not a dead tap — the row simply does not act, so
+                  // nothing teaches that a control can be pressed for nothing
+                  // (N-4).
+                  card.kind === 'practice' ? undefined : setEditingCard(card)
                 }
                 onToggleAvailability={(fieldIndex, next) =>
                   void setFieldAvailability(card.id, fieldIndex, next)
@@ -346,12 +330,9 @@ export default function ProfileScreen() {
           // the same pageSheet pattern (no stacked modals).
           setShowRetired(false);
           setMenuSeed(null);
-          // Same routing as the live list: a practice card never opens the
-          // free-form editor, retired or not.
-          if (card.kind === 'practice') {
-            setPracticeCard(card);
-            return;
-          }
+          // N-19: same rule as the live list — a retired practice card is
+          // read-only here too. Practice things are managed in the module.
+          if (card.kind === 'practice') return;
           setEditingCard(card);
         }}
       />
@@ -361,22 +342,6 @@ export default function ProfileScreen() {
         card={editingCard}
         onClose={closeEditor}
         createSeed={menuSeed}
-        practiceAvailable={practiceAvailable}
-        onChoosePractice={() => {
-          // Sequential sheets, never stacked — close the editor first, then
-          // open the practice sheet (the RetiredCardsSheet pattern above).
-          closeEditor();
-          setCreatingPractice(true);
-        }}
-      />
-
-      <PracticeCardSheet
-        mode={creatingPractice ? 'create' : practiceCard ? 'edit' : null}
-        card={practiceCard}
-        onClose={() => {
-          setCreatingPractice(false);
-          setPracticeCard(null);
-        }}
       />
     </SafeAreaView>
   );

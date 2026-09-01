@@ -12,20 +12,11 @@ import { theme, tileSurface } from '../styles/theme';
 import PermissionPill from './PermissionPill';
 import GalleryGrid from './GalleryGrid';
 import ImageViewer from './ImageViewer';
-import useCardSlots from '../hooks/useCardSlots';
-import {
-  PAUSED_HORIZON_DAYS,
-  PAUSED_NO_TIMES_BODY,
-  PAUSED_NO_TIMES_POINTER,
-  PAUSED_STAMP_OFF_BODY,
-  PAUSED_STAMP_OFF_POINTER,
-  PAUSED_TITLE,
-  type PracticePaused,
-} from '../services/practice';
 
 // ProfileCard — one of the user's cards in the Profile list: title, an optional
 // media image, its user-named fields, and the two DISPLAY permission pills
-// (see / act). Tapping the card opens the editor sheet. Media (the reserved
+// (see / act). Tapping the card opens the editor sheet — EXCEPT a practice
+// card, which is read-only here (N-19: practice things are managed in PlexMed). Media (the reserved
 // media_url field) can ride on ANY card kind — not just 'content' — so the
 // image renders and the media_url entry is kept OUT of the text-field rows.
 //
@@ -36,14 +27,13 @@ import {
 
 interface ProfileCardProps {
   card: Card;
-  onPress: () => void;
   /**
-   * Whether the owner holds a LIVE Verified Clinician stamp. Only meaningful on
-   * a practice card, and DELIBERATELY TRI-STATE: `undefined` means the caller
-   * has not told us, and no paused banner renders at all. A missing answer must
-   * never become "paused" — that is the same rule the honesty chips follow.
+   * Opens the editor. OPTIONAL SINCE N-19: a practice card is read-only in the
+   * Profile list — it is a card on the network and its owner sees it, but
+   * editing lives in the PlexMed module. Absent → the row renders and does not
+   * act, rather than acting on nothing (N-4).
    */
-  licenceLive?: boolean;
+  onPress?: () => void;
   // Flip one item field's availability (the 86 toggle). `fieldIndex` is the
   // canonical index into normalizeFields(card.fields) — passed straight to
   // CardContext.setFieldAvailability. Absent → item rows render but don't toggle.
@@ -53,53 +43,19 @@ interface ProfileCardProps {
 export default function ProfileCard({
   card,
   onPress,
-  licenceLive,
   onToggleAvailability,
 }: ProfileCardProps) {
-  // ─── P5, THE PAUSED BANNER ────────────────────────────────────────────────
+  // N-19 (2026-09-01) — THE PAUSED BANNER IS GONE, AND THE SLOT READ WITH IT.
+  // P5 put a "your card is up, but paused" notice here pointing at Settings ›
+  // PlexMed. Under N-19 the module screen says the same thing IN THE PLACE THAT
+  // FIXES IT: state 3 is "Open times — nobody can book you until you post some"
+  // with the button that posts them. A banner that points and a screen that acts
+  // are the same fact told twice, and the pointing one was the scattered half.
+  // The per-card useCardSlots read existed only to feed it; it is removed, so an
+  // ordinary Profile list no longer issues a slots request per practice card.
   //
-  // THE READ LIVES HERE, NOT ON THE SCREEN, and that is what makes it correct
-  // for more than one practice card. Nothing in the schema limits an entity to
-  // one (0038a adds the enum value and no uniqueness index), so a screen-level
-  // read would have to loop — which React forbids — or quietly answer for the
-  // first card only. One component, one card, one hook.
-  //
-  // A NON-PRACTICE CARD PASSES null AND COSTS NOTHING: useCardSlots returns
-  // early on a null id without issuing a request. The hook is called
-  // unconditionally because hooks must be, not because every card needs it.
   const isPractice = card.kind === 'practice';
-  const { from, to } = useMemo(() => {
-    const now = new Date();
-    return {
-      from: now,
-      to: new Date(now.getTime() + PAUSED_HORIZON_DAYS * 24 * 60 * 60 * 1000),
-    };
-  }, []);
-  const { slots, isLoading: slotsLoading, failed: slotsFailed } = useCardSlots(
-    isPractice ? card.id : null,
-    from,
-    to,
-  );
 
-  // PAUSED MEANS NOBODY CAN ASK — never "nobody has an opening left". The
-  // predicate is ZERO FUTURE SLOTS OF ANY STATE, so a clinician whose every
-  // time is booked gets NO banner: they are the person doing best here, and a
-  // paused notice on their card would be a false alarm on exactly the wrong
-  // person. `from` is now, so times that have already passed do not count.
-  //
-  // A FAILED OR IN-FLIGHT READ RENDERS NOTHING. An empty board and an unknown
-  // board must not look alike, and of the two possible mistakes, telling a
-  // working clinician they are paused is the expensive one.
-  const paused: PracticePaused | null = !isPractice
-    ? null
-    : licenceLive === false
-      ? // Checked FIRST and needs no slot read: with the stamp off the times are
-        // not shown whatever the board holds, so the other branch would name the
-        // wrong cause even when it is also true.
-        'stamp_off'
-      : licenceLive === true && !slotsLoading && !slotsFailed && slots.length === 0
-        ? 'no_times'
-        : null;
   // Canonical field list (media entry included so indices match the write
   // path); the media row is filtered out of the text rows below and rendered as
   // an image instead. Each kept row carries its canonical index for the toggle.
@@ -121,28 +77,15 @@ export default function ProfileCard({
 
   return (
     <Pressable
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      style={({ pressed }) => [styles.card, pressed && onPress && styles.cardPressed]}
       onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`Edit card: ${card.title}`}
+      // N-19: no onPress on a practice card, so it is not a button and does not
+      // announce an edit it will not perform.
+      disabled={!onPress}
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={onPress ? `Edit card: ${card.title}` : card.title}
     >
       <Text style={styles.title}>{card.title}</Text>
-
-      {/* P5. ABOVE the fields, because it is about whether this card WORKS —
-          a person reading it has not got to the fields yet. Pointing rather
-          than opening (N-8): the fix lives on another surface and this says
-          where, it does not reach across and start it. */}
-      {paused ? (
-        <View style={styles.pausedBanner}>
-          <Text style={styles.pausedTitle}>{PAUSED_TITLE}</Text>
-          <Text style={styles.pausedBody}>
-            {paused === 'stamp_off' ? PAUSED_STAMP_OFF_BODY : PAUSED_NO_TIMES_BODY}
-          </Text>
-          <Text style={styles.pausedPointer}>
-            {paused === 'stamp_off' ? PAUSED_STAMP_OFF_POINTER : PAUSED_NO_TIMES_POINTER}
-          </Text>
-        </View>
-      ) : null}
 
       {mediaUrl && !imageBroken ? (
         <Image
@@ -244,29 +187,13 @@ const styles = StyleSheet.create({
   cardPressed: {
     opacity: 0.7,
   },
-  // WHEAT, NOT CLAY-RED. A paused card is not an error and its owner did
-  // nothing wrong — this is the attention edge the decision slot uses, which is
-  // the register for "this needs you", not for "this broke".
-  pausedBanner: {
-    borderRadius: theme.borderRadius.card,
-    borderWidth: 1,
-    borderColor: theme.colors.accent2,
-    backgroundColor: theme.colors.surfaceInset,
-    padding: theme.spacing.md,
-    gap: 2,
-    marginBottom: theme.spacing.sm,
-  },
-  pausedTitle: {
-    ...theme.typography.bodyMuted,
-    fontFamily: theme.fonts.semiBold,
-    color: theme.colors.textPrimary,
-  },
-  pausedBody: { ...theme.typography.caption, color: theme.colors.textSecondary },
-  pausedPointer: { ...theme.typography.caption, color: theme.colors.accent },
   title: {
     ...theme.typography.h2,
     color: theme.colors.textPrimary,
   },
+  // WHEAT, NOT CLAY-RED. A paused card is not an error and its owner did
+  // nothing wrong — this is the attention edge the decision slot uses, which is
+  // the register for "this needs you", not for "this broke".
   media: {
     width: '100%',
     height: 160,

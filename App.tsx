@@ -24,7 +24,7 @@ import usePushTokenRegistration from './src/hooks/usePushTokenRegistration';
 import AuthScreen from './src/screens/AuthScreen';
 import EntitySetupScreen from './src/screens/EntitySetupScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
-import TabNavigator from './src/navigation/TabNavigator';
+import RootNavigator from './src/navigation/RootNavigator';
 import { theme } from './src/styles/theme';
 
 function SplashScreen() {
@@ -77,7 +77,7 @@ function Root() {
   }
   return (
     <NavigationContainer>
-      <TabNavigator />
+      <RootNavigator />
     </NavigationContainer>
   );
 }

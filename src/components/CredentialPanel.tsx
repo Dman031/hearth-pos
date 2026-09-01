@@ -50,11 +50,18 @@ export default function CredentialPanel({ onClose }: CredentialPanelProps) {
   // SAFE HERE, AND PROVEN: useNavigation throws only when BOTH NavigationContext
   // and NavigationContainerRefContext are undefined (@react-navigation/core,
   // useNavigation.tsx). NavigationContainer wraps the whole shell (App.tsx:79),
-  // so the container ref is always defined and the throw is unreachable. A
-  // header-rendered component gets the container ref rather than a screen's
-  // navigation prop — which supports navigate() to a root route, and 'Profile'
-  // is one (TabNavigator.tsx:90).
-  const navigation = useNavigation<{ navigate: (screen: string) => void }>();
+  // so the container ref is always defined and the throw is unreachable.
+  //
+  // N-19 (2026-09-01) — THIS PANEL NOW MOUNTS IN TWO PLACES: AccountChip's
+  // 'credential' view (the Credential pill inside My ID) and STATE 1 of the
+  // PlexMed screen. 'Profile' stopped being a root route when the root Stack
+  // arrived — from the PUSHED PlexMed screen the tabs are a child of 'Shell', so
+  // a flat navigate('Profile') would be a dev-error no-op exactly where a
+  // clinician finishes verifying. The parent-and-child form below is correct
+  // from BOTH mounts, and additionally pops PlexMed when called from there.
+  const navigation = useNavigation<{
+    navigate: (screen: string, params?: object) => void;
+  }>();
   const { entity, refresh: refreshEntity } = useEntity();
   const { verifications, refresh: refreshVerifications } = useMyVerifications();
 
@@ -191,7 +198,7 @@ export default function CredentialPanel({ onClose }: CredentialPanelProps) {
           onPress={() => {
             // Close the sheet FIRST — a modal left open would cover the tab.
             onClose();
-            navigation.navigate('Profile');
+            navigation.navigate('Shell', { screen: 'Profile' });
           }}
           accessibilityRole="button"
         >

@@ -214,6 +214,21 @@ export function isSlotNoLongerHeld(err: unknown): boolean {
 // the stamp off, posting more times changes nothing — sending someone to the
 // board would cost them ten minutes on the wrong fix.
 
+// ─── RETIRED BY N-19 (2026-09-01) — UNREFERENCED, AND DELIBERATELY SO ───────
+// The paused banner these seven strings dressed is gone from ProfileCard, and
+// the two MODULE_* arms below went with SettingsPanel's three owned arms.
+// WHY THEY ARE KEPT, and it is the startModulePurchase precedent (P-6): copy
+// that was ratified verbatim is expensive to re-derive, and the reason each was
+// written is the part that would be lost. PAUSED_STAMP_OFF_BODY's second
+// sentence in particular was ratified word-for-word on 2026-08-30 because it is
+// what stops a clinician spending ten minutes posting times that cannot show.
+// DO NOT REWIRE ANY OF THEM. N-19 did not decide they said the wrong thing; it
+// decided they said it in the wrong PLACE. The PlexMed screen now says each of
+// these where the fix is, which is why a pointer version must not come back:
+// state 1 IS "verify your license", state 3 IS "nobody can book you until you
+// post some". A second copy that points at that screen is the scattering.
+// PAUSED_HORIZON_DAYS below is NOT retired — PlexMedScreen reads it.
+
 export type PracticePaused = 'no_times' | 'stamp_off';
 
 export const PAUSED_TITLE = 'Your card is up, but paused';
@@ -262,13 +277,18 @@ export const PAUSED_HORIZON_DAYS = 90;
 /** Under the label on every arm. Says what the module IS, before it is owned. */
 export const MODULE_ROW_TITLE = 'PlexMed';
 
-/** Owned, licence not live. Taps THROUGH to the ceremony. */
+/** RETIRED BY N-19 — see the block above. Was: owned, licence not live. */
 export const MODULE_UNVERIFIED_BODY = 'Verify your license to open your times board.';
-/** Kept even though the row jumps: knowing where it lives outlives this tap. */
+/** RETIRED BY N-19 — see the block above. */
 export const MODULE_UNVERIFIED_POINTER =
   'Your license lives in your account menu, under My ID.';
 
-/** Owned and verified, but nothing to attach a board to. Taps to Profile. */
+/**
+ * RETIRED BY N-19 — see the block above. This is the exact string the device
+ * pass tapped: "Make a practice card to open your times board.", on a row that
+ * navigated to Profile from the Profile tab. It is kept as the artefact of the
+ * finding that produced the ruling.
+ */
 export const MODULE_NO_CARD_BODY = 'Make a practice card to open your times board.';
 
 /**
