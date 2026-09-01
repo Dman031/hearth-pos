@@ -3270,3 +3270,81 @@ three is mine to rule.
   (two) and practice.ts (one). The gate is one function; the storefront's copy, its price
   line and its tap are the other two decisions, and P-3 already anticipates the first of
   them by reserving the unowned arm's copy for the paywall session.
+
+## RULINGS — 2026-08-31 (PlexMed pricing, P-5…P-6 — closes findings (b) and (c); CORRECTS N-4-AMENDED's stated reasoning)
+
+DERRICK, CORRECTING HIS OWN EARLIER FRAMING, RECORDED AS GIVEN: "N-4-AMENDED was about
+the module ROW EXISTING so a clinician can discover PlexMed at all; the problem it fixed
+was invisibility, not a missing number. My phrase 'a price is an offer' overreached. The
+row's job is to say the module exists and what it does — not to quote a figure."
+
+THE STRIKE, WRITTEN OUT SO NOBODY RE-DERIVES IT. The sentence "a price is not an inert
+control, it is an offer, and hiding it means the product cannot be discovered or bought"
+(N-4-AMENDED, 2026-08-30, and repeated in entitlements.ts:36-38) IS WITHDRAWN AS
+REASONING ABOUT PRICE. What survives is the finding it was offered in support of, which
+was always about VISIBILITY: a clinician who had not verified saw no evidence PlexMed
+existed at all — a storefront with no door. THE DOOR IS THE ROW. THE FIGURE IS NOT PART
+OF THE DOOR. A future session reading N-4-AMENDED will find the price sentence there and
+must read this block beside it: the row exists to say the module exists and what it
+unlocks, and a number in that row does not follow from it.
+
+P-5 (RULES finding (b)) MODULE_CATALOGUE.plexmed.priceCents STAYS NULL — PERMANENTLY,
+    not pending a number. P-1's $15 is real and lives on the web, where the transaction
+    is. The unowned arm names the module and what it unlocks and SAYS NOTHING ABOUT COST.
+    P-3 STANDS EXACTLY AS WRITTEN: no price in the app, no sale, no link out.
+    WHY THIS IS THE STRONGER POSITION AND NOT THE TIMID ONE — DERRICK, RECORDED AS GIVEN:
+    "That removes the Apple question rather than reasoning about where its line falls."
+    A rule that depends on correctly locating someone else's boundary is a rule that
+    breaks when they move it. This one does not have a boundary to be on the wrong side
+    of. There is nothing to re-litigate when Apple's guidelines change, and no session
+    needs to become an expert on anti-steering to ship the storefront row.
+    THE FIELD IS NOT A PENDING SLOT. `priceCents: null` now means RULED NULL, not
+    "awaiting the paywall session" as its comment says today. Its doc comment and the
+    price-line branch in SettingsPanel.tsx (:192-196) are owed the correction at build
+    time — a live `priceCents !== null ? … : null` render is a branch waiting for a
+    number that is never coming, and the next person to find the field empty will read
+    the old comment as an invitation to fill it.
+
+P-6 (RULES finding (c)) startModulePurchase() IS A PERMANENT HONEST REFUSAL. IT NEVER
+    OPENS A BROWSER. Not a stopgap until commerce ships, not a deep link held back — the
+    app does not sell PlexMed and never will, so the seam's job is to say so if anything
+    ever calls it. It returns a refusal rather than throwing or silently doing nothing,
+    which is the shape it already has and the reason that shape was right.
+    THE REASON LITERAL IS NOW WRONG AND MUST CHANGE. `reason: 'not_available_yet'`
+    (entitlements.ts:148,150) SAYS "YET", which is a promise of a future in-app purchase
+    that P-3 forbids. So does the copy it drives: MODULE_UNAVAILABLE = "That isn't on
+    sale yet." (practice.ts:275). Both were correct while the paywall was merely unbuilt
+    and are false now that it is ruled to live elsewhere. This is the Awareness Pattern
+    about plausible placeholders in its quietest form: not an invented number, an invented
+    TENSE.
+
+COPY PROPOSED FOR RATIFICATION — NOT RATIFIED, NOT BUILT. Two constants, drafted here so
+the paywall session opens with something to approve or reject rather than a blank page.
+Both obey P-3: they name no figure, contain no URL, and nothing in them navigates.
+
+  MODULE_UNAVAILABLE (replacing "That isn't on sale yet."), option A — RECOMMENDED:
+      "PlexMed is set up outside the app."
+  option B, if the shorter line reads too abrupt beneath the blurb:
+      "PlexMed is set up from your account on the web, not in the app."
+
+  WHY NO URL IN EITHER. Naming teleoplexy.ai would put a destination in the app, and a
+  destination is the first half of a link out — the exact question P-5 exists to remove.
+  A clinician who subscribes does so from the web, where they already are when they do it.
+
+  WHY NEITHER SAYS "YET" OR "SOON". Both are the invented tense above. The sentence is
+  true forever or it is the wrong sentence.
+
+  THE UNOWNED ARM ITSELF needs no new copy: MODULE_CATALOGUE.plexmed.blurb ("Open times,
+  visits and superbills for your practice.") already does exactly what P-5 asks of the
+  row — names the module and what it unlocks, silent on cost. It was written before the
+  price question existed and is unaffected by its answer.
+
+OPEN, NOT RULED — RAISED HERE BECAUSE P-6 CREATES IT. Arm 1 is a `Pressable` with a
+  chevron (SettingsPanel.tsx:186-200), and under P-6 its tap can now do nothing but print
+  a refusal, forever. THAT IS AN INERT CONTROL, which is the precise thing N-4 was right
+  about before the price sentence overreached. Two shapes, and this is a design decision
+  owed a ruling rather than a build-time coin flip: (i) the row stays pressable and the
+  refusal is what the tap is for — honest, but it teaches that chevrons can lead nowhere;
+  (ii) the row loses its chevron and its tap, and the setup line renders inline and always
+  — nothing inert, but then startModulePurchase() has NO CALLER and its copy never renders,
+  leaving the function a pure guard. THE COPY ABOVE IS DRAFTED TO WORK IN EITHER SHAPE.
