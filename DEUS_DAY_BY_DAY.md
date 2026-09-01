@@ -3191,3 +3191,82 @@ BUILD: branch off main; guidance.ts (three constants + CRISIS_CHANNELS + compose
 test/display-stack.spec.ts goldens amended for ER-1 with an EMPTY-SET case added so the defect
 cannot regress silently. No migration, no route touch, no envelope shape change, no read widened.
 tsc clean. No push.
+
+## RULINGS — 2026-08-31 (PlexMed pricing, P-1…P-4) — recorded BEFORE the paywall session
+
+WHY THIS IS RECORDED NOW AND NOT AT BUILD TIME. The entitlement seam already exists —
+N-1 built it, N-4-AMENDED built the three arms around it — and a seam built against a
+guessed price is a seam built to the wrong shape. A RULING IS NOT A RULING UNTIL IT IS
+IN THE ROADMAP; this is that step, taken before the build prompt rather than after.
+
+P-1 PLEXMED IS $15/MONTH, FLAT. Not a share of the visit. The 1.5% transaction fee
+    stands unchanged. $15 MAKES REVENUE PREDICTABLE BEFORE VOLUME EXISTS — a percentage
+    of a thin network's visit flow is a number nobody can plan against, and the two
+    revenue lines answer different questions: the fee scales with the network, the
+    subscription does not depend on it.
+
+P-2 VERIFICATION IS FREE, ALWAYS. The stamp costs nothing and never will. IT IS THE
+    SUPPLY FUNNEL AND THE MOAT, and charging for it means fewer verified clinicians —
+    the one number the whole network is bottlenecked on. $15 BUYS THE WORKBENCH: the
+    times board, Today, the wrap, the superbill. GET VERIFIED FREE; PAY TO BE BOOKABLE.
+    This is what the two gate conditions in entitlements.ts have always meant, now with
+    the commercial reason attached: OWNED is the workbench, LICENSED is the stamp, and
+    they were kept from collapsing into one state precisely so this pricing was possible.
+
+P-3 BILLING IS ON THE WEB, NEVER IN THE APP.
+    THE MECHANISM, so nobody builds the wrong thing:
+    - A subscribe page on teleoplexy.ai using Stripe Checkout in SUBSCRIPTION mode,
+      $15/month recurring. A NEW STRIPE PRODUCT, ENTIRELY SEPARATE from the Connect flow
+      that moves visit money. CONNECT PAYS CLINICIANS; THIS COLLECTS FROM THEM — opposite
+      directions, and nothing in the Connect path may be reused to carry it.
+    - A webhook consuming customer.subscription.created / .updated / .deleted, writing an
+      entitlement row keyed to the entity. SAME POSTURE AS THE EXISTING STRIPE WEBHOOK:
+      signature verified, service-role only, idempotent. It is a second event source into
+      the same repo, so the STATE-TRANSITION WRITE RULE binds — one canonical writer for
+      the entitlement row, whatever calls it.
+    - isModuleOwned() in hearth-pos/src/services/entitlements.ts becomes a read of that
+      entitlement. N-4-AMENDED already built the three arms around it.
+    - THE iOS APP NEVER SHOWS A PRICE, NEVER LINKS TO A PURCHASE, AND SELLS NOTHING. It
+      reads an entitlement bought elsewhere. This is the multiplatform-service shape Apple
+      permits, and it is why APPLE TAKES ZERO. The unowned arm must NOT read "tap to buy";
+      its copy is proposed when the paywall session opens.
+
+P-4 OPEN, NOT RULED — WHEN BILLING STARTS. At signup, or at first accepted booking?
+    "YOU DON'T PAY UNTIL SOMEONE BOOKS YOU" IS A REAL SENTENCE, and nobody wants to pay
+    for an empty board on a thin network. Recorded as open, deliberately: it changes the
+    Checkout shape (trial vs immediate) and is not a detail the build may settle by
+    default.
+
+FOUND AT RECORD TIME, by reading the seam this block was written against (hearth-pos
+@ main, verified 2026-08-31 — canon rule 1). Recorded rather than resolved: none of the
+three is mine to rule.
+
+  (a) CONFIRMED, and P-3's central claim holds. `isModuleOwned(module: ModuleId):
+      Promise<boolean>` (entitlements.ts:96) is ALREADY ASYNC and returns `true` at :98,
+      async by ruling so "the call sites do not change shape when it becomes one". The
+      entitlement read drops in with no signature change and no call-site churn.
+
+  (b) OPEN, NOT RULED — `MODULE_CATALOGUE.plexmed.priceCents` IS `null` AND WAS WAITING
+      FOR EXACTLY THIS NUMBER. Its comment (entitlements.ts:47-58) says the row "renders
+      WITHOUT a price line until the paywall session rules the number", and N-4-AMENDED
+      put it there on the recorded reasoning that "a price is not an inert control, it is
+      an offer, and hiding it means the product cannot be discovered or bought". P-1 rules
+      the number and P-3 says the app never shows it. BOTH CANNOT BE TRUE OF THAT FIELD.
+      Either priceCents stays null forever and the field retires, or the storefront row
+      renders $15 and P-3's "never shows a price" narrows to "never links to a purchase".
+      THIS IS A DESIGN DECISION OWED A RULING, not something the paywall build may settle
+      by picking whichever reading is easier to code.
+
+  (c) OPEN, NOT RULED — `startModulePurchase()` (entitlements.ts:146) EXISTS AS "THE SEAM
+      THE STOREFRONT TAPS INTO" and returns `{ ok: false, reason: 'not_available_yet' }`.
+      P-3 says the app "never links to a purchase, and sells nothing", which leaves this
+      function with no ruled destination: it either stays a permanent honest refusal, or
+      it opens a web URL — and a link out IS the thing P-3's Apple posture is careful
+      about. Owed a ruling in the same breath as (b).
+
+  THEREFORE: "that one function is the entire app-side change" is TRUE OF THE GATE and
+  not yet true of the SURFACE. Three TODO(PAYWALL) sites exist, not one — `grep -rn
+  "TODO(PAYWALL)" src` in hearth-pos returns entitlements.ts (three), SettingsPanel.tsx
+  (two) and practice.ts (one). The gate is one function; the storefront's copy, its price
+  line and its tap are the other two decisions, and P-3 already anticipates the first of
+  them by reserving the unowned arm's copy for the paywall session.
