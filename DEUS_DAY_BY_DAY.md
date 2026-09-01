@@ -3459,9 +3459,15 @@ a price" to anyone who had not finished payouts.
        cannot call set_card_commerce either: it is current_entity_id()-scoped, so a
        service-role caller has a null actor. A service-role variant would be a new writer
        AND a migration — that is a ruling, not a diff, and it is not this one.
-       CONSEQUENCE, RULED ACCEPTABLE: the flip happens on the next app open with payouts
-       ready, not at the instant the webhook lands. A visit booked in that window is not
-       charged. A literal-moment flip needs the server-side machinery above.
+       CONSEQUENCE, RULED ACCEPTABLE: the flip happens the next time the Money panel is
+       open with payouts ready, not at the instant the webhook lands. A visit booked in that
+       window is not charged. In the ordinary path that window is nearly zero — the
+       reconciler is mounted in MoneyPanel, which is where Connect is launched and where the
+       balance refreshes on return, so the flip lands in the same breath as payouts becoming
+       ready. It is NOT mounted in App Root: that would add a /money/balance request to every
+       cold start for every user, signed-out ones included, to serve a case only clinicians
+       reach. KNOWN GAP: Connect completed on another device flips nothing until Money is
+       opened once. A literal-moment flip needs the server-side machinery above.
 
   P-7a A BACK BUTTON ON EVERY STEP of the practice onboarding. A multi-step form with only
        Cancel means a typo on step one starts over. Steps 2-4; step 1 has nowhere to go and

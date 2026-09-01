@@ -140,19 +140,29 @@ export default function PracticeCardSheet({ mode, card, onClose }: PracticeCardS
 
   const paymentsReady = balance?.payments_ready === true;
 
+  // P-7 — THE PRICE IS REQUIRED. Parsed once so the Next/Publish button and the
+  // save path cannot disagree about what counts as a price. null = not a usable
+  // price yet, which is what blocks the step.
+  //
+  // MUST BE > 0, not >= 0. The server accepts 0 (set_card_commerce guards only
+  // `< 0`), but a $0 chargeable visit is not a price — it is the unpriced card
+  // P-7 just removed, wearing a number.
+  const parsedPriceCents = useMemo(() => {
+    const trimmed = priceText.trim();
+    if (trimmed.length === 0) return null;
+    const dollars = Number(trimmed);
+    if (!Number.isFinite(dollars) || dollars <= 0) return null;
+    return Math.round(dollars * 100);
+  }, [priceText]);
+
   const save = useCallback(async () => {
     if (saving) return;
     setError(null);
 
-    const trimmedPrice = priceText.trim();
-    let priceCents: number | null = null;
-    if (trimmedPrice.length > 0) {
-      const dollars = Number(trimmedPrice);
-      if (!Number.isFinite(dollars) || dollars < 0) {
-        setError('Enter a price like 95.00, or leave it empty.');
-        return;
-      }
-      priceCents = Math.round(dollars * 100);
+    const priceCents = parsedPriceCents;
+    if (priceCents === null) {
+      setError('Enter a price like 95.00.');
+      return;
     }
 
     setSaving(true);
@@ -199,15 +209,22 @@ export default function PracticeCardSheet({ mode, card, onClose }: PracticeCardS
         });
         cardId = created.id;
       }
-      // The single commerce write path (0014). Only when something changed or a
-      // price exists — an unpriced card is published without a commerce write.
-      if (priceCents !== null || (isEdit && card && card.price_cents !== null)) {
-        await setCardCommerce(cardId, {
-          enabled: priceCents !== null,
-          priceCents,
-          terms: null,
-        });
-      }
+      // The single commerce write path (0033's set_card_commerce; 0014 called it
+      // "the ONLY write path" and that is still true). UNCONDITIONAL NOW — P-7
+      // makes a price part of every practice card, so there is no unpriced case
+      // left to skip the write for.
+      //
+      // `enabled` TRACKS CONNECT, and the price is stored either way: the
+      // server's gate sits inside `if p_enabled then` while the UPDATE writes
+      // price_cents unconditionally, so this is refused by nothing. If
+      // useMoneyBalance is still loading at save time this writes enabled=false
+      // for a clinician who IS ready; useCommerceReconcile heals that on the
+      // next load rather than the price being lost.
+      await setCardCommerce(cardId, {
+        enabled: paymentsReady,
+        priceCents,
+        terms: null,
+      });
       onClose();
     } catch (err) {
       console.error('[PracticeCardSheet] save failed:', err);
@@ -222,13 +239,24 @@ export default function PracticeCardSheet({ mode, card, onClose }: PracticeCardS
       setSaving(false);
     }
   }, [
-    saving, priceText, description, modalities, sessionMinutes, licensedStates,
+    saving, parsedPriceCents, description, modalities, sessionMinutes, licensedStates,
     slidingScale, isEdit, card, title, seePerm, actPerm, createCard, updateCard,
-    setCardCommerce, onClose,
+    setCardCommerce, paymentsReady, onClose,
   ]);
 
   const canAdvance =
-    step === 1 ? title.trim().length > 0 : step === 2 ? modalities.length > 0 : true;
+    step === 1
+      ? title.trim().length > 0
+      : step === 2
+        ? modalities.length > 0
+        : step === 3
+          ? parsedPriceCents !== null
+          : true;
+  // Edit mode puts every section on one scroll, so Save must enforce the same
+  // requirement the stepped flow does. CONSEQUENCE, INTENDED: a card created
+  // under the struck "publish without a price" path is asked for a price the
+  // first time it is edited. That is what "always" means.
+  const canSave = isEdit ? title.trim().length > 0 && parsedPriceCents !== null : canAdvance;
 
   // In edit mode every section is on one scroll; the stepped flow is for
   // authoring a card that does not exist yet.
@@ -360,49 +388,47 @@ export default function PracticeCardSheet({ mode, card, onClose }: PracticeCardS
           {/* ── P3 · what a visit costs ───────────────────────────────── */}
           {showStep(3) ? (
             <View style={styles.section}>
-              {paymentsReady ? (
-                <>
-                  <Text style={styles.label}>Price per visit</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={priceText}
-                    onChangeText={setPriceText}
-                    placeholder="95.00"
-                    placeholderTextColor={theme.colors.textMuted}
-                    keyboardType="decimal-pad"
-                    editable={!saving}
-                  />
-                  <Pressable
-                    style={[styles.toggle, slidingScale && styles.toggleOn, styles.selfStart]}
-                    onPress={() => setSlidingScale((v) => !v)}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: slidingScale }}
-                  >
-                    <Text style={[styles.toggleLabel, slidingScale && styles.toggleLabelOn]}>
-                      I offer sliding scale
-                    </Text>
-                  </Pressable>
-                  {slidingScale ? (
-                    <Text style={styles.helper}>
-                      The posted price still shows. Sliding scale appears on your full card so
-                      people know to ask.
-                    </Text>
-                  ) : null}
-                </>
-              ) : (
-                <>
-                  <Text style={styles.title}>Set up payouts to charge for visits</Text>
-                  <Text style={styles.body}>
-                    You can publish this card without a price and turn charging on later.
-                  </Text>
-                  {/* Refuses and points (N-8): payouts live in the account
-                      sheet, and opening it from inside this sheet would stack
-                      modals. */}
-                  <Text style={styles.helper}>
-                    Payouts live in your account menu, under Money.
-                  </Text>
-                </>
-              )}
+              {/* P-7 (2026-09-01) — ONE SHAPE, ALWAYS. This step used to ask
+                  whether Connect was set up before it would show a price field
+                  at all, and offered "Publish without a price" to anyone who had
+                  not finished payouts. Struck: a clinician SAYS what a visit
+                  costs; Connect is how they RECEIVE it. There is no branch here
+                  any more, and re-introducing one is the struck ruling coming
+                  back. */}
+              <Text style={styles.label}>Price per visit</Text>
+              <TextInput
+                style={styles.input}
+                value={priceText}
+                onChangeText={setPriceText}
+                placeholder="95.00"
+                placeholderTextColor={theme.colors.textMuted}
+                keyboardType="decimal-pad"
+                editable={!saving}
+              />
+              {/* INFORMATIONAL, NEVER A GATE. It does not disable the field, does
+                  not change the button, and does not open anything (N-8: payouts
+                  live in the account sheet, and this is inside a sheet). */}
+              {!paymentsReady ? (
+                <Text style={styles.helper}>
+                  Set up payouts in your account menu, under Money, to receive payments.
+                </Text>
+              ) : null}
+              <Pressable
+                style={[styles.toggle, slidingScale && styles.toggleOn, styles.selfStart]}
+                onPress={() => setSlidingScale((v) => !v)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: slidingScale }}
+              >
+                <Text style={[styles.toggleLabel, slidingScale && styles.toggleLabelOn]}>
+                  I offer sliding scale
+                </Text>
+              </Pressable>
+              {slidingScale ? (
+                <Text style={styles.helper}>
+                  The posted price still shows. Sliding scale appears on your full card so
+                  people know to ask.
+                </Text>
+              ) : null}
             </View>
           ) : null}
 
@@ -433,8 +459,8 @@ export default function PracticeCardSheet({ mode, card, onClose }: PracticeCardS
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <Pressable
-            style={[styles.primary, (!canAdvance || saving) && styles.primaryOff]}
-            disabled={!canAdvance || saving}
+            style={[styles.primary, (!canSave || saving) && styles.primaryOff]}
+            disabled={!canSave || saving}
             onPress={() => {
               if (!isEdit && step < TOTAL_STEPS) {
                 setStep((s) => s + 1);
@@ -453,13 +479,20 @@ export default function PracticeCardSheet({ mode, card, onClose }: PracticeCardS
             )}
           </Pressable>
 
-          {!isEdit && !paymentsReady && step === 3 ? (
+          {/* P-7a — BACK, ON EVERY STEP THAT HAS ONE. A multi-step form with only
+              Cancel means a typo on step one starts over. Steps 2-4 only: step 1
+              has nowhere to go and keeps Cancel alone, and edit mode is one
+              scroll with no steps to walk. This reuses the slot the struck
+              "Publish without a price" secondary occupied. */}
+          {!isEdit && step > 1 ? (
             <Pressable
               style={styles.secondary}
-              onPress={() => setStep(4)}
+              onPress={() => setStep((s) => s - 1)}
+              disabled={saving}
               accessibilityRole="button"
+              accessibilityLabel="Back"
             >
-              <Text style={styles.secondaryLabel}>Publish without a price</Text>
+              <Text style={styles.secondaryLabel}>Back</Text>
             </Pressable>
           ) : null}
         </ScrollView>

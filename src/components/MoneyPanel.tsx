@@ -14,6 +14,7 @@ import { formatForDisplay } from '../datetime';
 import type { InboundKind } from '../types/inbound';
 import type { SettledPayment } from '../types/settled-payment';
 import useMoneyBalance from '../hooks/useMoneyBalance';
+import useCommerceReconcile from '../hooks/useCommerceReconcile';
 import useSettledPayments from '../hooks/useSettledPayments';
 import { refundPayment } from '../services/money';
 import { startBusinessVerification } from '../services/stripe';
@@ -75,6 +76,11 @@ function amountsLabel(entries: { amount_cents: number; currency: string }[]): st
 
 function BalanceSection() {
   const { balance, isLoading, failure, refresh } = useMoneyBalance();
+  // P-7 — a practice card priced before payouts existed becomes chargeable now
+  // that they do. Mounted HERE because this panel already holds the balance and
+  // is where Connect completes; see the hook for why the flip is client-side
+  // through set_card_commerce rather than a trigger.
+  useCommerceReconcile(balance?.payments_ready === true);
   const [launchingConnect, setLaunchingConnect] = useState(false);
   const [connectHint, setConnectHint] = useState<string | null>(null);
   const [connectError, setConnectError] = useState<string | null>(null);
