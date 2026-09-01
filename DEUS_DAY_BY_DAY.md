@@ -3348,3 +3348,71 @@ OPEN, NOT RULED — RAISED HERE BECAUSE P-6 CREATES IT. Arm 1 is a `Pressable` w
   (ii) the row loses its chevron and its tap, and the setup line renders inline and always
   — nothing inert, but then startModulePurchase() has NO CALLER and its copy never renders,
   leaving the function a pure guard. THE COPY ABOVE IS DRAFTED TO WORK IN EITHER SHAPE.
+
+## RULING — 2026-09-01 (N-19: PlexMed is one screen) — approved for BUILD
+
+Source: a device pass on the Profile tab, signed in as a clinician holding a live licence
+stamp and no practice card. Settings › PlexMed correctly showed arm 3 — "Make a practice
+card to open your times board." — and tapping it appeared to do nothing. The investigation
+found nothing broken: every control the four sessions built was present and correctly
+wired. Arm 3 closed the account sheet and called `navigate('Profile')` from the Profile
+tab, so the destination was the origin. THE DEFECT WAS THE SHAPE, NOT THE CODE.
+
+  N-19  PLEXMED IS ONE SCREEN. Settings › PlexMed is a single surface with four states,
+        each showing exactly ONE next action. A clinician setting up their practice never
+        leaves PlexMed to do it.
+
+          1. NOT VERIFIED      one line on what PlexMed is; "Verify your license" +
+                               a Start button opening the credential ceremony IN PLACE.
+          2. VERIFIED, NO CARD the Verified Clinician stamp; "Set up your practice" +
+                               a Create button opening PracticeCardSheet IN PLACE.
+          3. CARD, NO TIMES    stamp; "My practice" row (Edit); "Open times — nobody can
+                               book you until you post some" + a Post times button opening
+                               the board with AddTimesSheet ready.
+          4. RUNNING           stamp; My practice row; Open times row with the count;
+                               Today row with the count; and one line: "Requests arrive
+                               in Incoming."
+
+        WHAT IS SUPERSEDED, AND EXACTLY HOW MUCH. N-1, N-2 and N-3 are superseded IN THEIR
+        DISTRIBUTED PLACEMENT ONLY. Each is otherwise untouched and still governs:
+          · N-1 SURVIVES ENTIRE — modules live in the account menu behind Settings, and the
+            two-condition gate (owned AND licensed, never collapsed) is unchanged. Settings
+            is still the entry point. What changes is what sits behind it: one row that
+            opens one screen, not three arms that each point somewhere else.
+          · N-2 SURVIVES — Today is generic and stays on Engagement, one consumer of
+            get_my_day. State 4's Today row is a COUNT AND A DESTINATION, not a second fold
+            of that read: it reuses the same service and takes the clinician to Engagement.
+          · N-3 SURVIVES — the board lives in the module. N-19 makes that literal: the
+            board is a state of the module screen rather than a view nested two sheets deep.
+          · N-4-AMENDED SURVIVES — the module row is always visible; the board is what
+            hides. The row is now the door to one screen.
+          · N-8 STILL BINDS, AND THE PUSHED SCREEN IS ITS RESOLUTION (see below).
+        WHAT DIES: the Practice chip and its P0 gate in CardEditorSheet, arm 3's
+        navigate-to-Profile, and the paused banner on ProfileCard. THE PRACTICE CARD STILL
+        APPEARS IN PROFILE'S CARD LIST, READ-ONLY — it is a card on the network and its
+        owner sees it — but editing lives in the module. One place manages practice things.
+
+        DERRICK'S REASONING ERROR, NAMED BY HIM AND RECORDED AS GIVEN: "I answered where
+        Today lives and treated it as answering where setup lives." N-2 asked a real
+        question about a generic surface and got the right answer. Setup was never asked
+        about; it was assumed to have been settled by the same stroke, and so it scattered
+        across whichever screen each session happened to be building. FOUR SESSIONS BUILT
+        CORRECTLY TO A DISTRIBUTED RULING THAT SHOULD NOT HAVE BEEN MADE. That is why the
+        device pass found no bug: there was none to find. The cost of a wrong shape is not
+        a defect, it is four correct sessions arriving somewhere nobody can use.
+
+        PLEXMED BECOMES A PUSHED SCREEN, NOT A SHEET VIEW — ruled here rather than deferred,
+        because N-8 forces it. Each state's action must open its sheet FROM the PlexMed
+        surface, and PracticeCardSheet and AddTimesSheet are both Modals: hosting them
+        inside AccountChip's Modal is the stacked modal N-8 exists to prevent. (Today's
+        board already does this — OpenTimesBoard renders inside the account sheet and mounts
+        AddTimesSheet from there. The pushed screen retires that, which is a second reason
+        to take it.) A root Stack gains `Shell` (the tab navigator) and `PlexMed`; Settings'
+        module row dismisses the sheet and pushes. CONSEQUENCE TO SWEEP: from a pushed
+        screen the tab names are no longer siblings, so every `navigate('Incoming')` /
+        `navigate('Engagement')` / `navigate('Profile')` reachable from inside PlexMed
+        becomes `navigate('Shell', { screen: ... })`.
+
+        PLEXLAW AND PLEXATS INHERIT THIS SHAPE, exactly as they inherit N-4-AMENDED's.
+        The four states are not medical; they are the states of any licensed module:
+        unverified, verified-but-unconfigured, configured-but-idle, running.
