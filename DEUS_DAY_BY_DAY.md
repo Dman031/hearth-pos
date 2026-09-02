@@ -3575,3 +3575,42 @@ rather than things the plan anticipated, which is what Session 0 was for.
        WIRE SHAPE, so a TAPER tool adding envelope fields cannot silently miss one. The
        type is currently checked only against the Tier-3 serializer's input, which is why
        the gap compiled.
+
+## RULINGS — 2026-09-01 (TAPER Session 1 close-out, T-6…T-8) — approved for 1-BUILD
+
+Source: the Session 1 discovery-tool proposal. All three answer substrate gaps the proposal
+found rather than questions the plan had asked.
+
+  T-6  ACUITY IS FOUR VALUES, MUTUALLY EXCLUSIVE: `emergency | crisis | urgent | scheduled`.
+       NOT a boolean beside the enum — that permits `acuity=emergency, crisis=true`, a state
+       nobody should be able to write, and Session 2 logs this field as THE RECORD OF WHICH
+       DOOR WAS USED. One field, one door, no combination.
+         emergency — physical and immediate. 911 or an emergency department. INCLUDES
+           ALCOHOL AND BENZODIAZEPINE WITHDRAWAL.
+         crisis    — suicidal ideation or overwhelming distress. 988 first.
+         urgent    — same-day, not immediate.
+         scheduled — everything else.
+       THE PARENTHETICAL PHYSICAL GUIDANCE RENDERS ON `emergency` AND `urgent` ONLY, NEVER ON
+       `crisis`. (This is the T-2 finding carried into the enum: the destination and the
+       accompanying guidance are two separate things, and the guidance is the half that was
+       silently wrong.)
+       ORDERING FOLLOWS THE VALUE, NOT THE SEVERITY: `crisis` returns the 988 civic card
+       first; `emergency` returns NO card first, because the network holds none that is
+       correct — there is no 911 card and no urgent-care classification (Session 1 finding 3),
+       and the description is what tells the model to say 911 before any result.
+
+  T-7  `specialty` STAYS A SEMANTIC HINT, UNSTRUCTURED. It is what the model determined from
+       the presentation, matched against the card's own description and embedding — which is
+       how retrieval already works. No filter, no column, no enum.
+       WHY NOT MINT ONE: a structured field means AUTHORING A TAXONOMY NOBODY HAS RULED and
+       then making a clinician pick from it. S5's specialty spec gap stays open for exactly
+       that reason; DO NOT CLOSE IT UNDER A DEADLINE.
+       CONSEQUENCE FOR THE CONTRACT: the tool description says specialty is matched
+       SEMANTICALLY, never "matched" — a filter the server does not perform must not be
+       claimed in text a model reads as a guarantee (prompt-code contract).
+
+  T-8  POST-RETRIEVAL JURISDICTION FILTERING IS ACCEPTABLE NOW. On a thin network the result
+       is identical to a retrieval-side filter and the cost is nothing.
+       ITS LIMIT IS RECORDED AS A DEFERRED TRIGGER: the first jurisdiction where filtering
+       drops MORE THAN HALF the returned set means retrieval-side is owed. (DEFERRED.md,
+       hearth-network — a fired trigger gets a home or a new trigger, never left fired.)
