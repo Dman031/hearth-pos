@@ -41,15 +41,28 @@ Brand mark hierarchy (Derrick, 2026-07-15): **face-orb = hero, signet = tiny ico
 
 Process rules:
 
-- **ONLY `DEUS_DAY_BY_DAY.md` IS MIRRORED ACROSS THE REPOS.** It is byte-identical in
-  hearth-pos and hearth-network by design, and a change to it is copied verbatim to the other.
-  **`CLAUDE.md`, `DEFERRED.md` and `BUGS_AND_SOLUTIONS.md` ARE PER-REPO AND MUST NEVER BE
-  COPIED BETWEEN THEM.** Each carries instructions, cut decisions and bug history specific to
-  its own codebase; a `cp` between repos silently destroys the target's contents. When a rule
-  belongs in both CLAUDE.md files, INSERT it into each in that repo's own voice — never copy
-  the file. (Origin: a `cp CLAUDE.md ../hearth-network/CLAUDE.md` on 2026-08-28 overwrote the
-  network's instructions wholesale; caught and reverted from an uncommitted tree, which is the
-  only reason it cost nothing.)
+- **WHAT IS MIRRORED, AND WHAT IS NEVER COPIED** (amended 2026-09-01, to match practice —
+  the previous wording said only the roadmap was mirrored, while three BUILD plans in THIS
+  repo root were in fact byte-identical with hearth-network, so the rule and the tree
+  disagreed):
+  - **`DEUS_DAY_BY_DAY.md` IS ALWAYS MIRRORED.** Byte-identical in hearth-pos and
+    hearth-network by design; a change to it is copied verbatim to the other.
+  - **BUILD PLANS ARE MIRRORED ONLY WHEN THEY CARRY WORK IN BOTH REPOS.** A plan a repo
+    cannot execute goes stale unread. They live at the REPO ROOT (`*_BUILD.md`), never in
+    `docs/`. The three this repo holds — `PLEXMED_CARE_LOOP_BUILD.md`,
+    `CREDENTIAL_VERIFICATION_BUILD.md`, `DISPLAY_STACK_BUILD.md` — are here because each
+    carried app-side work: screens, sheets and hooks built in hearth-pos. A network-only
+    plan does NOT arrive here. `TAPER_BUILD.md` (hearth-network, 2026-09-01) is the first
+    one deliberately not mirrored: nothing in it — an MCP tool, an event log, a skill
+    envelope, an auth challenge, a verify script, directory submissions — has a hearth-pos
+    surface. If a plan lands here that this app cannot build, that is the bug.
+  - **`CLAUDE.md`, `DEFERRED.md` AND `BUGS_AND_SOLUTIONS.md` ARE PER-REPO AND ARE NEVER
+    COPIED BETWEEN THEM.** Each carries instructions, cut decisions and bug history specific
+    to its own codebase; a `cp` between repos silently destroys the target's contents. When a
+    rule belongs in both CLAUDE.md files, INSERT it into each in that repo's own voice —
+    never copy the file. (Origin: a `cp CLAUDE.md ../hearth-network/CLAUDE.md` on 2026-08-28
+    overwrote the network's instructions wholesale; caught and reverted from an uncommitted
+    tree, which is the only reason it cost nothing.)
 
 - A RULING IS NOT A RULING UNTIL IT IS IN THE ROADMAP. Decisions made in strategy chat
   are written into the Day N block BEFORE the build prompt is issued.
