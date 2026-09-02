@@ -3533,3 +3533,45 @@ Derrick's addition, made before Session 0 and therefore binding on the plan as w
   three are mirrored because each carried app-side work, and TAPER is network-only by its
   own header, with no hearth-pos surface to build. THIS RULING BLOCK IS MIRRORED, as every
   DEUS_DAY_BY_DAY.md change is.
+
+## RULINGS — 2026-09-01 (TAPER Session 0 close-out, T-3…T-5) — approved for 1-INVESTIGATE
+
+Source: the Session 0 tool-manifest inventory. All three are things the inventory found
+rather than things the plan anticipated, which is what Session 0 was for.
+
+  T-3  JURISDICTION FILTERS ON THE STAMP, NOT A TYPED FIELD. `license_states` DOES NOT
+       EXIST AND MUST NOT BE MINTED — zero hits across `src/` and `migrations/`; the
+       TAPER draft assumed a substrate that was never built.
+       THE FILTER IS `verifications.registry_ref`, which is `<ST>:<board>:<NUMBER>` (0035
+       F4): structured, verified, and ALREADY extracted server-side on the search path by
+       `fetchStampDetails` (`src/tools/query-cards.ts:706-729`), gated to live verified
+       unvoided rows. NO NEW COLUMN, NO MIGRATION.
+       A CLINICIAN IS FINDABLE IN OREGON BECAUSE OREGON'S BOARD SAYS SO, not because they
+       typed it.
+       THE PRACTICE CARD'S "licensed states" FIELD STAYS DISPLAY-ONLY AND IS NEVER A
+       FILTER (`hearth-pos/src/services/practice.ts:33`, written as prose via `stateName()`).
+       It is SELF-ASSERTED, and a self-asserted jurisdiction filter is the
+       plausible-placeholder rule broken at the point where it decides WHO IS LAWFUL TO
+       CONSULT — the most expensive place in this system to accept an unverified claim.
+       CONSEQUENCE FOR THE TOOL: `find_professional_for_situation`'s `jurisdiction` input
+       matches against the stamp's state, and THE TOOL MUST SAY SO WHERE A HOST CAN READ
+       IT — the description is the only place a calling model learns what the filter means.
+
+  T-4  ADD `title` TO EVERY TOOL, IN SESSION 1 — not deferred to Session 6. No tool
+       declares one today and `McpTool` has no such field, so this is a TYPE CHANGE
+       (`src/types/mcp.ts:62-70`, and `McpToolAnnotations` :55-60) plus 13 manifest
+       entries. Session 1 is already editing the manifest; doing it there costs one pass
+       instead of two.
+       WHY IT IS NOT COSMETIC: mismatched or missing annotations are the top rejection
+       cause on both directories, and Session 6 submits to both.
+       ALSO MAKE `destructiveHint` EXPLICIT ON ALL 13. Absent is NOT false to a host — it
+       is unspecified — and "unspecified" on a tool that moves money or messages a stranger
+       is the wrong kind of silence. Today only `update_plan_item` and `request_payment`
+       spell it out; the other eleven leave it absent.
+
+  T-5  THE ENVELOPE DRIFT IS CLOSED IN THE SAME PASS. `structuredContent` emits
+       `{ guidance, count, cards }` (`src/tools/query-cards.ts:861`) while `ResultEnvelope`
+       declares `{ guidance, cards }` (`src/tools/card-view.ts:885`). MAKE THE TYPE THE
+       WIRE SHAPE, so a TAPER tool adding envelope fields cannot silently miss one. The
+       type is currently checked only against the Tier-3 serializer's input, which is why
+       the gap compiled.
