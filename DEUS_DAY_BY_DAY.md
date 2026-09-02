@@ -3614,3 +3614,49 @@ found rather than questions the plan had asked.
        ITS LIMIT IS RECORDED AS A DEFERRED TRIGGER: the first jurisdiction where filtering
        drops MORE THAN HALF the returned set means retrieval-side is owed. (DEFERRED.md,
        hearth-network — a fired trigger gets a home or a new trigger, never left fired.)
+
+## RULINGS — 2026-09-01 (TAPER Session 2 proposal, T-9…T-11) — approved for the 0047 migration
+
+Source: the handoff-event-log proposal. All three CORRECT TAPER_BUILD.md's own draft, which
+is the point of the investigate gate: the plan was written before the code was read.
+
+  T-9  CLIENT_ID, NOT A VENDOR ENUM. The draft's `host (claude|chatgpt|grok|unknown)` is
+       struck. THREE VENDOR NAMES IN A CHECK CONSTRAINT IS A VOCABULARY BEHAVIOUR CAN BRANCH
+       ON, which is exactly what CLAUDE.md's symmetry rule forbids ("NEVER hardcode
+       references to specific MCP clients... The protocol contract is symmetric"). Recording
+       who called is observability; an enum is the shape that turns into behaviour later.
+       AND `client_name` IS SELF-ASSERTED — supplied by the client at dynamic registration
+       (`src/types/oauth.ts:47-53`), so any host label derived from it is client-CLAIMED, not
+       verified. That is the same class of fact T-3 refused to filter jurisdiction on.
+       STORE `client_id` (FK to mcp_oauth_clients) WITH `client_name_snap` BESIDE IT, and
+       GROUP AT READ TIME — in the query, where the grouping can change without a migration.
+       SUBSTRATE NOTE, recorded so it is not rediscovered: user-agent is NOT plumbed.
+       `CallerContext` (`src/types/oauth.ts:30-39`) carries no headers and tool handlers never
+       see the request, so "from user-agent" in the draft describes something that does not
+       exist. client_id is what the server actually knows.
+
+  T-10 HMAC-SHA256 WITH A SERVER PEPPER, NOT BARE SHA256 — DERRICK CORRECTING HIS OWN SPEC,
+       recorded as given: "I specified sha256 in TAPER_BUILD.md and it was wrong: situations
+       are short and formulaic, so an unsalted hash is recoverable by dictionary and the
+       column would be reversible storage of the user's words while claiming not to store
+       them."
+       NEW WORKER SECRET `TAPER_SITUATION_PEPPER`, Derrick's to provision.
+       ITS ABSENCE MUST NOT FAIL THE EVENT: the row logs with a NULL hash rather than the
+       write erroring. An unprovisioned secret costs correlation, never the record — and the
+       column comment says so, so a null there reads as "no pepper" rather than as a defect.
+       THE HMAC VARIANT LIVES BESIDE `sha256Base64Url` in `src/oauth/tokens.ts:31`, not in a
+       second module: one hashing implementation, the same rule the canonical-writer rule
+       applies to writes.
+
+  T-11 CARRY THE HANDOFF_ID. Correlation is explicit, never inferred.
+       `find_professional_for_situation` returns a handoff_id; `reach_entity` takes it as an
+       optional input and stamps `reached`; the engagement path inherits it and stamps
+       `booked`.
+       AN UNLINKED ROW READING `offered` IS HONEST; AN INFERRED `booked` IS NOT. The model
+       may drop the id, AND THAT LEAVES THE ROW AT `offered`, WHICH IS TRUE RATHER THAN
+       BROKEN. Server-side correlation by (caller, card, time window) is REFUSED: it writes a
+       link that may not exist as though it were observed, which is the plausible-placeholder
+       rule at the point where it decides what the record says happened.
+       `abandoned` IS DERIVED AT READ TIME, NEVER WRITTEN AND NEVER SWEPT — an `offered` row
+       older than N with no later transition. A sweep would be a second writer and a cron job
+       for a fact a query can state.
