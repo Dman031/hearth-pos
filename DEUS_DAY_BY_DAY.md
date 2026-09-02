@@ -3477,3 +3477,59 @@ a price" to anyone who had not finished payouts.
   docs/PLEXMED_S5_PRACTICE_AUTHORING_SPEC.md P3 described the struck gate and the removed
   secondary button verbatim. Left alone it would have gone on describing a shape the ruling
   had just deleted, which is exactly the drift that rule exists to catch.
+
+## RULINGS — 2026-09-01 (TAPER — Turn-Adaptive Professional Expertise Routing, T-1…T-2) — recorded BEFORE Session 0 opens
+
+Source: TAPER_BUILD.md (hearth-network). The build plan covers a discovery tool, a handoff
+event log, a skill and guidance envelope, an auth challenge, a verify script, and directory
+submissions to Anthropic and OpenAI. T-1 is the ruling as the plan states it. T-2 is
+Derrick's addition, made before Session 0 and therefore binding on the plan as written.
+
+  T-1  RECOGNITION LIVES IN THE MODEL BY INSTRUCTION. THE SERVER VERIFIES, MATCHES, AND
+       LOGS. Acuity routes before specialty; specialty routes before the window;
+       urgent/civic ordering is server-enforced. Every handoff event is recorded with
+       acuity, boundary type, window position, and outcome.
+       NO server-side turn observation. NO tool restriction. NO behavioral injection.
+
+  T-2  ACUITY MUST DISTINGUISH MEDICAL EMERGENCY FROM CRISIS. Added by Derrick 2026-09-01,
+       before Session 0. Two different doors, and sending someone to the wrong one is the
+       failure this ruling exists to prevent.
+
+         EMERGENCY → 911 or emergency care. Acute PHYSICAL emergency: chest pain,
+           breathing trouble, and WITHDRAWAL FROM ALCOHOL OR BENZODIAZEPINES — which can be
+           fatal. A crisis line is the wrong door for these.
+         CRISIS → 988. Suicidal ideation and overwhelming distress. 988 is the right door
+           here and only here.
+
+       WHAT IS WRONG IN THE DRAFT, NAMED SO THE FIX IS CHECKABLE. TAPER_BUILD.md lists
+       "acute crisis" INSIDE the physical-emergency list and routes the whole list
+       identically, at TWO sites:
+         · the tool description (`:65-66`): "possible fracture, deep wound, chest pain,
+           breathing trouble, acute crisis"
+         · the skill instruction (`:127-129`): the same list, routed to "urgent care,
+           emergency care, or crisis support" as one undifferentiated set
+       SPLIT BOTH. A person in benzodiazepine withdrawal routed to 988 is the concrete
+       harm; so is a person with suicidal ideation routed to an ER as though it were a
+       fracture. The lists are different, the destinations are different, and the guidance
+       given in the same response differs too — the draft's parenthetical "(immobilize,
+       don't straighten, when it's ER vs urgent care)" is physical-injury guidance and must
+       not be offered on a crisis path.
+
+       THE SERVER'S URGENT-FIRST ORDERING RESPECTS THE DISTINCTION. T-1's server-enforced
+       ordering is unchanged in mechanism: emergency and urgent still return civic and
+       urgent/walk-in cards first. What T-2 requires is that the two acuities be
+       DISTINGUISHABLE in what the model is told and in what is logged, so that "routed to
+       988" and "routed to 911" are not the same recorded event.
+
+       WITHDRAWAL IS THE EXAMPLE THAT WAS MISSING ENTIRELY. It appears nowhere in the draft
+       — not in the emergency list, not in the crisis list. It is added by this ruling
+       because it is the case most likely to be mis-sorted: it presents as distress and
+       kills physically.
+
+  DOC PLACEMENT (settled 2026-09-01, against the repo's actual convention rather than the
+  assumption in the prompt): TAPER_BUILD.md lives at the hearth-network REPO ROOT, beside
+  PLEXMED_CARE_LOOP_BUILD.md, CREDENTIAL_VERIFICATION_BUILD.md and DISPLAY_STACK_BUILD.md —
+  NOT in docs/, which holds SPECS and captures. It is NOT mirrored to hearth-pos: the other
+  three are mirrored because each carried app-side work, and TAPER is network-only by its
+  own header, with no hearth-pos surface to build. THIS RULING BLOCK IS MIRRORED, as every
+  DEUS_DAY_BY_DAY.md change is.
