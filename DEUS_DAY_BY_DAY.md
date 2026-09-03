@@ -3635,7 +3635,10 @@ is the point of the investigate gate: the plan was written before the code was r
        see the request, so "from user-agent" in the draft describes something that does not
        exist. client_id is what the server actually knows.
 
-  T-10 HMAC-SHA256 WITH A SERVER PEPPER, NOT BARE SHA256 — DERRICK CORRECTING HIS OWN SPEC,
+  T-10 [WITHDRAWN BY T-12 — there is no situation_hash and no TAPER_SITUATION_PEPPER; the
+       hash protected a link the log no longer carries. Body kept as the record of the
+       reasoning, not as a live instruction.]
+       HMAC-SHA256 WITH A SERVER PEPPER, NOT BARE SHA256 — DERRICK CORRECTING HIS OWN SPEC,
        recorded as given: "I specified sha256 in TAPER_BUILD.md and it was wrong: situations
        are short and formulaic, so an unsalted hash is recoverable by dictionary and the
        column would be reversible storage of the user's words while claiming not to store
@@ -3651,7 +3654,9 @@ is the point of the investigate gate: the plan was written before the code was r
   T-11 CARRY THE HANDOFF_ID. Correlation is explicit, never inferred.
        `find_professional_for_situation` returns a handoff_id; `reach_entity` takes it as an
        optional input and stamps `reached`; the engagement path inherits it and stamps
-       `booked`.
+       `booked`. [The handoff_id survives T-12 unchanged. The `engagement_id` COLUMN this
+       block implied is SUPERSEDED BY T-12: the booking stamp sets a `converted` boolean
+       and carries no engagement reference.]
        AN UNLINKED ROW READING `offered` IS HONEST; AN INFERRED `booked` IS NOT. The model
        may drop the id, AND THAT LEAVES THE ROW AT `offered`, WHICH IS TRUE RATHER THAN
        BROKEN. Server-side correlation by (caller, card, time window) is REFUSED: it writes a
@@ -3660,3 +3665,334 @@ is the point of the investigate gate: the plan was written before the code was r
        `abandoned` IS DERIVED AT READ TIME, NEVER WRITTEN AND NEVER SWEPT — an `offered` row
        older than N with no later transition. A sweep would be a second writer and a cron job
        for a fact a query can state.
+
+## RULINGS — 2026-09-02 (TAPER Session 2 · T-12) — approved for the 0047 migration
+
+Source: Derrick, reading the T-9…T-11 draft back. T-12 SUPERSEDES T-9's `caller_entity_id`
+and T-11's engagement FK, and WITHDRAWS T-10 entirely. 0047 had not been applied, so this is
+an EDIT to that file and not a follow-on migration.
+
+  T-12 THE HANDOFF LOG IS UNLINKABLE.
+       THE LOG STORES THE SITUATION, NEVER THE PERSON. Recorded as given: "we can save the
+       question asked and not the user who asked it" — which REMOVES THE PHI QUESTION RATHER
+       THAN ANSWERING IT. Individually identifiable health information requires the
+       identification; without it there is nothing to protect and nothing to consent to.
+
+       · DROP `caller_entity_id` ENTIRELY. Not nullable, not optional. A column that CAN hold
+         an identity is a column that eventually does.
+       · DROP `engagement_id`. Conversion becomes a boolean on the same row — `converted bool
+         not null default false`, stamped by `set_handoff_outcome`. We lose per-search tracing
+         and keep the RATE, which is the number that was wanted.
+       · COARSEN `created_at` TO THE HOUR — `date_trunc('hour', now())`. A second-resolution
+         timestamp beside `matched_card_ids` re-identifies by join against `engagements`,
+         which is exactly how anonymized data stops being anonymous.
+       · STORE THE SITUATION TEXT PLAINLY. `situation text not null`, no hash, no HMAC. T-10
+         IS WITHDRAWN and `TAPER_SITUATION_PEPPER` is not needed — the hash existed to protect
+         a link that no longer exists. UNLINKED TEXT IS WHAT MAKES THE LOG WORTH KEEPING: a
+         fingerprint tells you a search converted and never which words converted.
+       · KEEP `client_id` per T-9 — it identifies an ASSISTANT VENDOR, not a person.
+       · `matched_card_ids` STAYS, un-FK'd. It identifies CLINICIANS, who are public on the
+         network, not patients.
+
+       THE LINE THIS HOLDS: NO ROW IN `handoff_events` MAY BE JOINED TO A PERSON BY ANY COLUMN
+       IT CARRIES. That sentence is written as the table's own COMMENT, because it is the
+       property a future column will quietly break.
+
+  T-12a `client_id` IS STRUCK TOO — T-12's own invariant applied to T-12's own exception,
+       ON MEASUREMENT. Derrick made this a PRECONDITION of the apply rather than a follow-on:
+       "If any shows 1, the column is a person-key for that client and T-12 requires it
+       dropped or bucketed before apply — the invariant is that NO column joins to a person,
+       and 'usually not' is not that invariant."
+       THE MEASUREMENT (2026-09-02, before apply, service-role read, nothing written):
+         `select client_id, count(distinct entity_id) from public.mcp_oauth_tokens group by 1`
+         → 22 clients hold live tokens. TWENTY-TWO SHOW EXACTLY ONE ENTITY. ZERO show more
+           than one. 58 clients are registered; `client_name` is 'Claude' 37 times, 'Grok' 18,
+           'ChatGPT' 2, 'MCP Inspector' 1.
+       WHY: `POST /oauth/register` mints a fresh client_id on every call
+       (`src/oauth/client-registration.ts:56`), so registration is PER INSTALLATION, and
+       `mcp_oauth_tokens` carries client_id beside entity_id (0002:44-49). A handoff row
+       carrying client_id joins to a human being in ONE HOP.
+       DROPPED, NOT BUCKETED, and the bucket is refused on evidence rather than taste:
+       `client_name` is SELF-ASSERTED at registration and constrained by nothing, so it can be
+       unique per install whenever a client chooses; and 37 'Claude' registrations are NOT 37
+       people — a single machine re-registering produces the same count, so a k-anonymity
+       threshold over client ROWS would assert an anonymity over PEOPLE that it never measured.
+       The only carrier that would hold BY CONSTRUCTION is the vendor enum T-9 struck under
+       CLAUDE.md's symmetry rule. THE VENDOR DIMENSION THEREFORE LEAVES THE TABLE rather than
+       being approximated by a column that lies; the want is logged with a trigger
+       (DEFERRED.md, hearth-network).
+       CONSEQUENCE, and the form the invariant is now checked in: `handoff_events` HAS NO
+       FOREIGN KEYS AT ALL. The verify block expects ZERO, not "one, to a vendor" — any FK
+       appearing there later is the property broken, whatever it points at.
+
+  T-12b THE TABLE COMMENT STATES ITS OWN LIMIT. What the COLUMNS guarantee is that no join to
+       a person exists. `situation` is a MODEL'S OUTPUT and carries whatever it was given — it
+       can contain a name, and no schema can stop that. Keeping names out of it is a CONTRACT
+       IN THE TOOL DESCRIPTION, owed by the Session 2 build; the comment says so rather than
+       letting the table imply a guarantee it does not make.
+
+## RULINGS — 2026-09-02 (T-13) — T-12 IS A SYSTEM PROPERTY
+
+Source: wiring TAPER Session 2 surfaced that the situation text T-12 had just unlinked in
+`handoff_events` was ALREADY STORED TWICE BESIDE IDENTITY. Recorded as given: "a table-scoped
+invariant is bookkeeping, not anonymity... I would rather change the system than reword the
+promise."
+
+  T-13  T-12 IS A SYSTEM PROPERTY, NOT A TABLE PROPERTY. `audit_log.detail.situation` sits
+       beside `actor` (an entity id) and `mcp_call_log.request_args` beside `caller_client_id`
+       (a person key, per T-12a). The manifest line approved with T-12b — "stored with nothing
+       that identifies who asked" — was FALSE against both.
+
+  T-13a REDACT THE TEXT FROM BOTH STORES. The shape of the call is kept; the words go.
+       `request_args` IS DROPPED ENTIRELY rather than field-redacted: CLAUDE.md's mandate for
+       that table is "tool name, client ID, timestamp, success/error, latency", `request_args`
+       is not in that list, and A LOG STORING MORE THAN ITS OWN MANDATE NAMES IS THE DEFECT.
+       MEASURED BEFORE THE DELETION: 775 rows all carrying args, 335 with human free text
+       (query 262, message 65, body 8, situation 0 — find_professional had never been called
+       through /mcp); audit_log 322 of 1000 sampled (query_cards:query 299, situation 16).
+       THREE SUB-RULINGS, given 2026-09-02:
+         1. STEPS 1 AND 2 IN THE SAME WINDOW. Stopping the write while 775 rows of retained
+            text sit in the column is the half-measure T-13 just rejected one table over.
+         2. SCRUB THE HISTORY. "A promise that is true going forward and false for everything
+            already stored is not a promise." audit_log.detail's query/situation keys too,
+            since that column stays.
+         3. ONE COMMIT, INCLUDING query_cards. The no-unrelated-fixes rule exists so a feature
+            cannot smuggle in a refactor; query_cards is NOT an unrelated fix — it is THE SAME
+            DEFECT AT 20× THE VOLUME, IN THE SAME COLUMN, REMOVED BY THE SAME DELETION.
+            Splitting it would ship a commit that redacts handoff text while leaving twenty
+            times more search text in place, which is the worse violation of the same rule.
+            RECORDED SO THE RULE IS NOT READ AS BROKEN.
+       Migration `0048_redact_logged_free_text.sql`. APPLY ORDER IS LOAD-BEARING: deploy the
+       code FIRST — dropping the column under the running Worker makes every mcp_call_log
+       insert fail, and logMcpCall is non-fatal, so observability would go blank silently.
+
+  T-13b WITH THOSE REDACTED, BLOCKER #1 DISSOLVES: `reach_entity` may accept `handoff_id`,
+       because mcp_call_log no longer holds (client_id, handoff_id). Queued behind Derrick's
+       confirm of 0048.
+
+  T-13c BLOCKER #2 TAKES THE BIT-NOT-KEY SHAPE. `inbound.via_handoff boolean` (reach_entity
+       OBSERVED a handoff id and stores nothing joinable), and accept/decline insert into an
+       unlinked `handoff_conversions(hour, card_id, decision)` — no id, no FK. Rate is
+       conversions ÷ handoff_events: both facts observed, neither reaching a situation.
+       AND A 0049 DROPS `converted` from handoff_events: "a column that cannot be written
+       honestly should not sit there looking writable." (0047 is applied, so this is a
+       follow-on migration, not an edit.) Queued behind the same confirm.
+
+  T-13d ACUITY STAYS ON THE AUDIT IMPRINT, BESIDE THE ACTOR — AND SPECIALTY WITH IT.
+       REVERSED BEFORE IT WAS BUILT. The session report raised `specialty` and `acuity` as the
+       sharper residue of T-13a: `acuity = 'crisis'` next to an entity id records that a named
+       person was in suicidal crisis, a harder fact than the sentence it came from. The answer
+       is that this is the POINT, not the defect. Recorded as given: "if the network routed a
+       person in crisis, it must be able to recall who — a system that cannot answer 'did we
+       route someone psychotic and where' has failed the person it was built for."
+       DUTY OF CARE GOVERNS OVER ANONYMITY FOR THIS FIELD. It is the one place in TAPER where
+       the two principles point opposite ways and anonymity yields.
+       THE TWO LOGS ARE NOW DIFFERENT INSTRUMENTS, AND THE SPLIT IS THE DESIGN:
+         · `handoff_events`  — UNLINKED, and stays unlinked. It answers WHAT KIND of situation
+           reaches this network and whether it converts. It can never answer "who".
+         · `audit_log`       — THE RECALL PATH. It answers "did we route this person, when, at
+           what acuity, toward what". It carries no situation text (T-13a) and does not need
+           to: acuity + specialty + jurisdiction + time is what recall requires.
+       NO CODE CHANGE WAS NEEDED — T-13a never removed these fields, so this ruling is recorded
+       rather than implemented. 0048 is unapplied and its header was corrected in place.
+       THE CONTROL IS PROVED, VERIFIED LIVE 2026-09-02, and the caveat this block carried for
+       one day is CLOSED. The repo's guess was WRONG IN ITS DETAIL and right in its conclusion:
+       audit_log has RLS on and ONE policy — not zero, as "no create policy in either repo"
+       had implied.
+         "Read own audit entries" · FOR SELECT · TO authenticated
+         USING ( entity_id in (select id from entities where user_id = auth.uid()) )
+       SELF-SCOPED. A person reads the entries about THEMSELVES. No insert/update/delete
+       policy exists, so writes stay service-role (definer-bypassed), and anon holds no policy
+       at all — which makes its table grant INERT, since RLS on with no matching policy is
+       default-deny and a grant cannot override it.
+       NET EFFECT, AND THE SENTENCE T-13d RESTS ON: THE CRISIS RECALL PATH IS READABLE BY THE
+       PERSON IT DESCRIBES AND BY SERVICE-ROLE, AND BY NOBODY ELSE. That is a better control
+       than the one assumed — the subject can see their own record, which is the right shape
+       for a duty-of-care store and not merely a tighter one.
+       THE POLICY IS NOW IN THE REPO (`0000_card_model.sql`, replacing the audit_log half of
+       the `TODO(source-of-truth)` at :146), so it is authoritative from here and a rebuild
+       reproduces it. THE TODO REMAINS OPEN for the other five tables 0000 enables RLS on —
+       entities, cards, connections, groups, group_members — whose policies are still
+       uncaptured. Closing it wholesale would claim a completeness this capture does not have.
+       SUBSTRATE NOTE for whoever builds recall: `actor` is the entity id on an AUTHENTICATED
+       call and `client:<client_id>` on an anonymous one. Per T-12a a client_id is
+       per-installation, so recall still reaches an installation when no entity was bound —
+       weaker than an entity id, and not nothing.
+
+## RULINGS — 2026-09-02 (TAPER Session 3 · T-14…T-19) — approved for 3-BUILD
+
+  T-14 THE INSTRUCTION LAYER IS NOT DELIVERED ON CLAUDE.AI. Recorded as a FACT ABOUT THE HOST,
+       not a defect in this server. `instructions` from the MCP initialize result is DROPPED by
+       claude.ai (anthropics/claude-ai-mcp#93 — opened 2026-03-11, still open, labelled
+       backlog/enhancement/triaged; Claude Code honours it per anthropics/claude-code#3312,
+       ChatGPT/Codex honours it, the Agent SDK does not per
+       anthropics/claude-agent-sdk-typescript#174). The same issue reports TOOL DESCRIPTIONS
+       TRUNCATED AT ~500 CHARACTERS.
+       MEASURED AGAINST THIS MANIFEST 2026-09-02: 8 of 14 tools exceed 500 chars.
+       `find_professional_for_situation` is 2053 — 75% cut — and everything the acuity rulings
+       depend on sits past the cut: `emergency —` at 1072, the alcohol/benzodiazepine
+       withdrawal warning at 1153, **911 at 1221**, `crisis —` at 1343, **988 at 1406**,
+       `urgent —` 1482, `scheduled —` 1572. What survives is the trigger sentence and the
+       example prompts.
+       WHAT THIS RETROACTIVELY EXPLAINS, and it is the reason this is a ruling and not a note:
+       EVERY RULING THAT ASSUMED A PRE-CALL CHANNEL WAS TRUE ON THE WIRE AND FALSE AT THE
+       MODEL. CRISIS_RULE inside SERVER_INSTRUCTIONS; T-6's "the DESCRIPTION is what tells the
+       model to say 911 before any result". Both are correctly implemented and neither arrives.
+       TWO DAYS OF "THE BEHAVIOUR DOESN'T FIRE" WERE NOT A CODE BUG.
+       CONSEQUENCE FOR THE DESIGN: THE TOOL RESULT IS THE ONLY RELIABLE CHANNEL ON THE PRIMARY
+       HOST, which makes SESSION 1'S SERVER-ENFORCED ORDERING THE LOAD-BEARING DESIGN AND THE
+       TEXT MERELY ITS EXPLANATION. The server putting 988 first for `crisis` and returning no
+       card for `emergency` works whether or not one word of guidance is ever read. That is now
+       the reason it was built that way, not a happy accident.
+       EVIDENCE GRADE: EXTERNAL, NOT YET OURS. The issue tracker and secondary write-ups, not
+       Anthropic documentation and not our own observation; this repo's archive holds no prior
+       finding on it (the only recorded host difference is BUG-005, image rendering).
+       CONFIRM LIVE BEFORE REDESIGNING — Derrick connects the live server to claude.ai and asks
+       the model, UNPROMPTED and without naming the tool, what `acuity=emergency` means for it.
+       If it cannot say, the tail is gone. RECORD THE RESULT EITHER WAY: a negative result is
+       as load-bearing as a positive one, because T-19 is gated on it.
+
+  T-15 SKILL STEP 2 RATIFIED AS REDRAFTED — the two acute doors are split, and the physical
+       guidance is bound to the two that own it. emergency and urgent → 911 or an ER, WITH the
+       immobilize / do-not-straighten / ER-vs-urgent-care parenthetical. crisis → 988, WITHOUT
+       it: fracture advice on a crisis path is noise at the moment a person can least absorb
+       it, and it signals the model has misread them. ALCOHOL AND BENZODIAZEPINE WITHDRAWAL IS
+       NAMED EXPLICITLY ON THE EMERGENCY SIDE — it presents as distress and kills physically,
+       which is exactly the confusion T-2 exists to prevent.
+       THE BOTH-DOORS RULE IS RATIFIED WITH IT: crisis AND physical danger → `emergency`.
+       THE REASONING GOES IN THE SKILL, not just here: 911 CAN DISPATCH FOR A PSYCHIATRIC
+       EMERGENCY AND CAN REACH SOMEONE WHO HAS TAKEN SOMETHING; 988 CANNOT SEND AN AMBULANCE.
+       An overdose in progress is the common case and it is the case the four-value enum would
+       otherwise force a wrong choice on.
+
+  T-16 SKILL STEP 7 RATIFIED. The skill NAMES WHAT EACH ACUITY VALUE OPENS — emergency → 911/ER
+       and no card returned; crisis → 988 first; urgent → soonest availability; scheduled → as
+       asked — because per T-14 THE SKILL IS THE ONLY PLACE THAT SURVIVES ON CLAUDE.AI. The
+       description says it too and is cut; the instructions say it and are dropped.
+
+  T-17 THE GUIDANCE SET IS RATIFIED, ACUITY-DRIVEN RATHER THAN TEXT-MATCHED. find_professional
+       knows the acuity as a validated enum; inferring care-seeking from a word list
+       (`isCareSeeking`) is strictly weaker and stays where it is, for query_cards.
+       THE EMERGENCY LINE FIRES ON AN EMPTY RESULT — the one case where GUIDANCE IS THE
+       RESPONSE, because `emergency` returns no card by ruling (T-6) and silence there would
+       withhold the only thing that matters.
+       THE DRAFT'S `{timestamp}` LINE IS STRUCK, for the ER-1 reason: it asserts something
+       about professionals a zero-result envelope does not contain (BUG-019's exact class), and
+       there is NO SHARED VERIFICATION INSTANT to name — each card's stamp carries its own
+       `checked` month and already tells the truth per-card.
+
+  T-18 THE PLUGIN LIVES UNDER `plugin/`, NEVER `.claude/`. `.claude/skills/` holds this repo's
+       DEV-TIME skills; a product skill there would auto-load into every build session, putting
+       crisis-routing instructions into sessions that are writing migrations. Wrong audience,
+       and the kind of mistake that is invisible once made.
+
+  T-19 DESCRIPTIONS ARE FRONT-LOADED — PENDING T-14'S LIVE CONFIRMATION, AND NOT BUILT UNTIL
+       THEN. The acuity doors, both numbers and the crisis rule move into the FIRST 500
+       CHARACTERS of find_professional's description, ahead of the trigger examples. The seven
+       other over-length tools get the same treatment IN THE SAME PASS.
+       THE PRINCIPLE, which outlives the specific number: WHAT A HOST CUTS IS WHAT MUST COME
+       LAST. Order a description by what breaks if it is missing, never by what reads well.
+
+## RULINGS — 2026-09-03 (TAPER Session 4 · T-20…T-25) — BUILT, this commit
+
+  T-20 T-14 IS CONFIRMED BY OBSERVATION, AND ITS TRUNCATION HALF IS FALSIFIED. Live claude.ai,
+       connector attached, asked directly and unprompted. Verbatim: "I received none that I can
+       see. What's in my context from Teleoplexy is limited to the tool definitions themselves
+       ... plus runtime content inside tool results." It named get_card_details' grounding rule
+       and find_professional's acuity ordering as arriving VIA DESCRIPTIONS, and the NOTE TO
+       ASSISTANT line as arriving VIA RESULTS.
+       SO: `instructions` DROPPED. DESCRIPTIONS ARRIVE WHOLE — there is no ~500-character
+       truncation. T-19 IS STRUCK, and the stale reason it rested on is struck at the source
+       too: `find-professional.ts` carried "the description is cut at ~500 chars" as a comment
+       justifying a design choice, and a plausible wrong cause in a comment is worse than none.
+       T-19'S PRINCIPLE SURVIVES ITS SUBJECT and moves to where it is now measured: WHAT A HOST
+       CUTS IS WHAT MUST COME LAST — see T-24, which applies it to `instructions` instead.
+       A SECOND HOST WAS THEN MEASURED, and T-14 is WIDER than claude.ai. Claude Code, which
+       anthropics/claude-code#3312 says honours the field, delivers EXACTLY 2048 CHARACTERS of
+       a 4215-character string — observed in a session's own delivered context, the block
+       ending mid-sentence inside EMPTY_RESULT_RULE. 51% lost, silently. TIME_ZONE_RULE,
+       ASK_FIRST_RULE, VISIT_RULE, FOLLOW_UP_RULE and QUERY_CARDS_KIND_GUIDANCE were unread on
+       BOTH KNOWN HOSTS, not just the primary one.
+       EVIDENCE GRADE: OURS NOW, not the issue tracker's. The bound on it: the 2048 cut was
+       seen in what reached a model; MCP client, harness renderer and system-reminder display
+       cannot be told apart from inside. Either way the model did not receive the remainder.
+
+  T-21 NETWORK_POSTURE IS SPLIT. THE TRIGGER SHIPS; THE COMPARATIVE DOES NOT.
+       The sentence welds two claims: a when-to-use trigger, and a comparative ("before
+       directing people to external websites, phone trees, or self-service workarounds").
+       ONLY THE TRIGGER GOES INTO A DESCRIPTION (query_cards). The comparative stays in
+       SERVER_INSTRUCTIONS and ships nowhere else.
+       THE OBJECTION WAS TO MANIPULATION, NOT TO EXPLAINING WHAT THE TOOL DOES. A description
+       may state CAPABILITY: "returns professionals verified against their licensing board" is
+       a claim about the tool, which is what a description is for. "Prefer this network" is a
+       claim about the assistant's behaviour and stays out. No naming of alternatives. THE
+       COMPARISON IS IMPLICIT IN THE CAPABILITY AND THE MODEL DRAWS IT.
+       NO ER-2 COUPLING, and the mechanism matters because it is what licenses the split: the
+       bar-on-helping is a property of an ORDERING ("X before Y") whose antecedent an empty
+       result makes unsatisfiable. A capability claim orders nothing — no X, no Y, nothing for
+       a zero-result to strand. The trigger half is deontic but its condition is on the INPUT
+       and is discharged the moment the tool is called; the empty result arrives after
+       compliance. `guidanceNotOnNetworkYet()` therefore needed NO amendment.
+       ── THE STANDING COST OF THIS RULING, which a future session must meet here where the
+       ruling lives, not only in the ledger (PROCESS-002): A CAPABILITY CLAIM SOUNDS LIKE A
+       FACT WHERE A PREFERENCE CLAIM ANNOUNCES ITSELF AS A PREFERENCE, SO TRIGGER-ONLY IS THE
+       FRAMING THAT FAILS UNDETECTED. The first draft of the ratified sentence claimed
+       "booking in one step" — booking is four steps, and the manifest says so in the same
+       file. It passed the manipulation test and failed the accuracy test. Every clause added
+       here from now on names the file and line that makes it true, per clause, BEFORE it is
+       proposed.
+
+  T-22 QUERY_CARDS' ACUTE LINE IS 988-ONLY, composed from CRISIS_CHANNELS. The both-doors
+       draft (478 chars) is REJECTED at 268. query_cards HAS NO ACUITY ENUM BECAUSE IT IS NOT
+       ROUTING ACUITY — that is a BOUNDARY, not a gap to patch. The emergency door belongs
+       where an emergency is classified: find_professional, which carries it in full and which
+       the model demonstrably reads (T-20). Duplicating both doors onto a general search tool
+       dilutes that tool's own purpose for little gain.
+       THE RESIDUE IS WATCHED, NOT ASSUMED AWAY — DEFERRED.md carries the trigger "an emergency
+       query surfaces through query_cards rather than find_professional". IF IT FIRES, THE FIX
+       IS NOT AUTOMATICALLY TO ADD THE DOOR: it may be that the skill or find_professional's
+       trigger should have caught the query earlier. Diagnose the routing, not the symptom.
+
+  T-23 THE RULES MOVE INTO THE CHANNELS THAT ARRIVE. Duplication into reliable channels, NOT
+       migration out — SERVER_INSTRUCTIONS stays populated for hosts that honour it.
+         · FOLLOW_UP_RULE + ASK_FIRST_RULE's ASKER half → reach_entity's RESULT. They describe
+           a state that begins at one instant, and that instant is what reach_entity returns.
+           `held_until` was emitted as a bare ISO instant with nothing saying what it means.
+           The shared return (reach / order / non-practice booking) GATES ON KIND: a plain
+           reach submits no order and carries no follow-up offer.
+         · ASK_FIRST's RESPONDER half already shipped in respond_thread's description.
+         · TIME_ZONE_RULE's PRESENTATION half → the envelope, GATED ON `terms.availability !==
+           null` AND NEVER ON KIND. A practice card with an empty board IS a practice card and
+           renders NO_OPEN_TIMES; kind-gating would print "the times above" over it, which is
+           BUG-019's class. Its BOOKING half already shipped in reach_entity's `scheduled_for`.
+         · VISIT_RULE's plan half already shipped (get_messages, update_plan_item). The room
+           link and THE NO-RECORDING ASSURANCE → get_messages' description. The assurance is
+           the load-bearing half: it answers a question a patient actually asks.
+
+  T-24 SERVER_INSTRUCTIONS IS ORDERED BY SURVIVAL, not by priority. Given the measured 2048
+       cap: CRISIS_RULE and its channels FIRST, then the priority line, the tool description,
+       then everything else, with FOLLOW_UP_RULE LAST as it already was.
+       THE PIN ON THAT LAST POSITION CHANGED MEANING WITHOUT CHANGING VALUE, which is exactly
+       the kind of thing that goes unnoticed, so it is recorded in the spec as well: it is last
+       now BECAUSE IT IS THE MOST SURVIVABLE LOSS, not for style.
+       MEASURED AFTER THE REORDER: CRISIS_RULE at offset 0, channels at 234; posture, symptom
+       and routing all inside 2048. EMPTY_RESULT_RULE (from 1443) is truncated mid-rule and
+       everything after it is cut — acceptable ONLY because every cut rule now has a delivered
+       home in a description or a result. That is the condition, not a coincidence.
+       The PRIORITY line's direction words were flipped with the reorder ("below"/"above" both
+       reversed). A stale directional reference inside a rule about precedence is worse than
+       none.
+
+  T-25 NO RULE MAY LIVE IN SERVER_INSTRUCTIONS ALONE. The field is treated as a channel that
+       may lose everything past ~2000 characters. Any rule that must arrive also ships in a
+       tool description, a tool result, or the skill, IN THE SAME COMMIT.
+       DEFERRED.md carries the trigger that would relax this: "a host is observed delivering
+       SERVER_INSTRUCTIONS whole."
+
+  ── ER-3 EXTENDED (not a new ruling; the old one applied to sites its own sweep missed).
+       CRISIS_CHANNELS had two copies outside guidance.ts: `manifest.ts` (find_professional's
+       description — a FIFTH site, which display-stack.spec.ts's byte-identical assertion did
+       not know about) and the product SKILL.md (a SIXTH, which is markdown and cannot import).
+       The manifest now composes from the constant, PROVED BYTE-IDENTICAL before the edit; the
+       skill gets a spec assertion instead, via a build-time raw import, because a `node:fs`
+       read cannot reach the repo from inside the Workers test pool.
