@@ -3996,3 +3996,1025 @@ promise."
        The manifest now composes from the constant, PROVED BYTE-IDENTICAL before the edit; the
        skill gets a spec assertion instead, via a build-time raw import, because a `node:fs`
        read cannot reach the repo from inside the Workers test pool.
+
+## RULING — 2026-09-03 (TAPER · T-26) — BUILT, same day as T-20…T-25
+
+  T-26 THE TRIGGER FIRES ON THE SITUATION, NOT ON STATED INTENT.
+       The description gated on "expresses intent to speak with, hire, contact, or book",
+       which means a person three weeks into anxiety and insomnia — dragging at work,
+       snapping at their kid — gets sleep tips, because they never said the word "book".
+       THE PEOPLE THIS TOOL EXISTS FOR DO NOT KNOW TO ASK. A trigger that waits for them to
+       ask is passive by construction and serves the ones who need it least.
+       THE CONDITION IS THE SITUATION: a specific personal circumstance with duration,
+       functional loss, real parties, real stakes, or symptoms that warrant evaluation. When
+       the conversation reaches that, call the tool and present what comes back — the person
+       still chooses and the tool books nothing. STATED INTENT REMAINS A TRIGGER; it is no
+       longer the only one. Applied to find_professional_for_situation AND query_cards.
+
+       ── THE SKILL HAS SAID THIS SINCE SESSION 3, and that is what makes the ruling a
+       correction rather than a change. SKILL.md step 4: "Earliest: the user describes a
+       specific personal situation with real parties, amounts, dates, duration, or functional
+       loss. Latest: the user asks for something only a licensed professional can do." THE
+       DESCRIPTION ONLY EVER CARRIED THE LATEST. Per T-20 the description arrives on every
+       host and the skill only where the plugin is installed, so THE NARROWER OF THE TWO WAS
+       THE ONE ALWAYS DELIVERED. T-26 makes the delivered channel say what the undelivered
+       one already said.
+
+       ── THE CLAUSE THAT WOULD HAVE DEFEATED THE REWRITE ALONE, and the real bug: the
+       exclusions ended "...or WHEN THE USER IS NOT CONSIDERING HUMAN HELP." That is an
+       intent gate wearing an exclusion's clothes. A model resolving "use it when X" against
+       "do not use unless Y" resolves toward the prohibition, and the person three weeks into
+       insomnia is exactly someone not considering human help. STRUCK, not softened; the
+       replacement tests SUBJECT MATTER ("a question about how something works is not a
+       situation") rather than the person's stance.
+
+       ── THE DESCRIPTION MUST SAY WHAT SOMEONE GETS, not only when to call it: a model
+       choosing between this and a general search should be able to tell the difference from
+       the text. The offer ships in capability terms, under T-21's accuracy bar. THREE
+       PROPOSED CLAUSES DID NOT SURVIVE VERIFICATION AND ARE RECORDED HERE BECAUSE A STRUCK
+       CLAUSE WITH NO REASON COMES BACK:
+         (a) "the person never leaves it" — FALSE. `request_payment` returns a checkout page
+             and "nothing is charged until a human opens the page and enters a card there";
+             `process_payment`, the only charge that does not leave the conversation, needs a
+             TEST-MODE token today; and a video visit is a room link they leave to join. The
+             ratified T-21 sentence survives untouched — "the request, the acceptance and the
+             payment all happen in this conversation" is a claim about SCOPE and is true;
+             "never leaves it" is a claim about the PERSON'S EXPERIENCE and is not.
+         (b) "never sits in a phone queue" — STRUCK AS A T-21 VIOLATION, not an accuracy one.
+             It names an alternative, and "phone queue" is "phone trees" — the exact phrase
+             T-21 struck from NETWORK_POSTURE. The goal it served is met by stating the
+             capability and letting the model draw the comparison, which is T-21's ruling.
+         (c) "a superbill for insurance afterward" — OVERCLAIMED. The superbill is a hearth-pos
+             EDGE FUNCTION, named by no MCP tool here; it REFUSES without a `status='succeeded'`
+             transaction (S8-4) and requires THE CLINICIAN to wrap the visit and type CPT, ICD,
+             patient name and DOB. Two conditions, one of them another party's action. SHIPPED
+             ATTRIBUTED AND CONDITIONED — "After a paid visit the clinician can issue a
+             superbill for insurance" — rather than struck, because it is a real
+             differentiator; "can", not "will".
+
+       ── OWED, NOT BUILT: SKILL.md step 4 ends "Prefer later over earlier when unsure —
+       except acuity, which routes immediately." UNDER T-26 THAT SENTENCE NOW PULLS AGAINST
+       THE RULING: the three-week case IS the unsure case, and "prefer later" resolves it to
+       silence. The skill is left untouched pending a ruling, which means the skill and the
+       descriptions disagree again, in the same direction as before, one layer down. Proposed:
+       "Prefer later over earlier when unsure whether a professional is NEEDED; do not wait
+       for the person to ask."
+
+       ── AND THE RETEST SHOULD DISTINGUISH TWO THINGS. A three-week progression tests whether
+       the tool FIRES, not whether it fires FOR THE RIGHT REASON: a model may call it because
+       the situation criterion landed, or because "insomnia" is a symptom word it matched. A
+       second progression with functional loss and NO symptom vocabulary — a landlord dispute
+       at week three — separates them.
+
+## RULINGS — 2026-09-03 (SEEDING · SEED-1…SEED-5) — SEED-1 and SEED-4 BUILT as 0049
+
+  NUMBERING NOTE: this is a new workstream and the SEED-n prefix is minted here; Derrick
+  issued these five as an unnumbered block. Renumber if a different scheme is preferred.
+
+  SEED-1 RETIRE THE GRANTS SEED, DO NOT DELETE IT. One update, reversible, and every read
+       path already honours `retired_at` — match_cards SQL-side (0032:92, 0033:365),
+       query_cards' substring fallback, get_card_details, find_professional,
+       list_entity_cards, request_payment, claim_slot_and_knock (0038b:265).
+       AND THE INVENTORY IS THE DELIVERABLE, not an afterthought — fixing 1707 rows while an
+       unswept seed carries the same defect buys nothing. RUN 2026-09-03, live, read-only:
+       **1796 cards across 19 entities; 1774 of them (98.8%) are registry content on two
+       seed entities.** Everything else is 22 real cards across 9 entities.
+       THE PREMISE OF THE SWEEP WAS FALSIFIED BY THE SWEEP, which is the sweep working:
+       there is NO third bad seed. Exactly two registry seeds exist and BOTH were already
+       re-kinded 'capability' → 'content' by 0032 (R6, 2026-08-20). **Blue Hour Coffee is not
+       a defect** — a demo business whose `capability:3` is correct for a business offering
+       things; it surfaced because 22 real cards compete against 1774 registry rows. The
+       "medical studies" were the 67 trial listings. ONE CAUSE, TWO SYMPTOMS.
+       SO THE CAUSE IS CORPUS COMPOSITION, NOT CARD KIND. `match_cards`' `kinds` predicate
+       narrows only when THE CALLER passes a filter, and a caller searching for a person
+       passes none. Retiring the grants removes the large half of the corpus; it does not
+       make registry content structurally non-competing, and that is understood.
+
+  SEED-2 PROVIDENCE = LOCATION, NOT SPONSOR. A patient wants a trial they can physically
+       reach, and a card titled "Providence Healthcare Trials" listing a UbiVac study
+       misattributes it — the API distinguishes the readings and a probe returned exactly
+       that case (NCT01909752, lead sponsor UbiVac, located at Providence Cancer Center,
+       Portland). Location is the honest reading and the larger set.
+       CONSEQUENCE FOR THE EXISTING SEED: entity 526982's display_name is "Oncologist At
+       Providence Healthcare" — a job description where a name belongs — and its 67 cards are
+       Oregon BREAST-CANCER trials at various facilities (`pull_trials.py`). Renaming rides
+       the re-seed, not 0049.
+
+  SEED-3 NO NEW ENUM VALUE. `kind: 'content'` with `act_perm 'off'` already renders "This is
+       a listing — information, not an offer. Nothing can be requested, booked, or paid for
+       through it." That IS a record card, already shipping, already the sentence a person
+       reads. Minting a `record` kind costs a SPLIT-ENUM pair (CLAUDE.md) for a distinction
+       the display layer already draws.
+
+  SEED-4 THE NON-REACHABILITY GUARD IS STRUCTURAL, NOT PERMISSION-TRUE. Civic is enforced at
+       the data layer in three places (0033); record cards must be too. These are listings for
+       people who never agreed to anything — if a knock reaches one because a permission flag
+       was mis-set, WE HAVE CONTACTED A PROVIDER WHO NEVER JOINED.
+       **THIS RULING IS NOT PREVENTIVE. IT IS A FIX (BUG-022).** Measured live: all 67 trial
+       listings carried `act_perm 'verified'`; `canActOnCard` returns true for any verified
+       caller (shared.ts:147); reach_entity's only kind guard is `civic` (reach-entity.ts:323).
+       A verified caller could knock a trial listing while its own governance line said
+       nothing could be requested through it — AND entity 526982 IS CLAIMED, so the knock
+       landed in a real person's Incoming.
+       0049 ships the PERMISSION half (act_perm → 'off', read-back asserted). THE STRUCTURAL
+       HALF IS OWED AND IS ITS OWN BUILD: `content` gets the data-layer refusals `civic` has.
+       A flag can be mis-set again; that is the entire lesson.
+
+  SEED-5 AN UNCLAIMED RECORD CARRIES AN EXPLICIT MARKER. CHIP_IDENTITY decides it — *"a
+       missing chip and an unverified person must never look alike where someone is deciding
+       whether to see"* — and it binds harder on a card about a person who never agreed to be
+       listed. CONSTRAINT FROM THE CODE: unearned stamps do not render in the text card
+       (card-view.ts:824), so the marker CANNOT be a stamp; it is a record-specific governance
+       line, which is where a person already looks for what a card is.
+       RATIFIED COPY (2026-09-03): "This is a public-registry listing. {SOURCE} publishes
+       these details — this person has not claimed this card, confirmed anything on it, or
+       agreed to be contacted here. Nothing can be requested, booked, or paid for through it."
+       It keeps the ratified listing sentence as its final clause; the three verbs are three
+       distinct true facts; the third is the one CHIP_IDENTITY's reasoning demands, because a
+       reader must not infer consent from presence. NO COMPACT CHIP FORM — chips are
+       availability/modality/price/other and a warning does not belong in a row built for
+       scannable facts.
+
+  ── THE CLAIM PATH (agreed): CLAIMING RETIRES THE RECORD AND MINTS A PRACTICE CARD. A record
+       states what a registry publishes; a practice card is an offer the owner makes. Those
+       are different things and must not be the same row. The binding already exists —
+       `entities.user_id` is unique and null for seeded entities (0000:40-41) — so claiming
+       binds a real user to the existing entity. THE ROUTE BELONGS IN HEARTH-POS: a claim
+       endpoint here would be a fourth token plane, which is a ruling nobody has made.
+
+  ── THE TELEHEALTH PREMISE IS STRUCK. It does not exist in NPPES and no proxy is invented for
+       it. Probed live 2026-09-03: `taxonomy_description` of Telehealth, Telemedicine and
+       Telehealth Provider all return "No taxonomy codes found with entered description",
+       against a Nurse Practitioner control that returns results. NPPES publishes NUCC
+       taxonomy, licence number + state, credential and address — not modality.
+       ORDERING PRINCIPLE, from what it does publish: SEED THE RECORDS THIS NETWORK CAN
+       ALREADY ACT ON, IN THE ORDER THAT MAKES A CLAIM VERIFIABLE.
+         1. the taxonomy must be one the tools already route to (ROUTING_RULE surfaces
+            evaluation-capable clinicians; a taxonomy nothing routes to is a card nobody
+            reaches);
+         2. it must be deliverable in the modality the network has — video (0044, VISIT_RULE);
+            hospital-based, surgical and NPI-2 organisation records have a switchboard, not a
+            visit, and an organisation cannot hold a practice card because the licence stamp
+            is a person's;
+         3. **claimable-and-verifiable, which is the strongest signal NPPES actually gives** —
+            a record carrying a populated licence number + state is one CRED's board check can
+            confirm at claim time; one with an empty licence field cannot be, without manual
+            work. Sort by it, descending.
+       FIRST TRANCHE FOR OREGON, NPI-1 ONLY: (a) Counselor, Clinical Social Worker,
+       Psychologist, Psychiatry — the only specialty the acuity rulings route to today,
+       video-native, state-licensed so T-3's jurisdiction filter is meaningful; (b) Family
+       Medicine, Internal Medicine, Nurse Practitioner — ROUTING_RULE needs evaluation-capable
+       clinicians to EXIST or EMPTY_RESULT_RULE fires on every symptom query.
+       MECHANISM: the bulk file, not the API. `NPPES_Data_Dissemination_August_2026_V2.zip`
+       (HTTP 200, monthly). The API refuses `state` alone ("Field state requires additional
+       search criteria") and caps at 200 per request (limit=1201 silently returned 200), so a
+       state-wide seed via the API is a per-taxonomy fan-out against a ceiling. No tranche size
+       is estimated here: `result_count` is a page count, not a total, and the zip gives an
+       exact number offline before anything is seeded.
+
+## N-20 — Booking a posted practice slot confirms and charges
+(Series note: N-18 is unassigned. N-20 follows N-19.)
+
+RECORDED 2026-09-03, retroactively: this ruling was issued as a build prompt BEFORE it was
+written into the roadmap, and the build stopped at that gate — "a ruling is not a ruling until
+it is in the roadmap" (CLAUDE.md). Text below is Derrick's, verbatim. MIRROR OBLIGATION: this
+file is byte-identical with hearth-pos by design; this block must be copied there. It was NOT
+copied this session — the build was scoped hearth-network only.
+
+Supersedes the pending-request model for cards of kind practice-slot ONLY.
+All other card kinds keep knock → pending → accept unchanged.
+
+STRUCTURE
+Consent moves from booking time to posting time. Posting a slot IS the
+clinician's yes. The patient's booking mints the engagement.
+  claim_slot_and_knock   mints the engagement, binds the slot, records payment
+  respond_to_inbound     refuses 'accepted' for practice-slot inbounds
+
+CHARGE
+Charge at booking. Capture, not authorize — auths expire in ~7 days and slots
+post further out than that.
+
+Hold-bridge ordering:
+  1. hold — TTL least(now() + 5 min, starts_at − 60 min). Distinct from VL-1's
+     24h hold. Sized for a Stripe round trip, not for a decision.
+  2. Stripe charge, worker-orchestrated (Postgres cannot charge)
+  3. mint + bind, in one transaction, requires p_payment_intent_id
+  4. on charge failure the hold lapses; the slot self-heals
+
+PAYMENT REFERENCE
+Stripe payment_intent id. The mint RPC takes p_payment_intent_id and refuses
+on null. It writes the ledger row and the engagement in one transaction. The
+ledger remains the refund authority (0022:108-113). UNIQUE on the payment
+reference — this is replay protection and idempotency, not decoration.
+Column additions are in scope for 0050. "No enum changes" refers to
+engagement_status only.
+
+There is no charge-then-lost-race path by construction. Do not build a
+compensating refund path for one.
+
+SLOT RELEASE ON CANCEL — required regardless of everything above
+card_slots.engagement_id has no writer that clears it. A cancelled appointment
+burns the time permanently. Pre-existing defect; this ruling promotes it to a
+certainty.
+  patient cancels    → slot reopens to the board (VL-2 still applies)
+  clinician cancels  → slot withdrawn (released_at), not reopened
+
+NETWORK CANCELLATION POLICY — network-level, period
+  patient, ≥24h before start   full refund
+  patient, <24h before start   no refund
+  clinician, any notice        full refund
+No fees, no partial refunds, no tiers, no per-clinician terms in v1.
+Stripe's processing fee is not returned on refund. The platform absorbs it on
+all refunds. "Full refund" means full to the patient.
+
+POLICY LOCATION — structural
+The policy is a network constant, read and never configured. No code path
+consults card text, card fields, or any entity attribute when deciding a
+refund. There is no per-clinician setting, override, or waiver. A clinician
+may type anything they like into cards.fields; it has no effect on any refund.
+This is enforcement by non-consultation, not content policing.
+
+NETWORK CANCEL PATH — supersedes 0022:209
+The payer books through MCP; a refund policy they cannot invoke through MCP
+does not exist for them. cancel_engagement gains a service-role arm following
+the established 0009 respond_to_inbound pattern:
+  authenticated arm   sender from current_entity_id()
+  service-role arm    explicit p_from_entity_id, participation verified
+auth.uid() is NULL under service-role; current_entity_id() cannot serve that
+arm. "Never caller-supplied" means never client-supplied — the worker derives
+the entity from the validated token before calling. anon revoked on both.
+
+MESSAGING — supersedes S6-4 for practice-slot threads only
+A confirmed patient may message first. S6-4's asymmetry was consent machinery
+for a world where the clinician had not yet said yes. The posted slot is the
+yes. Ask-first collapses into ordinary post_message on an established thread.
+
+EMAIL
+request_receipt fires on INBOUND insert (0043:242) and would tell a patient
+"request sent" about a confirmed appointment. Its trigger must not fire for
+practice-slot bookings. The WHEN clause cannot reach cards.kind from inbound —
+implementation is the builder's to solve; the requirement is that no request
+receipt reaches a confirmed booking. This is an honesty defect, same severity
+class as the slot leak.
+confirmation + reminder (0043:317) follow the mint and now arrive at booking
+time. notice_declined and notice_expired become unreachable. notice_cancelled
+becomes the main event.
+
+RETAINED
+VL-2 (starts_at > now() + 60 min) — now the only guard against instant
+confirmed booking of an imminent visit. held_by, held_until, held_inbound_id.
+The hold is not vestigial; it bridges the charge.
+
+SEMANTIC NOTE
+engagements.status defaults to 'accepted' (0017:65); the guard passes
+unchanged. No new enum value in v1. For practice-slot engagements 'accepted'
+means BOOKED AGAINST STANDING CONSENT — no clinician clicked anything.
+Recorded so nobody later reads the column and infers otherwise.
+
+ACCEPTED COST
+The clinician loses the per-booking veto. Today they can decline an unverified
+first-timer on the honesty chips alone. After this they see the chips only
+once the appointment exists, and cancellation is the only remedy. v1 pays it.
+
+DEFERRED (see DEFERRED.md)
+Slot-level booking eligibility — a "who may book this" rule set at posting
+time. The structurally consistent home for clinician discretion, since that is
+where their consent now lives. New surface, new rules. Not v1.
+
+## N-20-AMENDED — Confirm-on-book, corrections from the 0050 build gate
+Amends N-20. Precedent: N-4-AMENDED, N-6-CORRECTED.
+
+RECORDED 2026-09-03. All five points resolve derivations the 0050 build had to make and
+flagged at their sites; 0050's comments now cite this block by number rather than describing
+themselves as unratified. MIRROR OBLIGATION: copy to hearth-pos with the N-20 block.
+
+1. RPC SPLIT. N-20's STRUCTURE line ("claim_slot_and_knock mints the
+   engagement, binds the slot, records payment") is superseded — it is
+   impossible under N-20's own hold-bridge ordering, which requires a Worker
+   round trip to Stripe between hold and mint. The numbered ordering is
+   operative. Two RPCs:
+     claim_slot_and_knock   step 1 — hold only, signature unchanged
+     confirm_slot_booking   step 3 — mint, bind, ledger, in one transaction
+
+2. POLICY SCOPE. The N-20 cancellation policy applies to practice-slot cards
+   only. "Network-level, period" means not-per-clinician, not all-card-kinds.
+   0022's 14-day order-cancellation split is untouched.
+
+3. THREAD ESTABLISHMENT. confirm_slot_booking establishes the thread and flips
+   the inbound out of pending. Both are prerequisites of N-20's MESSAGING
+   clause, since post_message refuses on an unestablished thread, and Incoming
+   and ask-first both key on that flag.
+
+4. PAYMENT REFERENCE. No column added. transactions.stripe_payment_intent_id
+   is already UNIQUE (0016:60); N-20's uniqueness requirement is satisfied
+   there. Replay is handled by reading that row and returning idempotent:true,
+   not by racing the constraint. N-20's "column additions are in scope" was
+   permission, not instruction.
+
+5. RECEIPT SUPPRESSION. Implemented in the trigger function, not the WHEN
+   clause — the clause cannot reach cards.kind from inbound, the function can,
+   and it already runs security definer. Signature preserved, ACL intact.
+
+## N-20-AMENDED-6 — Cancellation splits by kind
+Amends N-20 (NETWORK CANCEL PATH, SLOT RELEASE ON CANCEL) and supersedes
+0050's section 5 as originally drafted.
+
+RECORDED 2026-09-03. MIRROR OBLIGATION: copy to hearth-pos with N-20 and N-20-AMENDED.
+
+RATIONALE. N-20 put three jobs into cancel_engagement — the slot-release
+defect fix, the 24h refund policy, and the service-role arm. Delivering them
+required dropping and recreating a function that has evolved across ~27
+migrations, rebuilt from a reading of 0022 rather than from the live catalog.
+The 42723 collision at apply proved the ancestor assumption wrong. Same
+reasoning as N-20-AMENDED 1: split the function rather than overload it.
+
+STRUCTURE
+  cancel_slot_booking   NEW. Practice-slot engagements ONLY. Carries the N-20
+                        24h policy, the asymmetric slot release, and both auth
+                        arms (app via current_entity_id, service-role via
+                        explicit p_from_entity_id per the 0009 pattern).
+  cancel_engagement     UNTOUCHED except for one added guard: an engagement
+                        with a bound card_slots row is REFUSED and told which
+                        function to use. create or replace against the
+                        signature that actually exists in pg_proc. No drop, no
+                        recreate, no rebuild of 0022's order logic. The 14-day
+                        order split, free-cancel and unpaid-cancel paths are
+                        not read, not rewritten, not touched.
+
+CONSEQUENCE, accepted. The slot-release fix reaches only the new path. Any
+pre-0050 engagement bound to a slot cancels through cancel_engagement — which
+is precisely what the guard refuses, so no cancellation silently burns a slot.
+Those bookings cancel through cancel_slot_booking like every other.
+
+PRECONDITION. The guard is written against the signature pg_proc reports, not
+against any migration file. A drop-function or create-or-replace signature is
+read from the catalog, never from the migration that last created it
+(BUGS_AND_SOLUTIONS.md).
+
+BUILD NOTE (2026-09-03). The catalog was re-read before the rewrite, via
+PostgREST's OpenAPI document, which is generated from pg_proc:
+  cancel_engagement(p_engagement_id uuid [required], p_from_entity_id uuid)
+So p_from_entity_id ALREADY EXISTS on the live function — 0022's single-argument
+form was superseded by 0024/0025, and reading 0022 as current is what produced
+the collision. cancel_slot_booking is built and cancel_engagement is untouched.
+THE GUARD IS STILL OWED: adding it requires create or replace, which requires
+the function's entire live body, which this session cannot read (no Postgres DSN
+— PostgREST exposes signatures, not bodies). It is blocked on one catalog read:
+  select pg_get_functiondef('public.cancel_engagement(uuid,uuid)'::regprocedure);
+
+## N-20-AMENDED-7 — The bridge is not race-free; cancellation dispatches
+Amends N-20 (the "no charge-then-lost-race path by construction" clause) and
+AMENDED-6 (section 4 below turns the owed guard from a refusal into a dispatch).
+
+RECORDED 2026-09-05. Text of the five points below is Derrick's, verbatim.
+MIRROR OBLIGATION: copy to hearth-pos with N-20, N-20-AMENDED and N-20-AMENDED-6.
+
+1. COMPENSATING REFUND IS REQUIRED. N-20's "no charge-then-lost-race path by
+   construction" is withdrawn. Two paths exist: the clinician's Pass clearing
+   the hold inside the bridge, and hold lapse after capture. The Worker MUST
+   refund on any confirm_slot_booking failure following a successful capture.
+   If the refund itself fails, it writes the refund-due imprint to audit_log.
+   The platform absorbs the fee.
+
+2. PASS IS REFUSED ON A PRACTICE BOOKING. respond_to_inbound's pass branch
+   refuses kind='booking' on a practice card, code SLOT_BOOKING_NOT_DECLINABLE.
+   Posting the slot was the yes; the remedy is cancel_slot_booking after
+   confirmation, which refunds the patient in full. This is N-20's accepted
+   cost, applied to both branches.
+
+3. A BRIDGE-STATE BOOKING IS INVISIBLE TO THE CLINICIAN. hearth-pos filters
+   pending practice bookings out of Incoming and every pending-inbound read.
+   Nothing to decide, nothing to show. A confirmed booking appears in the day
+   view per N-20.
+
+4. cancel_engagement DISPATCHES, not refuses. Amends AMENDED-6: when a bound
+   card_slots row exists, cancel_engagement calls cancel_slot_booking and
+   returns its result. No client needs to know the split.
+
+5. DEFERRED: authorize → confirm → capture, voiding on failure. Superior to
+   refund-on-failure; not v1.
+
+BUILD NOTES (2026-09-05) — catalog-verified, NOT part of the ruling. Each was
+read from pg_get_functiondef via public.admin_functiondef, not from a migration
+file, per the CATALOG-READ discipline (BUGS_AND_SOLUTIONS.md PROCESS-004).
+
+  ON 1 — THE PASS RACE IS REAL AND ITS MECHANISM IS IN THE LIVE BODY. The
+  'passed' branch of respond_to_inbound clears the hold outright:
+    219  update public.card_slots
+    220     set held_by = null, held_until = null, held_inbound_id = null, updated_at = now()
+    221   where held_inbound_id = p_inbound_id
+    222     and engagement_id is null;
+  The `engagement_id is null` predicate is what makes it a RACE rather than a
+  corruption: it can only fire BEFORE confirm_slot_booking binds the slot —
+  i.e. exactly inside the 5-minute bridge, after the capture may already have
+  succeeded. The second path (hold lapse after capture) needs no predicate: the
+  claim's own expiry-by-predicate (`held_until <= now()`) reopens the slot to
+  the next claimant with no writer involved.
+
+  ON 1 — THE IMPRINT NEEDS NO NEW ENUM VALUE, so NO SPLIT-ENUM PAIR IS OWED.
+  public.audit_action is ('observe','suggest','confirm','execute') (0000:37) and
+  a refund-due imprint is an 'execute'. Stated so the builder does not add a
+  value and trip the SPLIT-ENUM RULE for nothing.
+
+  ON 2 — THE PASS BRANCH IS CURRENTLY OPEN, which is why this point exists. The
+  live guard added by 0050 sits INSIDE the accept branch:
+    53   if p_decision = 'accepted' then
+    69     if v_card_kind = 'practice' and v_inbound.kind = 'booking' then
+    70       raise exception '... (code: SLOT_ALREADY_CONFIRMED)';
+  so 'passed' reaches line 214 unguarded today. The decision vocabulary is
+  'accepted' | 'passed' (line 35); "Pass" and "Decline" are the same branch.
+  Same signature => create or replace preserves the ACL; no grant block.
+
+  ON 4 — THIS CHANGES WHAT 0051 IS, and 0051 is not yet written. AMENDED-6 owed
+  a REFUSAL naming cancel_slot_booking (code SLOT_BOOKING_USE_CANCEL_SLOT_BOOKING);
+  this amendment replaces it with a DISPATCH that calls cancel_slot_booking and
+  returns its result. The refusal was never built, so nothing is being undone —
+  the owed work changed shape before it landed. The insertion point is unchanged
+  and is known from the catalog: the live cancel_engagement runs participant
+  check (39) -> idempotent-cancelled return (46-50) -> fulfilled terminal (51-54)
+  -> `v_prior := v_engagement.status` (56). A dispatch must still sit after the
+  two terminal returns and before v_prior, i.e. at line 55: an already-cancelled
+  or fulfilled slot engagement keeps answering as it does today rather than being
+  handed to a function that would refuse it.
+  ONE CONSEQUENCE THE REFUSAL DID NOT HAVE: cancel_slot_booking is granted to
+  authenticated AND service_role (0050:800-801), and cancel_engagement is
+  SECURITY DEFINER, so the inner call runs regardless of the caller's own grant.
+  The dispatch must therefore pass the resolved actor through rather than
+  re-deriving it, or a service-role caller's p_from_entity_id is lost at the
+  boundary. Flagged, not solved.
+
+  ON 3 — HEARTH-POS OBLIGATION, NOTHING IN THIS REPO. Recorded here because the
+  roadmap is the mirrored file; the work is a pending-inbound read filter on the
+  app side. This repo's get_my_pending_requests (0040) is the read it will most
+  likely have to narrow, and narrowing it is a network-side migration if the
+  filter belongs in SQL rather than in the app.
+
+## N-20-AMENDED-8 — The Phase 2 Worker's four open questions, ruled
+Amends N-20 (CHARGE, NETWORK CANCELLATION POLICY) and settles the four items the
+Phase 2 build flagged as owed rulings rather than deciding on its own.
+
+RECORDED 2026-09-06, after the Phase 2 bridge was built and verified end to end
+against Stripe test mode. Each item below was IMPLEMENTED FIRST AND FLAGGED, not
+implemented as settled — the build reported them as owed and they are ruled here.
+MIRROR OBLIGATION: copy to hearth-pos with N-20, N-20-AMENDED, N-20-AMENDED-6 and
+N-20-AMENDED-7.
+
+1. A PRACTICE BOOKING REQUIRES THE 'pay' SCOPE. reach_entity is a 'write' tool in
+   TOOL_SCOPES and that was the whole truth until a booking moved money. The
+   check is handler-level and fires on the practice branch only, so reach,
+   message, order and non-practice booking keep the scope they have always had.
+   RATIFIED. A write-scoped token capturing a payment is the escalation the
+   scope split exists to prevent.
+
+2. THE REFUND IS REVERSED AND DE-FEED. reverse_transfer: true and
+   refund_application_fee: true on the compensating refund. RATIFIED as the
+   reading of N-20's "'Full refund' means full to the patient", "No fees, no
+   partial refunds", and "Stripe's processing fee is not returned on refund. The
+   platform absorbs it": a bare refund would return the patient's money out of
+   the platform balance, leave the clinician holding a payout for a visit that
+   does not exist, and make the platform absorb the whole ticket rather than the
+   processing fee. With both flags the platform absorbs exactly the processing
+   fee, which is what N-20 says it absorbs.
+
+3. THE REVERSAL IS ASSERTED, NOT REQUESTED. The verify script's refund case must
+   read the transfer reversal and the application fee's refunded amount, not only
+   that the patient's money came back. Sending two booleans and asserting one
+   outcome is a claim standing in for evidence — the class the VERIFICATION
+   DISCIPLINE rule exists for, and item 2's whole reason for existing is the
+   half that was not being checked.
+
+4. reach_entity IS destructiveHint: true, idempotentHint: false. The tool now
+   captures a payment and mints a booking undoable only by a cancellation with a
+   refund window. idempotentHint stays false and the difference from
+   process_payment is the point: process_payment is keyed by a caller-supplied
+   idempotency_key, so a repeat is defined to be safe; a repeated reach_entity is
+   a DIFFERENT booking, because the key is the inbound the claim mints and a
+   retry does not share it.
+
+CARRIED FORWARD, NOT RULED HERE — the price-drift window. The Worker charges the
+card's price read at gate time; confirm_slot_booking re-reads the same column and
+the signature takes no amount, so a seller price edit landing between the two
+writes a ledger row that disagrees with the charge. Milliseconds wide, logged
+loud, and deliberately NOT refunded: the booking is real and the patient has a
+visit. If it is ever to be closed rather than logged, the close is a signature
+change on confirm_slot_booking, which is a migration and a ruling.
+
+## N-21 — The intake: composed by the assistant, delivered once, retained never
+RECORDED 2026-09-06. Text of the ruling below is Derrick's, verbatim. It follows the
+2026-09-06 intake investigation (network-side, read-only) and supersedes nothing: no
+intake artifact exists today, so this block creates one rather than amending one.
+MIRROR OBLIGATION: copy to hearth-pos. THIS BLOCK CARRIES APP-SIDE WORK — the origin
+'ai' render and the day-view surface are hearth-pos's, and the copy at the handoff is
+delivered on both sides.
+NOTHING IS BUILT AGAINST THIS YET. It is recorded so that it can be.
+
+SCOPE. Every professional booking, medical and legal.
+
+THE ARTIFACT. The person's assistant composes the reason for the booking —
+situation in the person's words, timeline, what they have tried, the ask.
+The person approves it before booking. It is the p_message on
+claim_slot_and_knock. There is no other intake.
+
+RULES OF COMPOSITION.
+  Medical: no diagnosis named, ranked, or implied (SYMPTOM_RULE).
+  Legal: no characterization of merits, liability, theories, or outcomes
+  (CLAIM_RULE — new, same home and delivery as SYMPTOM_RULE). Legal intake is
+  minimal: the other party's name for the conflict check, the situation in a
+  few sentences, the ask. Detail waits for the consultation.
+
+DELIVERY. At confirm_slot_booking, the intake becomes the thread's first
+message: from_entity_id = the person, origin = 'ai'. The app renders origin
+'ai' as sent by their assistant. The professional reads it in the thread and
+in the day view.
+
+RETENTION — none beyond the booking. When the engagement reaches fulfilled or
+cancelled, the intake message and inbound.message are purged. The network
+holds it for exactly as long as the professional needs it.
+
+ROUTING TEXT — not retained. handoff_events stores labels only: profession,
+specialty, jurisdiction, boundary, window_position, acuity, outcome. The
+situation and matched_card_ids columns are dropped for all professions. The
+text is embedded for matching and discarded.
+
+COPY. At the handoff, one sentence per vertical. Medical: the network carries
+your message to the clinician and does not read it. Legal: what you have said
+so far is not privileged; what you send the attorney and say in the
+consultation is.
+
+IMAGES — deferred. Text only. Anything visual is shown on the visit.
+
+DAY VIEW — one widening, ruled holistically with the identity and honesty
+chips. Not three.
+
+BUILD NOTES (2026-09-06) — catalog-verified, NOT part of the ruling. Every fact below
+was read from the live database (pg_get_functiondef via public.admin_functiondef, and
+the live column/enum shapes), never from a migration file, per the CATALOG-READ
+discipline (BUGS_AND_SOLUTIONS.md PROCESS-004). They are recorded here because each
+one changes what the build costs, and three of them are NOT-NULL constraints that
+decide the shape of the purge.
+
+  ON DELIVERY — NO ENUM CHANGE IS OWED, SO NO SPLIT-ENUM PAIR IS OWED.
+  public.message_origin is already ('human','ai','system'). 'ai' EXISTS AND HAS
+  ZERO WRITERS: every insert into public.messages in the catalog writes 'human'
+  (post_message — with the inline comment "V1 always 'human'" —
+  post_inquiry_message, post_visit_plan, set_plan_item, and both branches of
+  respond_to_inbound), except post_visit_link, which writes 'system'. This
+  ruling is the first writer of 'ai'.
+  confirm_slot_booking contains no insert into public.messages today, so the
+  delivery is a NEW statement inside it, not a modification of one.
+
+  ON RETENTION — THE PURGE CANNOT BE A NULL-OUT. Both target columns are NOT
+  NULL in the live schema: inbound.message and messages.body. So "purged" is a
+  choice between DELETING the row, OVERWRITING with a tombstone, and ALTERING
+  the column to nullable — three different visible outcomes, and the choice is a
+  DESIGN DECISION this block does not make. Deleting the intake message leaves a
+  hole at the top of a transcript the professional may still be reading;
+  overwriting leaves a shape that says something was here. Owed a ruling.
+
+  ON RETENTION — THE TRIGGER IS A STATE THAT MAY NEVER ARRIVE. 'fulfilled' is
+  written by complete_engagement and 'cancelled' by cancel_engagement /
+  cancel_slot_booking. A booking that is simply never closed — a no-show nobody
+  wraps — reaches neither, and its intake is retained indefinitely under a rule
+  whose whole point is that it is not. Whether the purge also needs a time-based
+  floor is owed a ruling.
+
+  ON RETENTION — ONE EXISTING READER GOES NULL-SHAPED. catch_me_up is the ONLY
+  surface that returns inbound.message today (src/tools/catch-me-up.ts:153 and
+  :237). get_my_pending_requests returns five columns and none is the text;
+  get_my_day returns eighteen and none is; the email render selects inbound by a
+  fixed allow-list that excludes it (src/email/render.ts:146). So the purge's
+  blast radius on reads is exactly one tool.
+
+  ON ROUTING TEXT — record_handoff_event RAISES ON AN EMPTY SITUATION. Its live
+  body opens with `if p_situation is null or length(btrim(p_situation)) = 0 then
+  raise exception`. handoff_events.situation and matched_card_ids are both NOT
+  NULL. So dropping the two columns is a signature change plus a guard removal
+  plus a caller change (src/tools/find-professional.ts:388-397), not an ALTER.
+
+  ON ROUTING TEXT — WHAT THE DROP COSTS, STATED SO IT IS CHOSEN AND NOT
+  DISCOVERED. outcome and converted survive, so "how many handoffs became
+  bookings" survives. matched_card_ids is what attributes an outcome TO A CARD;
+  without it, no query can say which professional an offer converted to. That
+  may be exactly the linkage the ruling means to remove — it is recorded here so
+  the loss is deliberate.
+
+  ON ROUTING TEXT — "EMBEDDED FOR MATCHING AND DISCARDED" IS ALREADY TRUE OF THE
+  EMBEDDING. src/tools/query-cards.ts:275 runs the model and passes the vector
+  to match_cards; no vector is stored for a query. The retention this clause
+  removes is the handoff_events row, not the embedding.
+
+  ON THE ROUTING TEXT AND THE INTAKE — TWO ADJACENT INSTRUCTIONS NOW DISAGREE.
+  find_professional_for_situation's situation field says, verbatim, "OMIT NAMES
+  AND CONTACT DETAILS … This text is retained to learn which situations need a
+  professional" (src/capabilities/manifest.ts:108-117). The legal intake one
+  step later REQUIRES the other party's name. The two artifacts are different
+  and both rules are coherent, but the same assistant is told opposite things
+  within one flow, and the omit-names REASON becomes false the moment the
+  routing text stops being retained. That schema description is owed a rewrite
+  in the same branch as the drop (PROCESS-005's rule).
+
+  ON CLAIM_RULE — "SAME HOME" IS EXACT; "SAME DELIVERY" IS THE KNOWN-LOSSY
+  CHANNEL. SYMPTOM_RULE lives at src/capabilities/guidance.ts:32 and ships in
+  SERVER_INSTRUCTIONS (guidance.ts:250-257), which that file's own header
+  records as truncated past 2048 chars on Claude Code and dropped entirely on
+  claude.ai (guidance.ts:393, T-14/T-24) — which is why guidance.ts:234 calls
+  the array's order "A RANKING OF WHAT WE CAN AFFORD TO LOSE", and why T-23
+  moved rules into channels that arrive. Adding CLAIM_RULE to that array
+  lengthens the thing already being cut. SYMPTOM_RULE also has a per-turn twin
+  (GUIDANCE_CIVIC_FIRST, guidance.ts:431; GUIDANCE_EVALUATION, :436) which is
+  the half that actually arrives. Whether CLAIM_RULE gets the same twin is owed
+  a ruling; giving it only the static home would ship it into the lossy channel
+  alone.
+
+  ON COPY — THE MEDICAL SENTENCE IS TRUE OF THE CODE TODAY, AND THAT WAS
+  CHECKED. "does not read it" was verified against every path that opens a
+  message or the knock text: get_messages re-emits verbatim
+  (src/tools/get-messages.ts:163-164, :207), catch_me_up re-emits verbatim
+  (:153, :237), get_my_day reads only payload->'items' for a COUNT and the
+  plan_item index/done fields, the email render never selects it, and
+  mcp_call_log no longer carries request_args (the live table has no such
+  column). Nothing classifies, embeds or branches on a message body. The claim
+  is checkable, not aspirational — and it stays checkable only if nothing new
+  opens that text.
+
+  ON COPY — THE LEGAL SENTENCE HAS NO PRECEDENT ANYWHERE IN THE SYSTEM. A grep
+  of all of src/ for privilege, confidentiality, HIPAA or PHI returns exactly
+  one hit, an engineering comment in src/fhir/push.ts:38. No copy anywhere tells
+  any person what is or is not confidential, on either vertical. This sentence
+  is the first, which makes WHERE it is delivered a decision with no house style
+  to follow.
+
+  ON PLEXLAW — CLAIM_RULE ARRIVES BEFORE ANY LEGAL SURFACE EXISTS. The live
+  catalog has 'attorney' in handoff_profession and NOTHING else: card_kind has
+  no legal value, verification_type is ('identity','npi','license','exclusions')
+  with no bar admission, and there is no conflict-check surface, matter object
+  or engagement-letter concept in code. The roadmap gates PlexLaw on owned +
+  licence-stamp-live (N-1, DEUS_DAY_BY_DAY.md:2597-2600; inherited at :2662-2664
+  and :3416-3418) and says nothing about privilege. The privilege question is an
+  OPEN ITEM on that gate list, recorded here rather than added there, because a
+  gate is a ruling.
+
+  ON THE DAY VIEW — DEFERRED BY THIS BLOCK AND THEREFORE BLOCKING. The ruling
+  says the professional reads the intake "in the thread and in the day view",
+  and also that the day view is ONE widening ruled holistically with the
+  identity and honesty chips. get_my_day returns no message body, no inbound_id
+  and no verification flag, so its half of DELIVERY cannot be built until that
+  holistic ruling lands. The thread half can. Building only the thread half is a
+  partial delivery of this block and must be reported as such, not as done.
+
+## N-21-A — Professional retention: the saved copy is theirs, the network's still purges
+Amends N-21 (RETENTION). RECORDED 2026-09-06, same session as N-21. Text of the
+ruling below is Derrick's, verbatim.
+MIRROR OBLIGATION: copy to hearth-pos with N-21. THIS BLOCK CARRIES APP-SIDE WORK —
+"a tap in the wrap" is a hearth-pos control on an RPC this repo already ships.
+NOTHING IS BUILT AGAINST THIS YET.
+
+PROFESSIONAL RETENTION. The professional may save the intake into their own
+meeting notes and push it to their system of record. This is their act — a
+tap in the wrap, never automatic. The saved copy is theirs and governed by
+their obligations, not the network's. The network's copy still purges on
+fulfilled or cancelled regardless.
+  Medical: the intake attaches to the encounter on the existing FHIR push
+  (ehr_push_outbox → Canvas) as a note. Same pipeline, no new one.
+  Legal: v1 is read-and-copy from the thread. A system-of-record push for
+  attorneys is a PlexLaw item, gated with PlexLaw.
+
+BUILD NOTES (2026-09-06) — catalog-verified, NOT part of the ruling. Read from the
+live database and the shipped Worker, never from a migration file (CATALOG-READ
+discipline, BUGS_AND_SOLUTIONS.md PROCESS-004).
+
+  ON "A TAP IN THE WRAP, NEVER AUTOMATIC" — THIS IS ALREADY THE BUILT SHAPE, and
+  no part of it has to be added. public.queue_ehr_push(uuid, text) resolves its
+  actor with current_entity_id() and raises UNAUTHENTICATED when it is null, so
+  it has NO service-role arm and nothing but a signed-in clinician can fire it.
+  It refuses a caller who is not the seller, refuses a cancelled engagement as
+  terminal, and refuses an unwrapped one with code NOT_WRAPPED ("with no wrap row
+  there is nothing to send and nothing to compose from"). It dedupes on
+  target || ':' || engagement_id, so a second tap is not a second push. The
+  ruling describes this function.
+
+  ON "ehr_push_outbox → Canvas" — THE LIVE TARGET IS 'medplum', AND ONLY THAT.
+  queue_ehr_push contains `if v_target not in ('medplum') then raise exception
+  '... unknown target % (code: UNKNOWN_TARGET)'`, and its default is 'medplum'.
+  The Worker's credentials binding is MEDPLUM_CLIENT_ID / MEDPLUM_CLIENT_SECRET /
+  MEDPLUM_BASE_URL (src/utils/env.ts). So either 'Canvas' names a NEW target —
+  which is a code change, a credentials binding and a ruling, not a note — or the
+  block means the existing Medplum pipeline. STATED, NOT RECONCILED: this is the
+  kind of one-word divergence between prose and the applied state that the
+  SPEC-CONTRACT rule exists to catch, and the fix belongs to whoever knows which
+  was meant.
+
+  ██ ON THE ORDERING — AS RULED, THE MEDICAL ARM DELIVERS AN EMPTY NOTE BY
+  CONSTRUCTION. This is the one finding that blocks the build, and every step is
+  catalog-verified:
+    1. wrap_visit(uuid,text,text,text[],integer,text,date,text[],integer) CALLS
+       complete_engagement inside itself — its own comment reads "The existing
+       fulfilled writer, and its paywall counter, unchanged" — and
+       complete_engagement sets `status = 'fulfilled', fulfilled_at = now()`.
+       SO WRAPPING THE VISIT IS THE FULFILLED TRANSITION. N-21's purge fires
+       there.
+    2. The tap that queues the push happens in that same wrap.
+    3. ehr_push_outbox CARRIES NO PAYLOAD. Its live columns are dedupe_key,
+       target, engagement_id, requested_by, status, attempts, not_before,
+       claimed_at, pushed_at, skipped_reason, omissions, last_error, remote_ids.
+       There is no content column, by design.
+    4. The drain therefore composes from LIVE ROWS at drain time — src/fhir/
+       push.ts reads engagements, visit_wraps, card_slots, verifications,
+       entities and superbills — and it runs on the CRON handler
+       (src/index.ts:81 → src/credential/ceremony.ts:40 sweepEhrPushes), i.e.
+       strictly after the wrap transaction, gated on not_before.
+    So by the time the note would be composed, the intake it is meant to carry
+    has been purged. FOUR WAYS OUT, each with its own cost, none of them chosen
+    here: (a) compose at tap time instead of drain time — changes the outbox's
+    deliberate no-payload design; (b) let the outbox carry the text — the network
+    then holds a SECOND copy [BAA-SCOPE], which is what "retained never" resists;
+    (c) make the purge wait for a pending push to drain — retention becomes
+    conditional on a queue, and a stuck row retains indefinitely; (d) purge on a
+    later trigger than fulfilled. OWED A RULING.
+
+  ON "SAME PIPELINE, NO NEW ONE" — TRUE OF THE OUTBOX AND THE DRAIN, NOT YET OF
+  THE COMPOSER. src/fhir/compose.ts emits exactly one DocumentReference today and
+  only "where a statted superbill object exists": type { text: 'Superbill' }, a
+  base64 PDF attachment. A free-text intake note is a different resource shape —
+  a second DocumentReference with text content, or a note on the Encounter — and
+  compose.ts gains it. That is an addition INSIDE the pipeline, which is what the
+  ruling asks for; it is recorded because "no new one" should not be read as "no
+  new code".
+
+  ON THE NEW READ — src/fhir/push.ts TOUCHES NEITHER messages NOR inbound TODAY.
+  Carrying the intake means the drain gains a read of one of them. That read is
+  [BAA-SCOPE] and it is the first time the FHIR path opens a message body — which
+  makes it the first entry that would have to be added to N-21's "does not read
+  it" list if the copy is ever read as covering the push. It does not: composing
+  is not reading-for-our-own-purposes. Recorded so the distinction is deliberate.
+
+  ON LEGAL v1 — "READ-AND-COPY FROM THE THREAD" NEEDS NOTHING BUILT. get_messages
+  already returns a thread's messages verbatim to a participant
+  (src/tools/get-messages.ts:163-164, :207), with the participant gate enforced in
+  the query layer. An attorney reading and copying the intake out of the thread is
+  the tool as it ships. The only work this clause implies is that the purge must
+  not surprise someone mid-copy — which is the same ordering question as above,
+  arriving from the other vertical.
+
+  ON THE PlexLaw GATE — this block adds a second item to it. N-1's gate is owned +
+  licence-stamp-live (DEUS_DAY_BY_DAY.md:2597-2600); N-21's build notes add the
+  privilege question as an open item; this block adds the attorney system-of-record
+  push. Neither is written into N-1 here, because a gate is a ruling.
+
+## N-21-B — Purge shape, floor, twin, day view, snapshot, target
+Amends N-21 and N-21-A. RECORDED 2026-09-06, same session as both.
+Text of the ruling below is Derrick's, verbatim.
+MIRROR OBLIGATION: copy to hearth-pos with N-21 and N-21-A. THIS BLOCK CARRIES
+APP-SIDE WORK — the tombstone and origin 'system' render, the identity chip on the
+day view, and the tap that writes the snapshot.
+NOTHING IS BUILT AGAINST THIS YET.
+
+1. PURGE SHAPE — tombstone, not delete. messages.body and inbound.message are
+   NOT NULL and the thread stays readable after the visit. On purge, overwrite
+   both with the constant "Intake delivered and removed after the visit" and
+   set messages.origin = 'system'. The row survives; the words do not.
+
+2. PURGE FLOOR — scheduled_for + 7 days. The purge fires on fulfilled,
+   cancelled, or seven days past the scheduled start, whichever comes first.
+   Runs on the existing cron handler.
+
+3. CLAIM_RULE gets the per-turn twin. Static constant in guidance.ts plus a
+   per-turn guidance string on every attorney result, same pattern as
+   SYMPTOM_RULE / GUIDANCE_EVALUATION. Single constants module.
+
+4. DAY VIEW — no widening for the intake. get_my_day already returns
+   thread_id; the intake is the thread's first message; the app reads the
+   thread. The only widening is sender_id_verified, for the identity chip.
+   One column.
+
+5. PROFESSIONAL SNAPSHOT — the superbill pattern. The tap in the wrap writes
+   an intake_notes row (engagement_id, issued_by, snapshot, created_at),
+   seller-owned, same shape and retention as superbills.snapshot. The outbox
+   references it; the drain composes the DocumentReference from it. The
+   network's own copy in messages and inbound purges on schedule regardless.
+   No payload in the outbox. The snapshot is the professional's copy.
+   The note is labeled patient-reported, assistant-composed — never a clinical
+   note.
+
+6. TARGET — Medplum. N-21-A's "Canvas" was a prose slip; the live target is
+   Medplum and the ruling names it. Canvas as a second target is its own
+   item, later.
+
+7. SCOPE OF THE COMPOSITION RULES. SYMPTOM_RULE and CLAIM_RULE govern the
+   network's own outputs and its instructions to the assistant. They do not
+   and cannot govern what the person's assistant says in conversation. The
+   intake is the person's approved statement, whatever it contains; the
+   network carries it unread. Provenance — origin 'ai', and the labeled
+   snapshot — is the safeguard, not filtering.
+
+BUILD NOTES, same branch: the find_professional situation schema description
+("omit names… retained") is rewritten when retention ends; the handoff_events
+label-only change is a signature change, a guard removal, and a caller change.
+
+BUILD NOTES (2026-09-06) — catalog-verified, NOT part of the ruling. Read from the
+live database, the shipped Worker and wrangler.jsonc, never from a migration file
+(CATALOG-READ discipline, BUGS_AND_SOLUTIONS.md PROCESS-004).
+
+  ON 5 — N-21-A's BLOCKING FINDING IS CLOSED BY THIS ITEM, and it is worth saying
+  which way. N-21-A recorded that the drain composes from live rows on the cron,
+  strictly after the wrap that sets 'fulfilled', so the purge would beat the note
+  and it would arrive empty. A seller-owned snapshot written at the tap removes
+  the dependency entirely: the drain reads intake_notes, not the purged message,
+  exactly as it already reads superbills (src/fhir/push.ts:201) rather than
+  recomposing a PDF. The outbox stays payload-free, which was the property worth
+  keeping. This is a fifth way out and a better one than the four N-21-A listed.
+
+  ██ ON 2 AND 5 TOGETHER — THE REMAINING RACE IS SIXTY SECONDS WIDE, and it is the
+  one derivation this block still owes. wrangler.jsonc:57 sets the cron to
+  `* * * * *` — EVERY MINUTE. wrap_visit calls complete_engagement, so wrapping
+  sets 'fulfilled' immediately. If the snapshot is written by a tap that is a
+  SEPARATE act from the wrap — which is what ships today, wrap_visit and
+  queue_ehr_push being two RPCs — then a clinician who wraps and taps ninety
+  seconds later snapshots THE TOMBSTONE, and the note that reaches Medplum reads
+  the tombstone constant (N-21-B item 1) instead of an intake. The failure is
+  silent, it looks like a successful push, and it depends on how fast a person taps.
+  "A tap in the wrap" is ambiguous between ONE TRANSACTION and TWO ACTS ON ONE
+  SCREEN, and the two differ here. Ways out, none chosen: fold the snapshot write
+  into wrap_visit (but then it is automatic, which item 5 and N-21-A both refuse);
+  give the purge a grace window on fulfilled_at; have the purge skip an engagement
+  with no intake_notes row until the floor; or have the tap refuse rather than
+  snapshot a tombstone. OWED A RULING.
+
+  ON 1 — THE TOMBSTONE IS WRITABLE AS RULED, and the origin has precedent. Both
+  columns are NOT NULL in the live schema, which is why the tombstone exists; both
+  take the constant. messages.origin is NOT NULL too and 'system' is already a
+  live value with a live writer — post_visit_link writes 'Your visit room is ready:
+  ' || v_url as 'system' — so the app already has a render for it and no enum
+  change is owed. NOTE THE READ CONSEQUENCE: get_messages returns origin
+  (src/tools/get-messages.ts:164, :207), so a tombstoned intake arrives at an agent
+  as a 'system' message whose body is the constant. inbound has NO origin column;
+  it takes the constant alone.
+
+  ON 2 — THE CRON HANDLER ALREADY CARRIES FOUR STEPS AND ITS ORDER IS A RULING.
+  src/index.ts:81 exports one scheduled handler; src/credential/ceremony.ts runs
+  drainPendingVerifications, then sweepMonitoredVerifications, then sweepVisitRooms,
+  then sweepEhrPushes, each wrapped so one failure cannot stop the next, and its
+  header records that a second cron expression was CONSIDERED AND REJECTED twice.
+  A purge sweep is a fifth step on those same terms. WHERE IT SITS IS LOAD-BEARING
+  AND NOT ARBITRARY: it must run AFTER sweepEhrPushes, or a push queued this tick
+  can lose its source to the purge in the same tick.
+
+  ON 4 — THIS CLOSES HALF OF A RECORDED SPEC DEFECT, and the other half stays open.
+  CLAUDE.md's SPEC-CONTRACT list records: "PLEXMED S7's A3 identity chip claims to
+  render 'exactly as on Incoming', but get_my_day returns no verification flag and
+  neither does get_my_thread_peers" (CLAUDE.md:336-337). Adding sender_id_verified
+  to get_my_day closes the get_my_day half. get_my_thread_peers is untouched by
+  this ruling and the bullet stays true of it. Whoever builds item 4 amends that
+  bullet rather than deleting it.
+  NAMING: on Incoming the column is sender_id_verified off inbound.from_entity_id
+  (get_my_pending_requests, live). On the day view the same person is
+  engagements.buyer_entity_id. Same fact, different join; the name is kept for the
+  chip's sake.
+
+  ON 5 — "THE SUPERBILL PATTERN" HAS TWO HALVES AND THIS BLOCK INHERITS ONLY ONE.
+  SHAPE AND RETENTION: superbills is (id, engagement_id, issued_at, issued_by,
+  storage_path, snapshot, created_at); its snapshot is jsonb validated as an object;
+  and NOTHING ANYWHERE DELETES A SUPERBILL — src/fhir/push.ts:201 is the only code
+  that touches the table at all. So "same retention" means KEPT, which is the
+  intent: it is the professional's copy.
+  AUTH IS THE HALF THAT DOES NOT CARRY OVER, and the two are opposites:
+  issue_superbill raises `this is a network-side writer; the app never issues a
+  superbill` when auth.uid() is NOT null, while queue_ehr_push raises
+  UNAUTHENTICATED when current_entity_id() IS null. One refuses the app, the other
+  refuses the network. intake_notes is written by a tap, i.e. app-side, so it
+  follows queue_ehr_push's arm and not issue_superbill's. Recorded so the build
+  does not copy the wrong half of a pattern it was told to copy.
+  MIGRATION DISCIPLINE: intake_notes is a CREATE TABLE, so `alter table ... enable
+  row level security` ships in the same migration before commit (MIGRATION TABLE
+  RLS rule — the default ACL grants anon ALL on a new table), and any new function
+  ships the full grant block including the anon line.
+
+  ON 5 — THE LABEL IS A CONTRACT WITH THE COMPOSER, NOT A COMMENT. "patient-reported,
+  assistant-composed — never a clinical note" has to survive into the FHIR resource
+  itself. compose.ts's one existing DocumentReference is `type: { text: 'Superbill' }`
+  with the comment "TEXT ONLY, NO CODING. There is no clean LOINC for a superbill and
+  inventing one is the exact SPEC-CONTRACT failure this repo has six recorded
+  instances of." The same reasoning binds here and harder: there IS a tempting LOINC
+  for a clinical note, and using it would assert precisely the thing the label denies.
+
+  ON 7 — THIS IS AN EXPLICIT CARVE-OUT FROM THE PROMPT-CODE CONTRACT RULE, and it
+  must be recorded as one or someone will later "fix" it. CLAUDE.md's promoted rule
+  reads: "every business rule the tool advertises in its description or inputSchema
+  MUST also be enforced inside the handler." SYMPTOM_RULE and CLAIM_RULE are
+  advertised and are NOT enforceable in any handler — they govern what the
+  assistant says, and item 7 rules that they cannot and must not be enforced by
+  filtering what the person sends. THE RULE IS NOT VIOLATED, because its subject is
+  what the TOOL does with its own inputs, not what a model said before calling it;
+  but the shapes are close enough that a future sweep would flag it. A filter added
+  here to satisfy that rule would break item 7 and would make the network a reader
+  of the intake, which is the one thing N-21 forbids.
+
+  ON THE TWO BUILD NOTES CARRIED IN THE RULING — both were already recorded in
+  N-21's build notes and are now ruled as same-branch work, which is PROCESS-005's
+  rule applied before the fact rather than after it. The find_professional schema
+  description is src/capabilities/manifest.ts:108-117; record_handoff_event's guard
+  is `if p_situation is null or length(btrim(p_situation)) = 0 then raise`, its
+  columns situation and matched_card_ids are both NOT NULL, and its caller is
+  src/tools/find-professional.ts:388-397.
+
+## N-21-C — The grace window
+Amends N-21-B. RECORDED 2026-09-06. Text of the ruling below is Derrick's, verbatim.
+MIRROR OBLIGATION: copy to hearth-pos with N-21, N-21-A and N-21-B.
+NOTHING IS BUILT AGAINST THIS YET — this block closes the last derivation N-21-B
+owed, so the N-21 chain is now complete enough to build from.
+
+8. PURGE GRACE ON FULFILLED. The purge does not fire at fulfilled_at. It
+   fires at fulfilled_at + 24 hours, or cancelled, or scheduled_for + 7 days,
+   whichever comes first. The professional has a day after the wrap to decide.
+   Retention stays bounded by the floor regardless.
+
+9. THE TAP NEVER SNAPSHOTS A TOMBSTONE. queue_ehr_push, or the intake_notes
+   writer it calls, refuses when the intake message body equals the purge
+   constant, code INTAKE_ALREADY_REMOVED. A silent push of "Intake delivered
+   and removed" is a lie in the record; a refusal is not.
+
+10. CRON ORDER. The purge sweep is the fifth step and runs after
+    sweepEhrPushes. A push queued this tick must not lose its source this
+    tick.
+
+11. FHIR TYPE. The intake DocumentReference carries
+    type: { text: 'Patient-reported intake (assistant-composed)' }. No LOINC.
+    The same reasoning that refuses to invent one for the superbill binds
+    harder here.
+
+12. Item 7 is an explicit carve-out from the prompt-code contract rule.
+    SYMPTOM_RULE and CLAIM_RULE are advertised and deliberately unenforced.
+    A future sweep that adds a filter breaks N-21. Recorded so it is not
+    "fixed."
+
+13. SPEC-CONTRACT at CLAUDE.md:336-337 is amended, not deleted: get_my_day
+    gains sender_id_verified; get_my_thread_peers still lacks it.
+
+"A tap in the wrap" resolves to two acts on one screen. Folding the snapshot
+into wrap_visit would make it automatic, which is refused.
+
+BUILD NOTES (2026-09-06) — NOT part of the ruling.
+
+  ON 8 AND 9 TOGETHER — THE SIXTY-SECOND RACE IS CLOSED, AND CLOSED TWICE. N-21-B's
+  owed derivation was that the cron is `* * * * *` (wrangler.jsonc:57) while
+  wrap_visit sets 'fulfilled' immediately, so a clinician tapping ninety seconds
+  after the wrap would snapshot the tombstone silently. Item 8 moves the purge a
+  day past the wrap, which makes the ordinary case impossible rather than
+  unlikely. Item 9 is the belt: it does not rely on the window being wide enough,
+  it refuses on the fact itself. THE PAIRING IS THE POINT — a grace window alone
+  would still fail silently at hour 25, and a refusal alone would leave a
+  clinician correctly refused for a reason they had no time to avoid.
+
+  ON 9 — THE REFUSAL COMPARES AGAINST THE CONSTANT, WHICH MAKES THE CONSTANT
+  LOAD-BEARING. The tombstone constant (N-21-B item 1) is now read in two places
+  that must agree: the purge that writes it and the tap that refuses on it. It is authored ONCE, in the constants module item 3 already
+  names, and the purge and the guard both read it. Two literals here is a
+  silent-drift bug of exactly the shape guidance.ts's CRISIS_CHANNELS comment
+  records ("three verbatim copies is three places they drift, silently, because
+  each copy reads correct on its own"). The guard lives in SQL and the constant is
+  read by TypeScript, so if the guard cannot import it the SQL side states in a
+  comment which constant it is duplicating and why.
+
+  ON 9 — THE REFUSAL IS ALSO REACHABLE ON A CANCELLED ENGAGEMENT, and that arm is
+  already closed: queue_ehr_push raises `engagement % is cancelled (terminal)`
+  before anything else. So INTAKE_ALREADY_REMOVED is reachable only via the
+  fulfilled+24h arm and the scheduled_for+7d floor — a visit wrapped and tapped
+  late, or never wrapped at all and tapped after the floor. The second is the case
+  worth having a message for: nothing went wrong, the record simply expired.
+
+  ON 10 — THE ORDER IS NOW RULED, NOT DERIVED, and it was previously only a build
+  note. src/credential/ceremony.ts runs drainPendingVerifications,
+  sweepMonitoredVerifications, sweepVisitRooms, sweepEhrPushes; the purge is fifth.
+  Its header records that a second cron expression was CONSIDERED AND REJECTED
+  twice, so the purge joins the one tick rather than getting its own. Each step is
+  individually wrapped so one failure cannot stop the next — the purge inherits
+  that, and a purge that throws must not cost a stamp.
+
+  ON 11 — THE TYPE TEXT IS THE LABEL FROM N-21-B ITEM 5, MADE MACHINE-VISIBLE.
+  compose.ts's existing DocumentReference is `type: { text: 'Superbill' }` under a
+  comment refusing to invent a LOINC. This carries the same shape and the same
+  refusal, and the string itself is what a person reading the chart sees — which is
+  why "patient-reported" and "assistant-composed" are both in it. A LOINC for a
+  clinical note would assert in a coded field exactly what the text denies, and a
+  coded field is what downstream systems read.
+
+  ON 12 AND 13 — PROMOTED FROM N-21-B's BUILD NOTES, WHICH STAY AS WRITTEN. Both
+  were recorded there as observations explicitly marked "NOT part of the ruling";
+  they are now ruling text. N-21-B's build notes are NOT edited — the amendment
+  chain carries the promotion, the same way item 6 superseded N-21-A's "Canvas"
+  without rewriting that block. A reader who reaches N-21-B first sees an
+  observation; the chain tells them it became a ruling here.
+
+  ON 13 — THE AMENDMENT IS OWED TO CLAUDE.md AND IS NOT MADE HERE. CLAUDE.md is
+  PER-REPO AND NEVER COPIED BETWEEN REPOS, so its SPEC-CONTRACT bullet is edited in
+  each repo in that repo's own voice, in the branch that builds item 4 — not in
+  this doc-only commit, and not by copying this file's text into it. The bullet's
+  own header carries a count that has been wrong before (PROCESS-003); amending a
+  bullet without re-checking that count is how it went wrong the first time.
+
+  ON THE CHAIN — WHAT REMAINS OPEN AFTER THIS BLOCK, stated so the build prompt can
+  be scoped against it. The N-21 chain no longer owes a ruling. Two items sit
+  OUTSIDE it and are not blockers: the PlexLaw gate list has gained the privilege
+  question (N-21 build notes) and the attorney system-of-record push (N-21-A), and
+  neither is written into N-1, because a gate is a ruling. Canvas as a second push
+  target is its own item (N-21-B item 6). Images are deferred (N-21).
