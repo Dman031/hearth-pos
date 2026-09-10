@@ -108,6 +108,12 @@ function DecisionPanel({
   // "there was never a hold", not "the hold lapsed". If the two are ever
   // conflated upstream, this catches it HERE, where the control is removed,
   // and renders Accept anyway rather than trusting the flag.
+  //
+  // THE SAME MISREADING HAD A SECOND FORM AND IT WAS LIVE (BUG-013): a practice
+  // REACH also has a null held_until, because only a booking ever claims a slot.
+  // isTimeLetGo now takes `kind` and answers false for it, so the ask-first flow
+  // keeps its Accept. That guard is upstream, in the predicate; this one stays
+  // as the belt it always was.
   const letGoAllowed = letGo && isPracticeRequest;
   if (letGo && !isPracticeRequest) {
     console.error('[ThreadDecisionBanner] let-go on a NON-PRACTICE request — Accept kept', {
@@ -285,6 +291,7 @@ export default function ThreadDecisionBanner({ threadId }: { threadId: string })
         const isPracticeRequest = card?.kind === 'practice';
         const letGo = isTimeLetGo({
           isPracticeRequest,
+          kind: item.kind,
           pending: holds.get(item.id) ?? null,
         });
         return (

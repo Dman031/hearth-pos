@@ -129,6 +129,14 @@ export default function OpenTimesBoard({ card, onBack, openAddOnMount = false }:
     setToast(message);
   }, []);
 
+  // THE REFRESH IS INSIDE THE try, AND THAT IS THE POINT (BUG-013 cross-check).
+  // setEntityTimezone returns a Result and cannot reject; refreshEntity is an
+  // EntityContext method and THROWS (EntityContext.tsx:255-309). This handler is
+  // invoked as `void confirmZone(z)` off a Pressable, so a rejection had nowhere
+  // to land: the zone saved, the refresh failed, and the board silently kept
+  // rendering the old zone — on the one surface whose whole job is telling a
+  // clinician which zone their times are in. The catch says which half failed,
+  // because "saved but not refreshed" and "not saved" need different actions.
   const confirmZone = useCallback(
     async (zone: string) => {
       setSavingTz(true);
@@ -139,7 +147,15 @@ export default function OpenTimesBoard({ card, onBack, openAddOnMount = false }:
         return;
       }
       setPickingZone(false);
-      await refreshEntity();
+      try {
+        await refreshEntity();
+      } catch (err) {
+        console.warn('[OpenTimesBoard] refreshEntity after timezone save failed', {
+          zone,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        showToast('Your zone is saved. Reopen the board to see times in it.', 'danger');
+      }
     },
     [refreshEntity, showToast],
   );
@@ -149,24 +165,28 @@ export default function OpenTimesBoard({ card, onBack, openAddOnMount = false }:
       if (slot.state === 'past') return;
 
       if (slot.state === 'held') {
-        // The sheet NEVER names the person. That request lives in Incoming,
-        // where it is answered.
+        // The sheet NEVER names the person. Unchanged, and still right.
+        //
+        // ── N-20 REWROTE WHAT A HELD ROW IS, SO THIS ALERT WAS WRONG TWICE ───
+        // It said "It is held for them until you answer. Answer in Incoming."
+        // Both halves were written for VL-1's 24-hour DECISION window:
+        //   1. THERE IS NO ANSWER TO GIVE. The hold is a five-minute payment
+        //      bridge (claim_slot_and_knock live body :70-74), and posting the
+        //      time was already the yes — respond_to_inbound refuses both an
+        //      accept and a pass on this row.
+        //   2. INCOMING IS THE ONE PLACE IT IS NOT. N-20-AMENDED-7 item 3 takes
+        //      bridge-state bookings out of every pending-inbound read, so the
+        //      old action sent a clinician to a screen deliberately emptied of
+        //      the thing they were sent to find — the worst shape a pointer can
+        //      have, because the destination looks broken rather than correct.
+        // The navigation action goes with the sentence that justified it. Close
+        // is the only control, which is honest: there is nothing to do here.
         Alert.alert(
-          'Someone has asked for this time',
-          'It is held for them until you answer. Answer in Incoming.',
-          [
-            { text: 'Close', style: 'cancel' },
-            {
-              text: 'Go to Incoming',
-              onPress: () => {
-                // N-19: the board is a view of the PUSHED PlexMed screen, so the
-                // tabs are a child of 'Shell'. This selects the tab AND pops
-                // PlexMed — which is what the old onDismiss() did by hand back
-                // when this rendered inside the account sheet's Modal.
-                navigation.navigate('Shell', { screen: 'Incoming' });
-              },
-            },
-          ],
+          'This time is being booked',
+          'Someone is paying for it right now. It holds for a few minutes — if the payment ' +
+            'goes through the visit appears in your day, and if it does not the time comes ' +
+            'back to your board on its own. There is nothing to answer.',
+          [{ text: 'Close', style: 'cancel' }],
         );
         return;
       }

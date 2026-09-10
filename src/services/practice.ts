@@ -132,12 +132,27 @@ export function readPracticeFields(entries: FieldEntry[]): Partial<PracticeDraft
 
 // ─── THE HOLD, AND WHAT HAPPENS WHEN IT RUNS OUT (PLEXMED S5 S4b / S6 T4) ────
 //
-// A request holds a time. When the hold lapses the time goes back on the board
+// A BOOKING holds a time. When the hold lapses the time goes back on the board
 // and the request stays — the conversation outlives the hold, which is a real
 // state and not an edge case. `get_my_pending_requests` reports a lapsed hold
 // as a NULL `held_until` (0040 — "Live holds only: a lapsed hold reports null,
 // which is the same thing the claim predicate believes"), and this is the one
 // place that null is turned into a display state.
+//
+// ── THE HOLD IS FIVE MINUTES NOW, NOT A DAY (N-20). CORRECTED IN PLACE. ──────
+// This block used to open "A request holds a time", and the banner below used
+// to say a request holds it "for a day, or until an hour before the visit".
+// That described VL-1's DECISION window, and N-20 removed the decision. The
+// live claim_slot_and_knock body is unambiguous, and says so itself at its
+// lines 70-74:
+//     -- N-20 hold-bridge step 1: 5 minutes, sized for a Stripe round trip.
+//     -- VL-1's 24h window was a DECISION window and there is no decision
+//     -- left to make; the `starts_at - 60 min` arm is VL-2 and is retained.
+//     held_until = least(now() + interval '5 minutes',
+//                        s.starts_at - interval '60 minutes'),
+// So the two arms are 5 MINUTES and AN HOUR BEFORE THE VISIT. The second half
+// of the old sentence was always true and is kept; the first half is corrected
+// rather than softened.
 //
 // IT IS NEVER AN ERROR STATE. The clinician did nothing wrong and neither did
 // the person who asked. Never say "expired" about a person's request, and never
@@ -146,8 +161,22 @@ export function readPracticeFields(entries: FieldEntry[]): Partial<PracticeDraft
 /**
  * Has this request's held time gone back on the board?
  *
+ * ── THE KIND CHECK IS NEW, AND IT CLOSES A REAL DEFECT (BUG-013) ────────────
+ * `held_until` is null for a THIRD reason this predicate did not account for:
+ * a PRACTICE REACH — the ask-first knock, which never claims a slot at all.
+ * reach_entity keeps 'reach' open on a practice card by ruling ("A visit is
+ * booked, never ordered. 'reach' stays open — asking a clinician a question
+ * before booking is the whole point of Ask-first, and it claims nothing",
+ * reach-entity.ts:393-395), and only claim_slot_and_knock takes a hold — which
+ * always mints kind='booking' (live body :59). So every practice reach reported
+ * a null held_until, satisfied `isPracticeRequest`, and rendered "That time was
+ * let go" about a request that never asked for a time — AND LOST ITS ACCEPT
+ * CONTROL, because T4 removes Accept on a let-go row.
+ *
+ * ONLY A BOOKING CAN HAVE LET A TIME GO, so kind is the check that was missing.
+ *
  * THE PRACTICE GATE IS A CHECK, NOT A COMMENT, AND IT IS THE FIRST LINE.
- * `held_until` is null for TWO different reasons — a practice hold that lapsed,
+ * `held_until` is null for TWO further reasons — a practice hold that lapsed,
  * and an ordinary booking or order that never had a hold at all. Deriving
  * let-go from the null ALONE would make every non-practice pending row read as
  * let-go, and T4 REMOVES Accept on a let-go row, so an ordinary booking would
@@ -160,10 +189,13 @@ export function readPracticeFields(entries: FieldEntry[]): Partial<PracticeDraft
 export function isTimeLetGo(input: {
   /** The request's card is a practice card. FALSE can never yield let-go. */
   isPracticeRequest: boolean;
+  /** The knock's kind. Only 'booking' ever holds a time — see the note above. */
+  kind: InboundKind;
   /** The get_my_pending_requests row, or null when the read failed/not loaded. */
   pending: { held_until: string | null } | null;
 }): boolean {
   if (!input.isPracticeRequest) return false;
+  if (input.kind !== 'booking') return false;
   // A MISSING READ IS NOT A LAPSED HOLD. Null pending means we do not know —
   // and "we do not know" must not remove a control, which is the same reason
   // the chips are omitted rather than guessed when their read fails.
@@ -174,9 +206,28 @@ export function isTimeLetGo(input: {
 /** T4's banner. Shared so the two accept surfaces cannot drift apart. */
 export const LET_GO_TITLE = 'That time was let go';
 export const LET_GO_BODY =
-  'A request holds a time for a day, or until an hour before the visit — whichever comes ' +
-  'first. This one passed that point, so the time went back on your board. You can still ' +
-  'talk here; to book, they need to ask for a time again.';
+  'Booking holds a time for five minutes while the payment goes through, and never past an ' +
+  'hour before the visit. This one passed that point, so the time went back on your board. ' +
+  'You can still talk here; to book, they need to ask for a time again.';
+
+// ── WHAT THIS STATE IS NOW, STATED SO IT IS NOT RE-DERIVED FROM THE CODE ────
+// With the kind check above and N-20-AMENDED-7 item 3's filter both in place,
+// NOTHING THE APP RENDERS CAN REACH IT: the only knock that holds a time is a
+// practice booking, and a PENDING practice booking is removed from every
+// pending-inbound read. The state is unreachable by construction, not by
+// accident, and both halves of that construction are deliberate.
+//
+// THE MACHINERY AND THE COPY STAY — the same reasoning as the N-19 retirement
+// block further down this file. This copy was ratified, the reason each clause
+// exists is the expensive part, and the banner becomes reachable again the
+// moment anything gives a non-booking knock a hold or puts a pending booking
+// back on a screen. What is NOT acceptable is a wired string that is false,
+// which is why the sentence above was corrected rather than left to rot behind
+// an unreachable branch.
+//
+// DO NOT DELETE IT AS DEAD CODE, and do not "simplify" the kind check away: it
+// is what stops the ask-first flow — the clinical tile's whole purpose — from
+// rendering a let-go banner it has no business showing.
 
 /**
  * The race: the hold was live when the screen painted and gone when the finger

@@ -68,14 +68,16 @@ export default function ClinicalRequestTile({
   const [toast, setToast] = useState<string | null>(null);
 
   const conversation = pending?.conversation ?? 'none';
-  // The hold has lapsed once held_until is null. The conversation outlives it:
-  // that is a real state, not an edge case.
+  // Null means NO LIVE HOLD — which is a lapsed booking hold, or a reach that
+  // never took one (BUG-013). Both renders below are gated on the value being
+  // present, so neither states a hold that does not exist. The conversation
+  // outlives a lapsed hold: that is a real state, not an edge case.
   const heldUntil = pending?.held_until ?? null;
   // ONE DERIVATION, SHARED WITH THE DECISION BANNER. This tile only ever renders
   // practice requests (InboundTile:102 routes here on card.kind === 'practice'),
   // so the gate is trivially true here — it is passed explicitly anyway so the
   // two surfaces call the SAME predicate and cannot drift.
-  const letGo = isTimeLetGo({ isPracticeRequest: true, pending });
+  const letGo = isTimeLetGo({ isPracticeRequest: true, kind: inbound.kind, pending });
 
   const acceptLabel =
     priceCents === null ? 'Accept' : `Accept — ${formatCents(priceCents, currency)}`;

@@ -763,3 +763,53 @@ Since `cancel_engagement` now **dispatches** to `cancel_slot_booking` whenever a
 - **Every writer of a `'suggest'` imprint the webhook consumes**: `cancel_engagement` (carries the key), `cancel_slot_booking` (does not — this entry). `slot-booking.ts:407` writes `slot_booking_refund_due` and `stripe-webhook.ts:165,183` writes/reads `duplicate_charge_refund_due`; both are self-consistent pairs and neither feeds the `prior_cancel_request` lookup.
 - **hearth-pos side**: `EngagementScreen.tsx:305-307` passes only `p_engagement_id` and reads `refund_due` / `transaction_id` from the return; `cancel_slot_booking`'s return is a superset of `cancel_engagement`'s, so nothing in the app breaks and nothing in the app can fix this. **Confirmed out of scope.**
 - **Out-of-scope-but-flagged:** `cancel_slot_booking:117`'s overstated "issued by the Worker" comment, which is what made the wrong diagnosis available in the first place.
+
+## BUG-013: every ask-first knock on a practice card rendered "That time was let go" — and lost its Accept button
+
+**Category:** template-system / clinical-surface · **Severity:** high (removes the only control on the flow the clinical tile exists for) · **Status:** fixed
+**Introduced-by:** Claude-build, PLEXMED S4b/S6 T4 as implemented (`5f2ff30`, 2026-08-30). The predicate was written against two causes of a null `held_until` and there are three; the third was never enumerated. **Latent until 2026-09-10**, when N-20-AMENDED-7 item 3's filter (`f15645d`, this branch) removed pending practice bookings from Incoming and left the mis-handled rows as the *only* practice rows on the tile — turning an edge case into the norm without touching the defect itself.
+**Found:** 2026-09-10, deriving the correct hold-window copy for item 11 from the live `claim_slot_and_knock` body rather than from the sentence being replaced.
+
+### Symptoms
+
+A patient's assistant asks a clinician a question before booking — the Ask-first flow. The request arrives in Incoming on a practice card, and the tile renders the T4 banner: **"That time was let go — A request holds a time for a day… This one passed that point, so the time went back on your board."** No time was ever asked for and none was let go. **The Accept control is not rendered** (`ClinicalRequestTile.tsx:242`, `ThreadDecisionBanner.tsx:155` both gate on `!letGo`), so the clinician cannot accept the question at all. The only remaining actions are Decline and the pre-decision composer.
+
+### Root Cause
+
+`isTimeLetGo` derived "the hold lapsed" from `pending.held_until === null`, guarded only by `isPracticeRequest`. Its own header enumerated **two** reasons that column is null — a lapsed practice hold, and an ordinary booking or order that never had one — and the guard was written to separate exactly those two.
+
+**There is a third, and it is inside the guard rather than outside it: a practice REACH.**
+
+- Only `claim_slot_and_knock` takes a hold, and it always mints `kind = 'booking'` (live body `:59`) on a practice card (`:31` refuses any other kind).
+- `reach_entity` deliberately keeps `'reach'` open on a practice card — *"A visit is booked, never ordered. 'reach' stays open — asking a clinician a question before booking is the whole point of Ask-first, and it claims nothing"* (`hearth-network/src/tools/reach-entity.ts:393-395`).
+- `get_my_pending_requests` joins `card_slots … on s.held_inbound_id = i.id`, so a reach — which no slot references — reports `held_until` null.
+
+So a practice reach satisfies `isPracticeRequest` **and** `held_until === null`, and every one of them read as let-go. The guard separated practice from non-practice when the real axis is **booking from not-booking**: *only a booking can have let a time go.*
+
+**Why it survived review:** the predicate's header is unusually careful and reasons explicitly about the null's causes — which makes it read as exhaustive. An enumeration that names two cases and defends the boundary between them does not invite the question "is there a third?"
+
+### Solution
+
+`isTimeLetGo` takes `kind` and returns false for anything that is not a booking (`practice.ts`, the predicate and its header). Both call sites pass it: `ClinicalRequestTile.tsx:78` (`inbound.kind`) and `ThreadDecisionBanner.tsx:288` (`item.kind`).
+
+With that check and item 3's filter both live, **the let-go state is unreachable by construction**: the only knock that holds a time is a practice booking, and a pending practice booking is no longer in any pending-inbound read. The machinery and copy are kept and marked unreachable — same reasoning as this file's N-19 retirement block: ratified copy is expensive to re-derive, and the banner becomes reachable again the moment anything gives a non-booking knock a hold. **What was not acceptable was a wired string that is false**, which is why `LET_GO_BODY`'s 24-hour sentence was corrected in the same commit rather than left to rot behind an unreachable branch.
+
+### Cross-check Performed
+
+- **Every consumer of `isTimeLetGo`**: two, both updated. No third call site (`grep -rn "isTimeLetGo" src/`).
+- **`ThreadDecisionBanner`'s existing non-practice belt** (`:110-121`): kept. It guards a different axis (practice vs not) and still catches an upstream conflation at the point the control is removed. The kind check is upstream in the predicate; the belt stays a belt.
+- **Every other derivation from `held_until`**: `get_my_pending_requests` returns it for the tile's hold deadline render only; no other predicate in `src/` branches on it (`grep -rn "held_until" src/`).
+- **`ClinicalRequestTile`'s other practice-only assumption** — `isTimeLetGo({ isPracticeRequest: true, … })` is hardcoded true because `InboundTile.tsx:102` only routes practice rows here. Still true, unchanged.
+- **`OpenTimesBoard.confirmZone`** — the missing catch flagged in BUG-011's sweep, fixed in this same commit **by ruling** (Derrick, 2026-09-10) because the file was already open for the hold-window copy. `setEntityTimezone` returns a Result and cannot reject; `refreshEntity` throws (`EntityContext.tsx:255-309`); the handler is invoked as `void confirmZone(z)`. The zone saved and the board silently kept rendering the old one. The catch distinguishes the two halves, because "saved but not refreshed" and "not saved" need different actions from the clinician.
+- **`PlexChatScreen.openSuperbill`** (`:281`, `await Linking.openURL` behind a `canOpenURL` guard) — the other hit from that sweep. **Still out-of-scope-but-flagged**: different file, different item, not opened by this commit.
+- **Out-of-scope-but-flagged:** `PlexChatScreen.openSuperbill`; `InboundTile`'s raw `err.message` rendering (BUG-011, ruled to stay flagged).
+
+### Prevention
+
+**When a predicate derives meaning from a NULL, the enumeration of why that null occurs is the whole proof — and it must be re-checked whenever a new writer of the column appears, not only when the predicate changes.** This one was correct on the day it shipped and went wrong because a *ruling elsewhere* (reach stays open on practice cards) added a third producer of the null. Nothing recompiles an enumeration in a comment.
+
+The test: for every `x === null` that means something, list the writers of `x` **from the live catalog**, not from the comment above the predicate. Here that is one join in `get_my_pending_requests` and one writer in `claim_slot_and_knock` — a two-minute read that names the third case immediately.
+
+Sweep: `grep -rn "=== null\|!== null" src/services/ src/components/` — every hit that turns a null into a *display state* or removes a control needs its producer list checked against the catalog.
+
+**And the sharper half, which is what actually found this:** the defect surfaced only because item 11 required deriving copy from `claim_slot_and_knock`'s live body instead of editing the sentence it was replacing. **Reading the source of a fact you are about to describe is how you discover the fact changed.** The SPEC-CONTRACT rule already says prose must not become an assumed identifier; this is its display-layer twin — prose must not become an assumed *behaviour*.
