@@ -8,11 +8,15 @@ import useThreadPendingInbound from '../hooks/useThreadPendingInbound';
 import usePendingRequests from '../hooks/usePendingRequests';
 import useThreadEngagements from '../hooks/useThreadEngagements';
 import {
+  ALREADY_CONFIRMED_MESSAGE,
+  isSlotAlreadyConfirmed,
+  isSlotBookingNotDeclinable,
   isSlotNoLongerHeld,
   isTimeLetGo,
   LET_GO_BODY,
   LET_GO_RACE,
   LET_GO_TITLE,
+  NOT_DECLINABLE_MESSAGE,
 } from '../services/practice';
 import { formatAcceptLabel, formatCents, ENGAGEMENT_KIND_LABEL, KIND_LABEL } from '../utils/format';
 import { formatForDisplay } from '../datetime';
@@ -206,14 +210,27 @@ export default function ThreadDecisionBanner({ threadId }: { threadId: string })
         // TERMINAL — the time is back on the board and no number of taps
         // returns it. The race is named; everything else keeps the retry
         // advice, which is true for everything else.
+        //
+        // TWO MORE TERMINALS, ONE PER DECISION (N-20-AMENDED-7 item 2). Both
+        // arms of this banner could reach the retry default on a refusal the
+        // server makes permanently: accept on SLOT_ALREADY_CONFIRMED, decline
+        // on SLOT_BOOKING_NOT_DECLINABLE. Each is gated on its OWN decision,
+        // not matched loosely, because the two codes come off opposite branches
+        // of respond_to_inbound and a cross-match would report the wrong one.
         const raced = decision === 'accepted' && isSlotNoLongerHeld(rpcErr);
+        const confirmed = decision === 'accepted' && isSlotAlreadyConfirmed(rpcErr);
+        const notDeclinable = decision === 'passed' && isSlotBookingNotDeclinable(rpcErr);
         setErrorById((prev) => ({
           ...prev,
-          [item.id]: raced
-            ? LET_GO_RACE
-            : decision === 'accepted'
-              ? 'Could not accept. Try again.'
-              : 'Could not decline. Try again.',
+          [item.id]: confirmed
+            ? ALREADY_CONFIRMED_MESSAGE
+            : notDeclinable
+              ? NOT_DECLINABLE_MESSAGE
+              : raced
+                ? LET_GO_RACE
+                : decision === 'accepted'
+                  ? 'Could not accept. Try again.'
+                  : 'Could not decline. Try again.',
         }));
         // The hold is gone server-side; re-read THE HOLDS so the panel drops
         // Accept rather than offering the tap that just failed. `refresh` above

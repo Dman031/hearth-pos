@@ -204,6 +204,72 @@ export function isSlotNoLongerHeld(err: unknown): boolean {
   return /SLOT_NO_LONGER_HELD/.test(message);
 }
 
+// ─── THE TWO PERMANENT REFUSALS (N-20-AMENDED-7 items 2 and 3) ──────────────
+//
+// THESE ARE ADDITIONS. isSlotNoLongerHeld above is UNTOUCHED and still live —
+// it fires on a non-practice slot accept, where the hold really can lapse.
+//
+// WHAT MAKES THEM DIFFERENT FROM EVERY OTHER FAILURE ON THESE SURFACES: they
+// are PERMANENT. "Try again" is the correct advice for a dropped connection and
+// the wrong advice for a decision the server will refuse every time, forever.
+// Telling a clinician to retry something terminal is the same defect class the
+// let-go race copy was written for — a fallback string describing the opposite
+// of what happened — and it is why these two get their own arms rather than
+// falling to the default.
+//
+// REACHABILITY, and it is narrow ON PURPOSE. N-20-AMENDED-7 item 3 removes
+// these rows from every pending-inbound read, so a clinician reaches these
+// refusals only in the race window: the row was on screen when
+// confirm_slot_booking landed and the finger came down before the realtime
+// stream cleared it. The filter is the fix; this is the belt.
+//
+// NOTE ALSO WHAT IS NOW UNREACHABLE ON A PRACTICE BOOKING. respond_to_inbound's
+// practice-booking guard sits at live-body line 70, IN FRONT OF the
+// SLOT_NO_LONGER_HELD raise at line 132 inside the same accept branch. So on a
+// practice booking the lapsed-hold race can no longer be reached at all. Its
+// arm stays because the code still fires elsewhere — deleting it would be
+// removing a live answer to make a dead branch tidy.
+//
+// MATCHED BY MESSAGE, like every refusal in this file: the raises carry an
+// explicit `(code: X)` suffix and a status alone is not an assertion.
+
+/** Accept was refused: the patient already booked and paid this time. */
+export function isSlotAlreadyConfirmed(err: unknown): boolean {
+  const message =
+    typeof (err as { message?: unknown })?.message === 'string'
+      ? String((err as { message: string }).message)
+      : '';
+  return /SLOT_ALREADY_CONFIRMED/.test(message);
+}
+
+/** Pass/Decline was refused: posting the time was the yes. */
+export function isSlotBookingNotDeclinable(err: unknown): boolean {
+  const message =
+    typeof (err as { message?: unknown })?.message === 'string'
+      ? String((err as { message: string }).message)
+      : '';
+  return /SLOT_BOOKING_NOT_DECLINABLE/.test(message);
+}
+
+// THE TWO STRINGS SHARE THEIR FIRST CLAUSE DELIBERATELY. It is the same fact
+// underneath both refusals — the time is booked and paid — and a clinician who
+// meets one and then the other should recognise it, not read two unrelated
+// explanations of one state. Each then says the thing its own control needs:
+// where the visit went, or how to undo it.
+//
+// NEITHER SAYS "TRY AGAIN" AND NEITHER IMPLIES FAULT. Nothing went wrong. The
+// patient booked a time the clinician had posted, which is the system working.
+
+/** Accept, refused. */
+export const ALREADY_CONFIRMED_MESSAGE =
+  'That time is already booked and paid — posting it was the yes, so there is nothing to ' +
+  'accept. The visit is in your day.';
+
+/** Decline / Pass, refused. */
+export const NOT_DECLINABLE_MESSAGE =
+  'That time is already booked and paid — posting it was the yes, so it cannot be declined. ' +
+  'To undo it, cancel the visit; the patient is refunded in full.';
+
 // ─── THE BRIDGE STATE (N-20-AMENDED-7 item 3) ───────────────────────────────
 //
 // "A BRIDGE-STATE BOOKING IS INVISIBLE TO THE CLINICIAN. hearth-pos filters

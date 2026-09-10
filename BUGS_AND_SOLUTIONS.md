@@ -673,3 +673,93 @@ Rulings P-5 and P-6 (DEUS_DAY_BY_DAY.md, 2026-08-31), built in one commit:
 The test, one line: **does this sentence, literal, or branch assume a future that has been ruled out?** If the future is genuinely open, the tense is honest. If a ruling has closed it, the tense is a promise nobody made — and the fix is never to soften the word, but to say the permanent thing instead.
 
 Sweep: `grep -rniE "\byet\b|\bsoon\b|not available|coming|until the" src/` — every hit gets read against the roadmap, not against intuition.
+
+## BUG-011: two permanent refusals on a practice booking — one told the clinician to try again, the other told them nothing at all
+
+**Category:** ai-tool-calling / refusal-copy · **Severity:** high (a clinician acting on a live booking gets no true account of what happened) · **Status:** fixed
+**Introduced-by:** upstream ruling, not a slip. N-20-AMENDED-7 items 2 and 3 (recorded 2026-09-05) and the 0050/0051 migrations added two refusals to `respond_to_inbound` that did not exist when these surfaces were written. Every arm here was correct on the day it shipped; the server grew two terminals underneath it. The Decline half is a genuine app defect and is older — see below.
+**Found:** 2026-09-10, the N-20/N-21 app catch-up investigation, reading the live `respond_to_inbound` body via `admin_functiondef`.
+
+### Symptoms
+
+A clinician taps **Accept** on a practice booking that has just confirmed and paid, and reads: *"Couldn't accept just now. Nothing was changed — try again."* Every retry fails identically. Nothing is wrong with the connection, the row, or the clinician; the server refuses this decision permanently and always will.
+
+A clinician taps **Decline** on the same row and **nothing happens at all.** No toast, no error, no state change — a control that visibly does nothing. This is the worse of the two: the retry advice is at least an account, however false; silence gives the clinician nothing to be wrong about, and there is nothing on screen to correct it.
+
+### Root Cause
+
+**Two different causes wearing one symptom, which is why the Decline half survived a fix to the Accept half.**
+
+**The Accept half is a stale default.** `respond_to_inbound`'s live body raises `SLOT_ALREADY_CONFIRMED` at line 70 when `card.kind = 'practice' and inbound.kind = 'booking'`. `ClinicalRequestTile.tsx` matched only `SLOT_NO_LONGER_HELD` and let everything else fall to a retry string. That default is *correct* for a dropped connection and *false* for a terminal refusal — the same shape the let-go race arm was written to close, arriving one ruling later. The retry advice is not merely unhelpful: it asserts that trying again might work, which is a claim about the world that the server has already settled.
+
+**The Decline half is a missing catch, and it predates the ruling.** `ClinicalRequestTile.tsx:218` was `onPress={() => void onDecline(inbound)}` — the handler called straight off the Pressable with no `try`/`catch` anywhere on the path, while the sibling `accept` on the same component (:99-117) had one. `IncomingScreen.handleDecline` (:53-57) throws on `rpcErr`. So the rejection had nowhere to land and became an unhandled promise rejection. **`SLOT_BOOKING_NOT_DECLINABLE` did not break this path; it only made an already-silent path reachable with something worth saying.** Any decline failure — a dropped connection included — has always been silent here.
+
+**Why the asymmetry survived review:** the two controls sit eight lines apart and read as a pair, so `accept`'s visible `try`/`catch` makes the file *look* like it handles decline too. The absence is invisible at exactly the altitude a reviewer reads at.
+
+### Solution
+
+Two commits on `feat/n20-n21-app`:
+
+- **`f15645d`** removes the row from every pending-inbound read (N-20-AMENDED-7 item 3) — the actual fix. A bridge-state practice booking is not a decision anyone can make, so it is not offered.
+- **this commit** is the belt for the race window, where the row was on screen when `confirm_slot_booking` landed and the finger came down before the realtime stream cleared it.
+
+- `src/services/practice.ts` — `isSlotAlreadyConfirmed` / `isSlotBookingNotDeclinable` (matched by message, like every refusal in this file), plus `ALREADY_CONFIRMED_MESSAGE` and `NOT_DECLINABLE_MESSAGE`. The two strings share their first clause deliberately: one fact underlies both refusals, and a clinician meeting the second should recognise it rather than read an unrelated explanation of the same state.
+- `src/components/ClinicalRequestTile.tsx` — the accept arm, and a wrapped `decline` callback that replaces the bare `void onDecline(inbound)`. Its generic arm ("Couldn't decline just now. Nothing was changed — try again.") is new behaviour for *every* decline failure on this tile, not only the two ruled ones.
+- `src/components/ThreadDecisionBanner.tsx` — both arms, **each gated on its own `decision`**. The two codes come off opposite branches of `respond_to_inbound`; a loose match would report the wrong refusal.
+
+**`isSlotNoLongerHeld` and `LET_GO_RACE` are untouched.** The arms are additions. Note, though, that `SLOT_NO_LONGER_HELD` is now **unreachable on a practice booking** — the practice guard at live line 70 precedes the raise at line 132 inside the same accept branch. The arm stays because the code is still live for non-practice slot accepts; deleting a live answer to tidy a dead branch would be the wrong trade.
+
+### Cross-check Performed
+
+- **`src/components/InboundTile.tsx:83,96`** — the non-clinical tile's own `accept`/`decline` catches. Both codes are **unreachable** here: the server guard requires `card.kind = 'practice'`, and `InboundTile.tsx:102` routes every practice row to `ClinicalRequestTile` before these handlers are used. **Out of scope, deliberately left** — adding arms for codes that cannot fire would be dead copy on a hot path. It does carry a separate, pre-existing weakness worth naming: both catches surface `err.message` raw, so any RPC refusal reaching them shows the server's internal string, prefix and `(code: …)` suffix included. **Flagged, not fixed** — no ruled copy exists for those paths and inventing some is out of this item's scope.
+- **`src/screens/IncomingScreen.tsx:35-57`** — both handlers rethrow and are unchanged. Rethrowing is correct: the tile owns the copy, and moving the decision up here would put it further from the surface that renders it.
+- **Every other `respond_to_inbound` call site**: three total (`IncomingScreen` ×2, `ThreadDecisionBanner` ×1). All three accounted for above.
+- **Every other refusal `ClinicalRequestTile` can meet**: `postInquiryMessage`'s (`ask`, :79-97) already has named arms for `awaiting_their_reply` and `already_decided`. Unchanged and correct.
+- **Other surfaces with a `void handler()` straight off a Pressable, i.e. the same missing-catch shape**: swept with `grep -rn "onPress={() => void " src/` — 21 hits, every one read. **This sweep's first result was written up as "no second instance" and that was wrong; it is corrected here rather than left standing.** The distinction that decides each hit is what the handler *awaits*: this app's service layer returns `{ ok, reason }` Results and never rejects (`visits.ts`, `slots.ts`, `inquiry.ts`), so a `void` call into it is safe; the **Contexts** (`CardContext`, `EntityContext`, `VendorContext`) and `IncomingScreen`'s two decision handlers are what throw. Sorted by that predicate:
+  - **Safe, Result-only:** `TodayTile.sendToRecord/start/openRoom/runSuperbill`, `AddTimesSheet.post`, `MoneyPanel.loadMore`, `ClinicalRequestTile.ask`.
+  - **Calls a throwing Context and already catches:** `CardEditorSheet.handleSave` (:313-407), `CardEditorSheet.onCommerceToggle` (:236-267), `MoneyPanel.onSetUpPayments` (:94-112).
+  - **ONE SECOND INSTANCE, REAL:** `OpenTimesBoard.confirmZone` (:132-144) toasts on the `setEntityTimezone` Result and then `await refreshEntity()` — an EntityContext method that throws (`EntityContext.tsx:255-309`) — with no `try`/`catch` and invoked as `void confirmZone(z)` (:231, :243). A failed refresh after a saved timezone is silent. Lower stakes than the Decline path and the same shape.
+  - **Second-order:** `PlexChatScreen.openSuperbill` (:281) ends on `await Linking.openURL(url)`, which can reject even behind its `canOpenURL` guard.
+- **Out-of-scope-but-flagged:** `OpenTimesBoard.confirmZone` and `PlexChatScreen.openSuperbill` — both are missing catches, neither is a refusal-copy defect, and fixing them here would be scope creep on an item that is about two error arms. `OpenTimesBoard` is already opened by N-20-AMENDED-7's hold-window copy work (item 11 of the same build); this is where that catch belongs. `InboundTile`'s raw `err.message` rendering (above). BUG-012 below.
+
+### Prevention
+
+**A refusal arm is owed wherever a server grows a terminal, and the retry default is where the debt accumulates.** The pattern is not "we forgot a case" — it is that a *default* which was true of every refusal a surface could meet stays syntactically valid, and silently false, when a new refusal arrives. Nothing recompiles a fallback string.
+
+Sweep, to be run whenever a migration adds a `raise` carrying a `(code: X)` suffix: `grep -rn "(code:" ../hearth-network/migrations/*.sql | grep -oE "code: [A-Z_]+" | sort -u` — every code goes to a `grep -rn "<CODE>" src/`. A code with no app hit is either unreachable from the app (say why, in the entry) or an unrendered refusal.
+
+**And the narrower one, which is what actually bit here: an async handler invoked with `void` off a control has no catch unless someone wrote one.** `void` silences the floating-promise warning that would otherwise have pointed at this exact line.
+
+Sweep: `grep -rn "onPress={() => void " src/`. **A hit is only safe if you can name what the handler awaits.** In this app that is a two-way split — the service layer returns `{ ok, reason }` and cannot reject, the Contexts throw — so the second grep is the one that matters: `grep -rn "throw " src/context/`. A handler that awaits a Context method and has no `try`/`catch` is an instance, whatever its stakes.
+
+**And a note on this entry's own cross-check, because it is the more useful lesson:** the first version of that bullet said "no second instance" on the strength of a heuristic that searched 40 lines from the first grep hit for the substring `try {`. It resolved three handler definitions to the wrong line entirely and reported "NO try/catch" for handlers that plainly have one. **A check that can pass — or fail — without the thing being true is worse than no check**, and it nearly shipped a false all-clear into the ledger, in the cross-check section whose whole purpose is to catch what the fix missed. Read the handler; do not pattern-match near it.
+
+## BUG-012: [NETWORK · OPEN] cancel_slot_booking's audit imprint carries no `event` key, so every slot cancellation records `prior_cancel_request: false`
+
+**Category:** stripe / audit-provenance · **Severity:** medium (no user-visible effect; corrupts the provenance flag an operator triages refunds with) · **Status:** **OPEN — hearth-network item, out of scope for hearth-pos**
+**Introduced-by:** hearth-network `0051` as built (N-20-AMENDED-7 section 4). `cancel_engagement`'s pre-existing refund-due imprint carries `'event', 'cancel_requested_refund_due'`; the new `cancel_slot_booking` imprint was written with the richer slot fields and without that key.
+**Found:** 2026-09-10, the N-20/N-21 app catch-up investigation, reading both live bodies via `admin_functiondef` while checking whether the app's "refunds are processed manually" copy is still true. **Recorded here by ruling (Derrick, 2026-09-10) so it is not lost — it is not fixed by any hearth-pos commit and must not be.**
+
+### Symptoms
+
+None visible. A slot cancellation refunds correctly and the app renders correctly. The damage is in the ledger: when `charge.refunded` later arrives, the webhook records `prior_cancel_request: false` for a refund that *was* preceded by an in-system cancel request — the exact discrimination that flag exists to make.
+
+### Root Cause
+
+`cancel_slot_booking`'s imprint (live body :120-131) builds `engagement_id, from_status, to_status, path, refund_due, slot_id, slot_disposition, transaction_id, stripe_payment_intent_id` — and **no `event`**. `cancel_engagement`'s own refund-due imprint (live :137-148) carries `'event', 'cancel_requested_refund_due'`.
+
+The consumer matches on that key exactly: `hearth-network/src/routes/stripe-webhook.ts:378-396` looks up `action = 'suggest'` **and** `detail->>event = 'cancel_requested_refund_due'` for the engagement. A slot cancellation writes `action = 'suggest'` (:122) but no `event`, so the lookup misses.
+
+Since `cancel_engagement` now **dispatches** to `cancel_slot_booking` whenever a bound `card_slots` row exists (live :90-93), *every* slot-booking cancellation — app-originated included — takes the path that omits the key.
+
+**Note what is NOT wrong, because it was checked and could easily have been mis-diagnosed:** the SQL comment at `cancel_slot_booking:117` says the refund "is issued by the Worker". No Worker code issues a refund off this imprint — `stripe-webhook.ts:378-396` only *reads* it as a provenance flag on the `refund_finalized` imprint. Refunds are issued by hand in the Stripe dashboard on both paths, so the app's "Refunds are processed manually" copy stays true. The comment overstates; the flag is the real defect.
+
+### Solution
+
+**Not applied.** Owed to hearth-network: add `'event', 'cancel_requested_refund_due'` to `cancel_slot_booking`'s imprint so the dispatch path is indistinguishable from the direct path to the consumer — the same reasoning that made the dispatch return `cancel_slot_booking`'s result unchanged ("no client needs to know the split"). Same-signature `create or replace`, so no grant block is owed. Whether historical rows are backfilled is a separate call.
+
+### Cross-check Performed
+
+- **Every writer of a `'suggest'` imprint the webhook consumes**: `cancel_engagement` (carries the key), `cancel_slot_booking` (does not — this entry). `slot-booking.ts:407` writes `slot_booking_refund_due` and `stripe-webhook.ts:165,183` writes/reads `duplicate_charge_refund_due`; both are self-consistent pairs and neither feeds the `prior_cancel_request` lookup.
+- **hearth-pos side**: `EngagementScreen.tsx:305-307` passes only `p_engagement_id` and reads `refund_due` / `transaction_id` from the return; `cancel_slot_booking`'s return is a superset of `cancel_engagement`'s, so nothing in the app breaks and nothing in the app can fix this. **Confirmed out of scope.**
+- **Out-of-scope-but-flagged:** `cancel_slot_booking:117`'s overstated "issued by the Worker" comment, which is what made the wrong diagnosis available in the first place.

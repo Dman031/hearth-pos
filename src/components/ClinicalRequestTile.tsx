@@ -7,11 +7,15 @@ import HonestyChips from './HonestyChips';
 import Toast from './Toast';
 import { postInquiryMessage, type PendingRequest } from '../services/inquiry';
 import {
+  ALREADY_CONFIRMED_MESSAGE,
+  isSlotAlreadyConfirmed,
+  isSlotBookingNotDeclinable,
   isSlotNoLongerHeld,
   isTimeLetGo,
   LET_GO_BODY,
   LET_GO_RACE,
   LET_GO_TITLE,
+  NOT_DECLINABLE_MESSAGE,
 } from '../services/practice';
 import type { Inbound } from '../types/inbound';
 
@@ -96,6 +100,31 @@ export default function ClinicalRequestTile({
     onAsked();
   }, [busy, inbound.id, body, onAsked]);
 
+  /**
+   * Decline, WRAPPED — it was `void onDecline(inbound)` straight off the
+   * Pressable, with no catch anywhere on this path. IncomingScreen's handler
+   * throws on an RPC error, so SLOT_BOOKING_NOT_DECLINABLE became an unhandled
+   * rejection and the clinician saw NOTHING happen: no toast, no state change,
+   * a control that silently did nothing. Silence is the worst of the three
+   * possible answers, worse even than the retry advice on the accept side —
+   * there is nothing on screen to correct it.
+   */
+  const decline = useCallback(async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await onDecline(inbound);
+    } catch (err) {
+      setToast(
+        isSlotBookingNotDeclinable(err)
+          ? NOT_DECLINABLE_MESSAGE
+          : 'Couldn’t decline just now. Nothing was changed — try again.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, inbound, onDecline]);
+
   const accept = useCallback(async () => {
     setBusy(true);
     try {
@@ -106,10 +135,21 @@ export default function ClinicalRequestTile({
       // time had gone to someone else. That is a fallback string describing the
       // opposite of what happened, in the copy the rule was written about.
       // Matched by message now; anything else says what it is.
+      //
+      // SLOT_ALREADY_CONFIRMED IS PERMANENT AND GETS ITS OWN ARM (N-20-AMENDED-7
+      // item 2). It reached the retry default before this, which told a
+      // clinician to try again at something the server refuses every time.
+      // Reachable only in the race window — item 3 takes the row off the
+      // screen — which is exactly when a clinician is owed the real reason.
+      // The lapsed-hold arm below it is now UNREACHABLE on a practice booking
+      // (the guard at respond_to_inbound's live line 70 precedes the raise at
+      // 132) and stays because the code is still live elsewhere.
       setToast(
-        isSlotNoLongerHeld(err)
-          ? LET_GO_RACE
-          : 'Couldn’t accept just now. Nothing was changed — try again.',
+        isSlotAlreadyConfirmed(err)
+          ? ALREADY_CONFIRMED_MESSAGE
+          : isSlotNoLongerHeld(err)
+            ? LET_GO_RACE
+            : 'Couldn’t accept just now. Nothing was changed — try again.',
       );
     } finally {
       setBusy(false);
@@ -215,7 +255,7 @@ export default function ClinicalRequestTile({
           ) : null}
 
           <View style={styles.actionRow}>
-            <Pressable onPress={() => void onDecline(inbound)} disabled={busy} hitSlop={8}>
+            <Pressable onPress={() => void decline()} disabled={busy} hitSlop={8}>
               <Text style={styles.textAction}>Decline</Text>
             </Pressable>
             {/* ONE QUESTION AT A TIME. Disabled while it is their turn — the
