@@ -45,6 +45,22 @@ export interface DayVisit {
   currency: string | null;
   room_url: string | null;
   first_visit_on_network: boolean;
+  /**
+   * N-21-B item 4 / 0056. THE ONE WIDENING the day view was ruled to get —
+   * "the intake is the thread's first message; the app reads the thread. The
+   * only widening is sender_id_verified, for the identity chip. One column."
+   *
+   * SAME FACT AS ON INCOMING, DIFFERENT JOIN. get_my_pending_requests sources it
+   * as coalesce(e.id_verified, false) off inbound.from_entity_id; here the
+   * caller is the seller, so it is coalesce(b.id_verified, false) off
+   * engagements.buyer_entity_id. The NAME is kept across both for the chip's
+   * sake (N-21-B build notes).
+   *
+   * IT IS A NETWORK FACT AND NOTHING MORE (the S6-3 discipline the live body
+   * states twice): id_verified says this network checked an identity, never that
+   * the person is who a clinician needs them to be.
+   */
+  sender_id_verified: boolean;
   plan_message_id: string | null;
   plan_items_total: number | null;
   plan_items_done: number | null;

@@ -323,8 +323,15 @@ time, which is why this is a rule and not a habit:
   `get_my_pending_requests` carries modality, and that column list is ruling S6-6. Shipped with
   the modality omitted.
 - **PLEXMED S7's A3 identity chip** says it renders "exactly as on Incoming". `get_my_day`
-  returns no verification flag and neither does `get_my_thread_peers`, so on Today the chip has
-  no source at all.
+  returned no verification flag and neither does `get_my_thread_peers`, so on Today the chip had
+  no source at all. **HALF CLOSED, HALF STANDING (N-21-C item 13, amended here 2026-09-10, not
+  deleted).** Migration `0056` added `sender_id_verified` to `get_my_day` — catalog-verified,
+  nineteen columns — and hearth-pos renders the chip from it (`TodayTile.tsx`, gated on
+  `card_kind = 'practice'` because N-2 keeps Today generic). **`get_my_thread_peers` is untouched
+  by that ruling and the defect stays true of it**, so a chip sourced from thread peers still has
+  nowhere to read from. The instance count above is unchanged and was re-checked when this bullet
+  was amended: six bullets, six instances — a defect that is half closed is still one instance,
+  and the count went wrong once before (PROCESS-003) by being edited without being recounted.
 - **The rule caught its own author, one day after promotion.** Writing the care-loop proposal,
   an agent named the wrap's table `visit_records` — taken from the S7 spec's PROSE ("it upserts
   the record") rather than from `0041:157`, where it is `visit_wraps`. The database refused it:

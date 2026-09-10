@@ -7,7 +7,10 @@ import { theme } from '../styles/theme';
 //
 // BUILT TO BE REUSED VERBATIM BY S7. Today's identity chip is this component,
 // not a re-authoring of it (S7 A3: "reuse the S6 chip, do not re-author it").
-// That is why the identity chip takes a flag rather than a request object.
+// That is why the identity chip takes a flag rather than a request object — and
+// as of N-21-B item 4 that reuse is real rather than anticipated: Today passes
+// idVerified off get_my_day's sender_id_verified. NOT ONE LINE OF THIS FILE
+// CHANGED to make it render, which is what "do not re-author it" bought.
 //
 // A1 RENDERS IN BOTH STATES ON PURPOSE. A missing chip and an unverified person
 // must never look alike on a clinical surface.
@@ -63,10 +66,18 @@ function Chip({ label, tone, expanded }: { label: string; tone: ChipTone; expand
 
 interface HonestyChipsProps {
   /** OPTIONAL, and undefined means NO IDENTITY CHIP AT ALL — not an unverified
-   *  one. Today omits it by ruling N-17: get_my_day returns no verification
-   *  flag, and the chip earns its place on Incoming only because the clinician
-   *  is deciding whether to see a stranger. Passing `false` here would render
-   *  "Identity not verified", which on Today would be a claim nobody made. */
+   *  one. Passing `false` renders "Identity not verified", which is a fact;
+   *  passing nothing renders no chip, which is the absence of one. Never use
+   *  `false` to mean "we did not check" — that is the distinction this prop's
+   *  optionality exists for.
+   *
+   *  TODAY NOW PASSES IT (N-21-B item 4, migration 0056). It did not under
+   *  N-17, and the reason was EVIDENTIAL, not structural: get_my_day returned no
+   *  verification flag, so there was no fact to render and `false` would have
+   *  been a claim nobody made. 0056 adds sender_id_verified and the ruling names
+   *  this chip as its purpose. Corrected here rather than deleted, because the
+   *  reason the omission was right is what stops it being re-derived as a rule.
+   *  TodayTile gates it on card_kind = 'practice' (N-2 keeps Today generic). */
   idVerified?: boolean;
   /** Omitted on surfaces where history is not part of the claim (S7 Today). */
   firstContact?: boolean;

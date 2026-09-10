@@ -250,13 +250,32 @@ export default function TodayTile({
         <Text style={styles.state}>{VISIT_STATE_LABELS[state]}</Text>
       </View>
 
-      {/* History only — idVerified is NOT PASSED, so the component cannot
-          render an identity chip here (N-17). That is structural, not a
-          convention: passing `false` would render "Identity not verified",
-          which on Today would be a claim nobody made. */}
-      {visit.first_visit_on_network ? (
+      {/* ── THE IDENTITY CHIP ARRIVES (N-21-B item 4, migration 0056) ───────
+          N-17 omitted it here for one reason and one only: get_my_day returned
+          no verification flag, so there was no fact to render. 0056 adds
+          sender_id_verified and the ruling names this chip as what it is for.
+          The old comment said the omission was structural; it was EVIDENTIAL,
+          and it is corrected rather than deleted so the distinction survives.
+
+          IT IS GATED ON isPractice, THE HISTORY CHIP IS NOT. That asymmetry is
+          deliberate and is the narrower of the two options: N-2 rules Today
+          GENERIC — "a plumber with three scheduled bookings HAS A DAY" — and
+          card_kind gates only the visit-and-wrap affordances. The identity chip
+          is a clinical-surface chip (PLEXMED S6/S7): it belongs on a visit,
+          where a clinician is about to see a stranger, not on a plumber's job.
+          The history chip's existing behaviour is UNCHANGED — widening the
+          wrapper must not quietly put a new chip on a surface that never had
+          one, so `firstContact` is still passed only when the visit is a first,
+          and is `undefined` otherwise exactly as before.
+
+          BOTH STATES RENDER, NEVER AN ABSENCE (A1). On a practice visit the chip
+          shows "Identity verified" or "Identity not verified"; what it must not
+          do is vanish, because a missing chip and an unverified person would
+          then look alike on a clinical surface. */}
+      {isPractice || visit.first_visit_on_network ? (
         <HonestyChips
-          firstContact
+          idVerified={isPractice ? visit.sender_id_verified : undefined}
+          firstContact={visit.first_visit_on_network ? true : undefined}
           historyLabels={{ first: CHIP_FIRST_VISIT.label, established: '' }}
         />
       ) : null}
