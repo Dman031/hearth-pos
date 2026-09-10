@@ -24,6 +24,7 @@
 // believe something the system will not honour.
 
 import type { FieldEntry } from '../utils/card-fields';
+import type { InboundKind, InboundStatus } from '../types/inbound';
 
 /** The canonical labels this app writes. Lower-cased, exactly as the network reads them. */
 export const PRACTICE_FIELD = {
@@ -201,6 +202,63 @@ export function isSlotNoLongerHeld(err: unknown): boolean {
       ? String((err as { message: string }).message)
       : '';
   return /SLOT_NO_LONGER_HELD/.test(message);
+}
+
+// ─── THE BRIDGE STATE (N-20-AMENDED-7 item 3) ───────────────────────────────
+//
+// "A BRIDGE-STATE BOOKING IS INVISIBLE TO THE CLINICIAN. hearth-pos filters
+// pending practice bookings out of Incoming and every pending-inbound read.
+// Nothing to decide, nothing to show."
+//
+// WHY THERE IS NOTHING TO DECIDE, and it is not a matter of taste: BOTH
+// decisions are refused server-side. respond_to_inbound's live body raises
+// SLOT_ALREADY_CONFIRMED on the accept branch and SLOT_BOOKING_NOT_DECLINABLE
+// on the pass branch, for exactly `card.kind = 'practice' and inbound.kind =
+// 'booking'`. Posting the time was the yes; the booking confirms and charges
+// when the patient books it. A row offering two controls that can only refuse
+// is worse than no row.
+//
+// WHY `pending` IS THE BRIDGE AND NOT A LOOSER GUESS: confirm_slot_booking
+// flips the row — `update public.inbound set status = 'accepted' where id =
+// p_inbound_id and status = 'pending'` (live body, read 2026-09-10). So a
+// practice booking that is STILL pending has not confirmed: it is inside the
+// five-minute payment bridge, or the bridge failed and the Worker refunded.
+// Either way there is no clinician decision in it.
+//
+// THE PREDICATE IS THE SERVER'S OWN, TERM FOR TERM. Same pair, same order, so
+// the two cannot drift into disagreeing about which row is undecidable.
+//
+// ── ON THE UNLOADED-CARDS CASE, WHICH IS THE ONLY WAY THIS CAN BE WRONG ──
+// With `cards` empty (still loading, or the read failed) no card resolves and
+// this returns FALSE — the row is SHOWN. That is deliberate and it is the same
+// answer InboundTile already gives: its `isClinical = card?.kind === 'practice'`
+// (InboundTile.tsx:71) is likewise false until the cards land, so the tile
+// renders as an ordinary booking in that window. Showing a row we cannot yet
+// classify is recoverable; hiding one we cannot yet classify is not.
+//
+// IT IS ALSO WHY THE BADGE AND THE LIST CANNOT DISAGREE. Both call THIS
+// function, over the SAME `cards` array from the one CardProvider, so they
+// resolve every row identically — including during that window, where they are
+// wrong together and correct together rather than drifting apart.
+
+/**
+ * Is this pending row a practice booking mid-bridge — i.e. a row the clinician
+ * has no decision to make about, and which every pending-inbound read hides?
+ *
+ * `cards` is the recipient's OWN card list (CardProvider). The knock is
+ * addressed to them, so its card is always one of theirs; a card_id that
+ * resolves to nothing is a deleted card, and a deleted card is not a practice
+ * card as far as this predicate is concerned.
+ */
+export function isBridgeStatePracticeBooking(
+  inbound: { kind: InboundKind; status: InboundStatus; card_id: string | null },
+  cards: readonly { id: string; kind: string }[],
+): boolean {
+  if (inbound.status !== 'pending') return false;
+  if (inbound.kind !== 'booking') return false;
+  if (inbound.card_id === null) return false;
+  const card = cards.find((c) => c.id === inbound.card_id);
+  return card?.kind === 'practice';
 }
 
 // ─── THE PRACTICE CARD'S PAUSED STATES (PLEXMED S5 P5) ──────────────────────

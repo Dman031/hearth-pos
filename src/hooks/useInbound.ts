@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '../services/supabase';
 import useEntity from './useEntity';
+import useCards from './useCards';
+import { isBridgeStatePracticeBooking } from '../services/practice';
 import type { Inbound } from '../types/inbound';
 
 // First Supabase Realtime hook in the app. Loads the PENDING inbound addressed
@@ -10,6 +12,18 @@ import type { Inbound } from '../types/inbound';
 // (inbound_select_own) scopes both the query and the realtime stream to rows
 // where to_entity_id = the caller's entity, so the filter is a narrowing, not a
 // trust boundary.
+//
+// N-20-AMENDED-7 item 3 — BRIDGE-STATE PRACTICE BOOKINGS ARE HIDDEN. The
+// predicate lives in services/practice.ts and is shared with the thread banner
+// and the tab badge; see its header for why `pending` IS the bridge and what
+// happens before the cards load.
+//
+// THE FILTER IS A useMemo OVER THE RAW ROWS, NOT A NARROWING INSIDE `load`.
+// Filtering at load time would bake in whatever `cards` happened to hold when
+// the read returned, and CardProvider resolves independently of this one — a
+// row read before the cards arrived would stay visible for the life of the
+// list. Deriving on render re-answers the question every time either input
+// changes, which is the only version that converges.
 
 const INBOUND_SELECT =
   'id, to_entity_id, from_entity_id, card_id, thread_id, kind, message, status, return_address, scheduled_for, quantity, created_at';
@@ -32,8 +46,9 @@ export interface UseInbound {
 
 export default function useInbound(): UseInbound {
   const { entity } = useEntity();
+  const { cards } = useCards();
   const entityId = entity?.id ?? null;
-  const [inbound, setInbound] = useState<Inbound[]>([]);
+  const [rows, setRows] = useState<Inbound[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
 
@@ -41,7 +56,7 @@ export default function useInbound(): UseInbound {
   const load = useCallback(
     async (opts?: { signal?: AbortSignal; silent?: boolean }) => {
       if (!entityId) {
-        setInbound([]);
+        setRows([]);
         return;
       }
       if (!opts?.silent) setIsLoading(true);
@@ -58,7 +73,7 @@ export default function useInbound(): UseInbound {
         return;
       }
       setError(null);
-      setInbound((data ?? []) as Inbound[]);
+      setRows((data ?? []) as Inbound[]);
       if (!opts?.silent) setIsLoading(false);
     },
     [entityId],
@@ -70,7 +85,7 @@ export default function useInbound(): UseInbound {
 
   useEffect(() => {
     if (!entityId) {
-      setInbound([]);
+      setRows([]);
       return;
     }
     const controller = new AbortController();
@@ -98,6 +113,11 @@ export default function useInbound(): UseInbound {
       void supabase.removeChannel(channel);
     };
   }, [entityId, load]);
+
+  const inbound = useMemo(
+    () => rows.filter((r) => !isBridgeStatePracticeBooking(r, cards)),
+    [rows, cards],
+  );
 
   return { inbound, isLoading, error, refresh };
 }

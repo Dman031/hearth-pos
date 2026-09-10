@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '../services/supabase';
 import useEntity from './useEntity';
+import useCards from './useCards';
+import { isBridgeStatePracticeBooking } from '../services/practice';
 import type { Inbound } from '../types/inbound';
 
 // The PlexChat decision slot's populating source: PENDING knocks on ONE thread
@@ -11,6 +13,12 @@ import type { Inbound } from '../types/inbound';
 // are a narrowing, not a trust boundary. Channel topic is thread-scoped —
 // NEVER `inbound:{entityId}` — because the Incoming tab's subscription stays
 // mounted under the tab navigator and duplicate topics collide.
+//
+// N-20-AMENDED-7 item 3 — THIS IS ONE OF THE "EVERY PENDING-INBOUND READ" THE
+// ruling names, and it is the one a filter on Incoming alone would miss: the
+// decision banner is a SECOND place the same undecidable row would offer
+// Accept and Decline. Same shared predicate, same useMemo-over-raw-rows shape
+// as useInbound — see services/practice.ts for both reasons.
 
 const INBOUND_SELECT =
   'id, to_entity_id, from_entity_id, card_id, thread_id, kind, message, status, return_address, scheduled_for, quantity, created_at';
@@ -32,14 +40,15 @@ export interface UseThreadPendingInbound {
 
 export default function useThreadPendingInbound(threadId: string | null): UseThreadPendingInbound {
   const { entity } = useEntity();
+  const { cards } = useCards();
   const entityId = entity?.id ?? null;
-  const [pending, setPending] = useState<Inbound[]>([]);
+  const [rows, setRows] = useState<Inbound[]>([]);
   const [error, setError] = useState<Error | null>(null);
 
   const load = useCallback(
     async (opts?: { signal?: AbortSignal }) => {
       if (!entityId || !threadId) {
-        setPending([]);
+        setRows([]);
         return;
       }
       const { data, error: qErr } = await supabase
@@ -58,7 +67,7 @@ export default function useThreadPendingInbound(threadId: string | null): UseThr
         return;
       }
       setError(null);
-      setPending((data ?? []) as Inbound[]);
+      setRows((data ?? []) as Inbound[]);
     },
     [entityId, threadId],
   );
@@ -69,7 +78,7 @@ export default function useThreadPendingInbound(threadId: string | null): UseThr
 
   useEffect(() => {
     if (!entityId || !threadId) {
-      setPending([]);
+      setRows([]);
       return;
     }
     const controller = new AbortController();
@@ -97,6 +106,11 @@ export default function useThreadPendingInbound(threadId: string | null): UseThr
       void supabase.removeChannel(channel);
     };
   }, [entityId, threadId, load]);
+
+  const pending = useMemo(
+    () => rows.filter((r) => !isBridgeStatePracticeBooking(r, cards)),
+    [rows, cards],
+  );
 
   return { pending, error, refresh };
 }
