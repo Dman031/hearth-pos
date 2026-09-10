@@ -5018,3 +5018,132 @@ BUILD NOTES (2026-09-06) — NOT part of the ruling.
   question (N-21 build notes) and the attorney system-of-record push (N-21-A), and
   neither is written into N-1, because a gate is a ruling. Canvas as a second push
   target is its own item (N-21-B item 6). Images are deferred (N-21).
+
+## N-21-D — One bundle, two documents
+Amends N-21-A, N-21-B item 5, N-21-C item 11. RECORDED 2026-09-08. Text of the
+ruling below is Derrick's, verbatim.
+MIRROR OBLIGATION: copy to hearth-pos with N-21, N-21-A, N-21-B and N-21-C.
+RULES THE 0055 ITEM-3 FINDING — this block exists because the build gate stopped
+rather than picked. The finding, quoted from the live catalog so the ruling can
+be read against the thing it ruled on: `queue_ehr_push` derives
+`v_key := v_target || ':' || p_engagement_id::text` against
+`unique (dedupe_key)`, and `ehr_push_outbox` carries NO document-kind column.
+A superbill push and an intake push for one engagement therefore COLLIDE, and
+"an intake push" is not a separable thing the system has — the DocumentReference
+is a MEMBER of the one per-engagement bundle, never a push of its own.
+
+1. SHAPE (A). The intake DocumentReference is a member of the one
+   per-engagement FHIR bundle, alongside the superbill. Zero outbox change.
+   ehr_push_outbox's dedupe key and 'sent' posture (S8-3) are untouched.
+
+2. ACCEPTED: an intake saved after the push has drained does not reach the
+   EHR. intake_notes is the professional's copy and survives regardless. The
+   app reads the outbox row's status and tells the clinician plainly when
+   the push has already gone: saved to your notes, not sent. The S8-3
+   corrections gap stays deferred; this ruling widens what it covers.
+
+3. ACCEPTED: ICD headroom drops from four codes to three when both documents
+   are present. A thirty-minute telehealth visit rarely carries four. Logged
+   loud when too_many_conditions fires, revisited when it does.
+
+4. medplum.ts remote_ids accumulates repeated resourceTypes as an array
+   rather than overwriting. The 0045 table comment describing it as scalar
+   is amended in 0055. In scope.
+
+5. save_intake_note's ACL is case (h)'s contract: authenticated present,
+   service_role and anon absent. It mirrors queue_ehr_push's app arm and
+   goes one grant tighter than 0045's live ACL. queue_ehr_push's own
+   service_role EXECUTE is flagged, out of scope.
+
+6. REFUSAL ORDER: the idempotent read precedes the tombstone check. A
+   clinician who saved in time and taps again after the purge gets their
+   copy, never "cannot be saved now."
+
+7. The intake predicate is origin in ('ai','system') on the inbound-bound
+   message, so a purged intake refuses INTAKE_ALREADY_REMOVED rather than
+   NO_INTAKE.
+
+8. Audit imprint carries ids and length(snapshot). Never the body.
+   author is the patient reference; no Device resource is minted.
+
+9. Case (i) reads: one outbox row drains, two DocumentReferences land with
+   distinct identifiers, neither overwrites the other in remote_ids.
+
+  ON 1 — THE OTHER TWO SHAPES ARE RECORDED SO THE CHOICE IS LEGIBLE LATER, which
+  is the thing a ruling that only states its winner cannot do. (B) was: let a new
+  document requeue a 'sent' row — small, but it edits queue_ehr_push's ruled 'sent'
+  posture, and save_intake_note cannot do the requeue itself without becoming a
+  second writer of the outbox, which the single-canonical-write-path rule forbids.
+  (C) was: a `kind` column, a `target:kind:engagement` dedupe key, and a
+  kind-scoped drain — the literal reading of the verification's case (i), and not
+  minimal: it touches the outbox DDL, the drain and the script. (A) wins because
+  the bundle was ALREADY per-engagement; (C) would have built a second push
+  pipeline to deliver a second member of a bundle that already exists.
+
+  ON 2 — THE ACCEPTANCE IS THE HONEST HALF OF (A) AND IS WRITTEN DOWN AS A COST,
+  not as a footnote. The gap is not new: the live 'sent' no-op comment in
+  queue_ehr_push already cites S8-3's reasoning, that a corrections flow designed
+  before anyone has needed one usually gets the shape wrong. What IS new is that
+  the gap now covers a second document, so the surface it can lose grew. The app
+  sentence in item 2 is the mitigation and it is a PRODUCT sentence, not a
+  technical one: "saved to your notes, not sent" is true, complete, and says which
+  of the two things the clinician got.
+
+  ON 3 — THE NUMBER MOVED AND THE COMMENT MUST SAY SO. `entryCount` was
+  3 + codes + (document ? 1 : 0) against the 8-entry conditional-transaction cap
+  (S10-7, Medplum's own limit), so a superbill left four codes. Two documents
+  leave three. Truncation stays rejected outright — S10-7's reason is unchanged
+  and is the whole point: silent data loss in a clinical record. The refusal is
+  still the feature.
+
+  ON 4 — THIS IS A DEFECT THE RULING CREATES, AND IT IS FIXED IN THE SAME BREATH.
+  medplum.ts writes `remoteIds[type] = id` for every non-Condition type, so the
+  second DocumentReference in a bundle would have silently overwritten the first —
+  invisible, because the push still returns ok and the row still reads 'sent'. It
+  is only a bug once two documents can share a bundle, which is what item 1 does.
+  A ruling that introduced it without closing it would have shipped the exact
+  shape BUG-016 named: the bookkeeping saying yes while the thing itself is gone.
+
+  ON 5 — "EXACTLY" WAS THE WORD THAT COULD NOT SURVIVE THE READ. The build prompt
+  said save_intake_note mirrors queue_ehr_push's posture exactly AND that
+  service_role is revoked; `admin_proacl('public.queue_ehr_push(uuid,text)')`
+  returns ["postgres=X/postgres","authenticated=X/postgres","service_role=X/postgres"],
+  so the two halves contradicted. The verification case is the contract and the
+  header says what is true: it mirrors the APP ARM — current_entity_id(), no
+  p_from_entity_id — and goes one grant tighter. Writing "exactly" over a
+  measured difference is the SPEC-CONTRACT failure class pointed inward, at our
+  own header, which is where it is hardest to notice.
+
+  ON 6 AND 7 TOGETHER — BOTH ARE ABOUT WHAT THE CLINICIAN IS TOLD, and both were
+  found by asking what happens on the SECOND tap rather than the first. Order
+  matters because a saved copy plus a purged message is the COMMON end state, not
+  an edge: the grace window is 24 hours and the purge is forever after. The
+  predicate matters because purge_intakes tombstones by flipping origin to
+  'system' (N-21-B item 2 — the flip IS the idempotence), so a guard reading
+  origin = 'ai' finds nothing after a purge and would answer NO_INTAKE — a true
+  sentence about the predicate and a false one about the world. ('ai','system')
+  is exact rather than lax: inbound_id has three writers only, and post_visit_link's
+  'system' message carries engagement_id and NO inbound_id, so it is out of reach.
+
+  ON 8 — 0048 IS THE REASON AND IT IS RECENT. The intake is patient free text; an
+  audit_log detail carrying it would put the purged words back into a table the
+  purge does not sweep, which is retention defeated by its own imprint. Ids and a
+  LENGTH answer every question an operator actually asks — did it save, which row,
+  was it empty — without carrying one word of it. The author reference is the
+  patient for the same reason a Device is not minted: the resource should say the
+  patient authored it through their assistant, which is TRUE, and a Device
+  resource would both assert a thing we do not have and eat one of the eight
+  entry slots item 3 just made scarcer.
+
+  ON 9 — THE CASE IS RE-READ, NOT RELAXED. Under (C) case (i) would have meant two
+  outbox rows; under (A) it means one row draining a bundle whose two
+  DocumentReferences carry DISTINCT identifier systems and survive independently
+  in remote_ids. The assertion got stronger, not weaker: it now checks the
+  overwrite item 4 fixes, which the two-row reading would never have exercised.
+
+  ON THE CHAIN — WHAT THIS BLOCK CLOSES AND WHAT IT DOES NOT. It closes the 0055
+  item-3 stop and nothing else. The two items sitting outside the chain at N-21-C
+  are untouched: the PlexLaw gate list and Canvas as a second push target (N-21-B
+  item 6) — and item 1's "zero outbox change" is not a ruling against a second
+  target, which would add a `target` VALUE, never a kind. Images stay deferred
+  (N-21). The S8-3 corrections gap stays deferred and is now explicitly wider.
