@@ -44,9 +44,11 @@ import type { Engagement } from '../types/engagement';
 // and nothing strands. Confirm copy is chosen from LEDGER truth (settled, via
 // the 0023 helper — never engagement.status, which lags the ledger in the
 // webhook window; settled null means UNKNOWN and the confirm refuses to
-// guess). The 14-day boundary here is ADVISORY — the server decides at call
-// time (0022:140-142); post-call state renders from the RETURN's refund_due,
-// never from the predicted case. A refund-due cancel makes NO server state
+// guess). The refund boundary here is ADVISORY — the server decides at call
+// time; post-call state renders from the RETURN's refund_due, never from the
+// predicted case. WHICH boundary it is depends on the card (N-20): 24 hours on
+// a practice slot, 14 days otherwise, and NEITHER when cardKind is unknown —
+// see refundRule() below. A refund-due cancel makes NO server state
 // change (refund is issued by hand; charge.refunded finalizes later): the row
 // keeps reading Paid until then — announced in the alert, remembered only in
 // transient refundPendingIds (residual is a DEFERRED entry).
@@ -63,6 +65,45 @@ type ViewMode = 'list' | 'calendar';
 // ADVISORY ONLY — picks confirm copy; the server re-evaluates at call time
 // (0022:140-142, timestamptz vs timestamptz, UTC interim).
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
+const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+
+// ── N-20: CANCELLATION SPLITS BY KIND, AND SO DOES THE COPY ─────────────────
+//
+// cancel_engagement DISPATCHES to cancel_slot_booking when a bound card_slots
+// row exists (live body :90-93), and the two apply DIFFERENT refund windows:
+//   practice slot   patient >= 24h before start   full refund   (:82)
+//                   patient <  24h before start   no refund     (:86-87)
+//                   clinician, any notice         full refund   (:78-80)
+//   everything else buyer  >  14 days out         refund due    (cancel_engagement :130)
+//                   seller, any notice            refund due
+// Both read from the live catalog 2026-09-10, not from a migration file.
+//
+// THE THIRD STATE IS UNKNOWN AND IT IS NOT "NOT PRACTICE". cardKind is null for
+// a deleted card or a row RLS did not return (see useMyEngagements), and a null
+// must not silently select the 14-day sentence — that is how a patient
+// cancelling a visit gets told the wrong rule. On null the copy names NO window
+// and lets the return speak, which ruling 5 already makes authoritative.
+
+type RefundRule = 'practice_24h' | 'standard_14d' | 'unknown';
+
+function refundRule(cardKind: string | null): RefundRule {
+  if (cardKind === null) return 'unknown';
+  return cardKind === 'practice' ? 'practice_24h' : 'standard_14d';
+}
+
+/** The boundary in ms, or null when we do not know which rule applies. */
+function refundWindowMs(rule: RefundRule): number | null {
+  if (rule === 'practice_24h') return TWENTY_FOUR_HOURS_MS;
+  if (rule === 'standard_14d') return FOURTEEN_DAYS_MS;
+  return null;
+}
+
+/** How the window is spoken. Empty when unknown — the sentence omits it. */
+function windowPhrase(rule: RefundRule): string | null {
+  if (rule === 'practice_24h') return '24 hours';
+  if (rule === 'standard_14d') return '14 days';
+  return null;
+}
 
 function sortUpcoming(a: Engagement, b: Engagement): number {
   if (a.scheduled_for && b.scheduled_for) return a.scheduled_for.localeCompare(b.scheduled_for);
@@ -316,10 +357,23 @@ export default function EngagementScreen() {
         return;
       }
       // RULING 5 ENFORCED HERE: what happens next is decided by the RETURN's
-      // refund_due, never by the case the confirm predicted — near the 14-day
-      // line the server's call-time evaluation wins.
-      const result = (data ?? {}) as { refund_due?: boolean; transaction_id?: string | null };
+      // refund_due, never by the case the confirm predicted — near whichever
+      // line applies, the server's call-time evaluation wins.
+      // THE RETURN IS A SUPERSET ON THE SLOT PATH, AND THE EXTRA KEYS ARE HOW
+      // WE KNOW WHICH PATH RAN. cancel_engagement returns engagement_id/status/
+      // refund_due/idempotent; cancel_slot_booking returns those PLUS path,
+      // slot_id, slot_disposition, transaction_id and the payment intent
+      // (live bodies :149-157 and :133-142). So `slot_id` present == the
+      // dispatch fired, read off the answer itself rather than re-derived from
+      // cardKind — which may be null, and which was only ever advisory.
+      const result = (data ?? {}) as {
+        refund_due?: boolean;
+        transaction_id?: string | null;
+        slot_id?: string | null;
+        path?: string | null;
+      };
       const refundDue = result.refund_due === true;
+      const wasSlotPath = typeof result.slot_id === 'string';
       if (refundDue) {
         setRefundPendingIds((prev) => {
           const next = new Set(prev);
@@ -331,15 +385,35 @@ export default function EngagementScreen() {
           e.agreed_price_cents !== null ? formatCents(e.agreed_price_cents, e.currency) : null;
         // RULING 6: announce the discrepancy — the row will KEEP reading Paid
         // until the by-hand refund lands; say so before the user finds it.
+        // ── WHAT THE ROW DOES NEXT IS NOT THE SAME ON BOTH PATHS ────────────
+        // This alert said, on every path, that the row "will still show as Paid
+        // until the refund goes through". That is TRUE of cancel_engagement's
+        // refund-due arm, which deliberately makes no status change (:131-132:
+        // "NO status change — plpgsql cannot call Stripe"), and FALSE of
+        // cancel_slot_booking, which sets status='cancelled' unconditionally
+        // (:112-114) and returns 'status','cancelled' even when refund_due is
+        // true. On a practice slot the row is in Past before this alert paints,
+        // so telling the clinician to expect Paid sends them looking in the
+        // wrong list for a row that is already where it belongs.
+        //
+        // "PROCESSED MANUALLY" IS TRUE ON BOTH AND STAYS. Checked rather than
+        // assumed: cancel_slot_booking's comment says the refund "is issued by
+        // the Worker", but nothing in hearth-network/src issues one off that
+        // imprint — stripe-webhook.ts:378-396 only READS it as a provenance flag
+        // on refund_finalized. A person issues it in the Stripe dashboard on
+        // both paths. (The imprint's missing `event` key is BUG-012, network.)
+        const settlingLine = wasSlotPath
+          ? `Refunds are processed manually, not instantly, so it may take a few days to appear. This ${noun} has already moved to the Past list.`
+          : `Refunds are processed manually, not instantly — this ${noun} will still show as Paid until the refund goes through, then it will move to your Past list.`;
         Alert.alert(
           'Cancellation received',
           isSeller
             ? `${e.peerName ?? 'The buyer'} will get ${
                 amount !== null ? `their ${amount} back` : 'their money back'
-              }. Refunds are processed manually, not instantly — this ${noun} will still show as Paid until the refund goes through, then it will move to your Past list.`
+              }. ${settlingLine}`
             : `${
                 amount !== null ? `Your ${amount} refund` : 'Your refund'
-              } is on its way. Refunds are processed manually, not instantly — this ${noun} will still show as Paid until the refund goes through, then it will move to your Past list.`,
+              } is on its way. ${settlingLine}`,
         );
       } else if (predictedRefund && !isSeller && result.transaction_id) {
         // NEAR-BOUNDARY FLIP: the confirm promised case 2 (refund) but the
@@ -351,9 +425,25 @@ export default function EngagementScreen() {
         const noun = ENGAGEMENT_KIND_LABEL[e.kind].toLowerCase();
         const amount =
           e.agreed_price_cents !== null ? formatCents(e.agreed_price_cents, e.currency) : null;
+        // NEAR-BOUNDARY FLIP — the window named here comes from the RETURN's
+        // own `path`, never from the prediction that just proved wrong.
+        // cancel_slot_booking sets 'n20_patient_cancel_lt_24h' (:87) and
+        // cancel_engagement's no-refund arm is the 14-day rule. If the path is
+        // absent or unrecognised the sentence omits the number rather than
+        // inventing one — a stale promise must not be replaced by a fresh guess.
+        const missedWindow =
+          result.path === 'n20_patient_cancel_lt_24h'
+            ? '24 hours'
+            : wasSlotPath
+              ? null
+              : '14 days';
         Alert.alert(
           'Cancelled — without a refund',
-          `By the time this went through, the date was less than 14 days away, so ${
+          `${
+            missedWindow !== null
+              ? `By the time this went through, the date was less than ${missedWindow} away, so `
+              : 'By the time this went through there was too little notice left, so '
+          }${
             amount !== null ? `your ${amount}` : 'your payment'
           } wasn’t refunded. The ${noun} has moved to your Past list. If this seems wrong, message ${
             e.peerName ?? 'the seller'
@@ -381,6 +471,9 @@ export default function EngagementScreen() {
           ? formatCents(e.agreed_price_cents, e.currency)
           : null;
       const paid = e.agreed_price_cents === null ? false : e.settled;
+      // WHICH REFUND RULE THIS ROW IS UNDER. Advisory, exactly as the 14-day
+      // test always was — the server evaluates at call time and the return wins.
+      const rule = refundRule(e.cardKind);
       // predictedRefund feeds ONLY the near-boundary mismatch alert — the
       // outcome itself always comes from the return (ruling 5).
       const run = (predictedRefund: boolean) => () =>
@@ -410,10 +503,29 @@ export default function EngagementScreen() {
         return;
       }
       if (isSeller) {
-        // Case 6 — seller cancel always refunds, any time, dated or not.
+        // Case 6 — seller cancel always refunds, any time, dated or not. TRUE
+        // ON BOTH PATHS (cancel_slot_booking :78-80, cancel_engagement :128),
+        // so the OUTCOME sentence is unchanged. What changed is the rule it
+        // cited and what it promised the row would do next.
+        //
+        // THE WINDOW CLAUSE IS DROPPED, NOT RENUMBERED. "the 14-day rule doesn't
+        // apply when you cancel" named the wrong rule on a practice slot and was
+        // never load-bearing on either: a seller cancel bypasses whichever window
+        // applies. Naming a rule only to say it does not apply is a sentence that
+        // can only ever be wrong.
+        //
+        // AND THE ROW DOES NOT KEEP READING PAID ON THE SLOT PATH.
+        // cancel_slot_booking sets status='cancelled' UNCONDITIONALLY (:112-114),
+        // even when refund_due is true, so a practice visit is in Past the moment
+        // this returns. cancel_engagement's own refund-due arm makes NO status
+        // change (:149-150) and the old sentence was true only there.
         Alert.alert(
           `Cancel and refund ${peer}?`,
-          `${peerStart} paid ${amount ?? 'for this'}. Cancelling means their full payment is refunded — the 14-day rule doesn’t apply when you cancel. The ${noun} will show Paid until the refund goes through.`,
+          `${peerStart} paid ${amount ?? 'for this'}. Cancelling means their full payment is refunded${
+            rule === 'practice_24h'
+              ? `. The ${noun} moves to your Past list right away; the refund follows.`
+              : `. The ${noun} will show Paid until the refund goes through.`
+          }`,
           [
             { text: 'Keep it', style: 'cancel' },
             { text: 'Cancel and refund', onPress: run(true) },
@@ -430,25 +542,52 @@ export default function EngagementScreen() {
         );
         return;
       }
-      const outside14 =
-        parseUTCTimestamp(e.scheduled_for).getTime() - Date.now() > FOURTEEN_DAYS_MS;
-      if (outside14) {
-        // Case 2 — buyer, paid, more than 14 days out: refund due.
+      // UNKNOWN RULE: we cannot say which side of a boundary this falls, so we
+      // name none. The refund outcome is still decided by the return (ruling 5)
+      // — this arm gives up the PREDICTION, never the cancellation.
+      const windowMs = refundWindowMs(rule);
+      if (windowMs === null) {
+        const dateLabel = formatRelativeDay(toDateKey(e.scheduled_for));
+        Alert.alert(
+          'Cancel this booking?',
+          `${dateLabel}. Whether your ${
+            amount ?? 'payment'
+          } comes back depends on how much notice this is, and we couldn’t check that here — you’ll be told as soon as it goes through. If you need to be sure of a refund, ask ${peer} to cancel instead: when the seller cancels, you’re always refunded in full.`,
+          [
+            { text: 'Keep it', style: 'cancel' },
+            { text: 'Cancel it', style: 'destructive', onPress: run(false) },
+          ],
+        );
+        return;
+      }
+
+      const phrase = windowPhrase(rule);
+      const outsideWindow =
+        parseUTCTimestamp(e.scheduled_for).getTime() - Date.now() > windowMs;
+      if (outsideWindow) {
+        // Case 2 — buyer, paid, outside the window: refund due.
+        //
+        // THE "SHOWS PAID UNTIL IT GOES THROUGH" CLAUSE IS PATH-SPECIFIC, same
+        // finding as case 6: the slot path cancels the row outright (:112-114).
         Alert.alert(
           'Cancel and get refunded?',
-          `You’ll get your ${amount ?? 'payment'} back — the date is more than 14 days away. The refund is processed for you; this ${noun} will show Paid until it goes through, then move to your Past list.`,
+          `You’ll get your ${amount ?? 'payment'} back — the date is more than ${phrase} away. The refund is processed for you; this ${noun} ${
+            rule === 'practice_24h'
+              ? 'moves to your Past list right away and the refund follows.'
+              : 'will show Paid until it goes through, then move to your Past list.'
+          }`,
           [
             { text: 'Keep it', style: 'cancel' },
             { text: 'Yes, cancel', onPress: run(true) },
           ],
         );
       } else {
-        // Case 3 — buyer, paid, inside 14 days: NO refund. Never generic —
+        // Case 3 — buyer, paid, inside the window: NO refund. Never generic —
         // the forfeit AND the ask-the-seller alternative, before the tap.
         const dateLabel = formatRelativeDay(toDateKey(e.scheduled_for));
         Alert.alert(
           'Cancel without a refund?',
-          `${dateLabel} is less than 14 days away, so cancelling now means your ${
+          `${dateLabel} is less than ${phrase} away, so cancelling now means your ${
             amount ?? 'payment'
           } is NOT refunded. If you need your money back, ask ${peer} to cancel instead — when the seller cancels, you’re always refunded in full.`,
           [

@@ -819,3 +819,62 @@ Sweep: `grep -rn "=== null\|!== null" src/services/ src/components/` — every h
 **THE SWEEP BELONGS IN THE NETWORK-WIDE AUDIT, NOT IN THIS REPO'S BACKLOG.** It spans hearth-pos and hearth-network, it is a design-time question rather than a build-time one, and scoping it to whichever repo happened to find the first instance is how a cross-cutting class gets half-swept and then recorded as done. Flagged here, owned there. **This entry is `fixed` for the defect it names and OPEN as a class** — anyone reading it as coverage of the class is reading it wrong.
 
 **And the sharper half, which is what actually found this:** the defect surfaced only because item 11 required deriving copy from `claim_slot_and_knock`'s live body instead of editing the sentence it was replacing. **Reading the source of a fact you are about to describe is how you discover the fact changed.** The SPEC-CONTRACT rule already says prose must not become an assumed identifier; this is its display-layer twin — prose must not become an assumed *behaviour*.
+
+## BUG-014: the cancellation copy knew one refund policy and the server had grown two — wrong window, and a promise about the row that was false
+
+**Category:** stripe / refund-copy · **Severity:** high (tells a paying person the wrong rule about their own money, on the one surface in this app an ordinary user is guaranteed to meet) · **Status:** fixed
+**Introduced-by:** upstream ruling, not a slip. Day 22 item 5's six confirm cases were correct against `cancel_engagement` as it stood. N-20 added a second refund policy (24 hours, practice slots) and N-20-AMENDED-7 section 4 made `cancel_engagement` DISPATCH to `cancel_slot_booking` when a bound slot exists — so one call site silently acquired two behaviours. The dispatch is deliberately invisible to clients ("No client needs to know the split"), and this is the cost of that: the client stopped knowing something it was rendering copy about.
+**Found:** 2026-09-10, the N-20/N-21 app catch-up, reading both live bodies via `admin_functiondef` while checking whether the existing copy was still true.
+
+### Symptoms
+
+**Wrong window.** A patient cancelling a practice visit three days out is told *"the date is more than 14 days away"* or *"is less than 14 days away, so cancelling now means your payment is NOT refunded"*. The applicable rule is 24 hours. Three days out, they are owed a full refund and were being told they would forfeit it — a sentence that could talk someone out of a cancellation they were entitled to.
+
+**A false promise about the row.** After a refund-due cancel, every path said *"this booking will still show as Paid until the refund goes through, then it will move to your Past list."* On a practice slot the row is **already** in Past when that alert paints. The person then goes looking in Upcoming for a row that is not there, and the app has told them to.
+
+### Root Cause
+
+Two refund policies, one set of strings. From the live bodies (2026-09-10):
+
+| | practice slot (`cancel_slot_booking`) | everything else (`cancel_engagement`) |
+|---|---|---|
+| patient, good notice | full refund at **≥ 24h** (`:82`) | refund due at **> 14 days** (`:130`) |
+| patient, short notice | no refund (`:86-87`) | no refund |
+| seller/clinician | full refund, any notice (`:78-80`) | refund due, any notice (`:128`) |
+| **row status on a refund-due cancel** | **`status='cancelled'` UNCONDITIONALLY** (`:112-114`) | **NO status change** (`:131-132`, "plpgsql cannot call Stripe") |
+
+The last row is the one that produced the false promise, and it is the easiest to miss because both functions return a `status` key and only one of them means the row moved.
+
+**Why the client could not tell which policy applied:** `ENGAGEMENT_SELECT` carried `card_id` but no card kind, and the confirm alerts fire *before* the RPC answers. There was no data on the row from which to pick a sentence — so the only sentence available was the one written when there was only one policy.
+
+### Solution
+
+- `useMyEngagements.ts` — `ENGAGEMENT_SELECT` embeds `card:card_id ( kind )`, `EngagementRowRaw` and `MyEngagement` carry it, and the mapper lifts it to `cardKind`.
+- `EngagementScreen.tsx` — `refundRule()` / `refundWindowMs()` / `windowPhrase()`; the six confirm cases branch on the result. Case 6 **drops** the window clause rather than renumbering it: "the 14-day rule doesn't apply when you cancel" named the wrong rule on a slot and was never load-bearing on either, since a seller cancel bypasses whichever window applies. Naming a rule only to say it does not apply is a sentence that can only ever be wrong.
+- `EngagementScreen.tsx` — post-call, `wasSlotPath` is read from the **return's own `slot_id`**, not re-derived from `cardKind`. The two cancel functions' returns differ by exactly those keys (`:133-142` vs `:149-157`), so the answer says which path ran; `cardKind` was only ever advisory and may be null. The settling sentence forks on it, and the near-boundary alert names its window from the return's `path` (`'n20_patient_cancel_lt_24h'` → 24 hours) rather than from the prediction that just proved wrong.
+
+**`"Refunds are processed manually"` STAYS, because it was checked rather than assumed.** `cancel_slot_booking:117` comments that the refund "is issued by the Worker", which would have made the sentence false. Nothing in `hearth-network/src` issues a refund off that imprint — `stripe-webhook.ts:378-396` only reads it as a provenance flag on `refund_finalized`. A person issues it in the Stripe dashboard on both paths. **The comment overstates and the code does not**, which is exactly the kind of plausible wrong cause the VERIFICATION DISCIPLINE rule says to diagnose from output rather than from the most interesting hypothesis available.
+
+### THE THIRD STATE: `cardKind` NULL IS "UNKNOWN", NEVER "NOT PRACTICE"
+
+`public.cards` has RLS enabled (`0000:141`) and **no SELECT policy in any migration in either repo** — the five that exist are on `audit_log`, `inbound`, `messages`, `threads` and `engagements`. Whether an authenticated caller can read a card they do not own is **NOT ESTABLISHED**, and table RLS cannot be read with the two sanctioned catalog helpers (`admin_proacl` covers functions only). The embed may therefore return null for the buyer — who on a practice booking is the patient, i.e. precisely the person this copy is for.
+
+So the null arm names **no window at all** and says the refund depends on notice we could not check, pointing at the seller-cancel alternative which is unconditional. **Both answers to the RLS question are safe under this shape**, which is why it was built this way instead of waiting on the answer. Defaulting null to the 14-day sentence would have been the original bug with an extra step.
+
+### Cross-check Performed
+
+- **Every `cancel_engagement` / `cancel_slot_booking` call site in the app**: one (`EngagementScreen.tsx:305-307`). The app never calls `cancel_slot_booking` directly and should not — the dispatch is the contract.
+- **Every other consumer of `MyEngagement`**: `EngagementRow`, `TodayTile`'s peer lookup, `confirmDone`. None reads `cardKind`; adding a field breaks nothing.
+- **Every other site naming a refund window**: `grep -rn "14 day\|14-day\|24 hour" src/` — all remaining hits are inside the new derivation or comments describing it. No second copy of either number.
+- **`confirmDone`'s copy** (`:462+`): names no refund window and is unaffected by the split. Unchanged.
+- **The free-cancel and no-date cases (1, 4, 5)**: name no window either. Unchanged, deliberately — a cancel with no money in it is the same on both paths.
+- **`TodayTile`'s cancel affordance**: there is none; cancellation is `EngagementScreen`-only. No second surface to fix.
+- **Out-of-scope-but-flagged:** BUG-012 (the imprint's missing `event` key) is the other half of this area and stays open, network-side. `cancel_slot_booking:117`'s overstated comment.
+
+### Prevention
+
+**When a server function starts DISPATCHING, every client string about what it does becomes suspect — including the ones that still compile and still read correctly.** The dispatch was designed to be invisible ("no client needs to know the split") and it succeeded: nothing broke, nothing errored, and two sentences quietly became false for one class of row. Invisibility at the call boundary is not invisibility at the copy boundary.
+
+The test, for any RPC whose body gained a dispatch or a second policy arm: **list every user-facing string derived from that call and re-read each against BOTH arms.** Not the call site — the strings. Here that was six confirm alerts and two post-call alerts, of which four were wrong.
+
+Sweep: `grep -rn "\.rpc('" src/` → for each RPC, `admin_functiondef` its live body and count the distinct outcomes it can return; then grep the screen for strings that name any of them. An RPC with more outcomes than the screen has sentences is either under-rendered or lying.

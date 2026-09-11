@@ -36,11 +36,26 @@ import type { Engagement } from '../types/engagement';
 // after its own writes stays: it is idempotent redundancy, not a workaround
 // to remove (PLEXMED S7 spec, app-side gap 2).
 
+// `card:card_id ( kind )` is N-20's cancellation split reaching the app: the
+// network refunds a practice slot on a 24-hour boundary and everything else on
+// 14 days, and the confirm copy has to name the right one BEFORE the call.
+// Embedded the same way `inbound` already is.
+//
+// IT MAY COME BACK NULL, AND THE CALLER MUST TREAT THAT AS UNKNOWN — NOT AS
+// "not practice". Two ways it can be null: the FK is SET NULL (a deleted card),
+// or RLS hides the row. `public.cards` has RLS enabled (0000:141) and NO select
+// policy in any migration in either repo — the five that exist are on audit_log,
+// inbound, messages, threads and engagements — so whether an authenticated
+// caller can read a card they do not own is NOT ESTABLISHED HERE. Table RLS
+// cannot be read with the two sanctioned catalog helpers (admin_proacl covers
+// functions only), so this is stated as unverified rather than asserted either
+// way, and the confirm copy is built so that BOTH ANSWERS ARE SAFE: a null
+// names no window at all instead of defaulting to one that may be wrong.
 const ENGAGEMENT_SELECT =
   'id, inbound_id, kind, buyer_entity_id, seller_entity_id, card_id, thread_id, ' +
   'agreed_price_cents, currency, status, scheduled_for, visit_started_at, ' +
   'room_url, room_provider, room_created_at, fulfilled_at, cancelled_at, ' +
-  'created_at, updated_at, inbound:inbound_id ( message )';
+  'created_at, updated_at, inbound:inbound_id ( message ), card:card_id ( kind )';
 
 /** An engagement row + the app-side display context joined at load time.
  *  Wrapper type on purpose: types/engagement.ts mirrors the network-owned
@@ -55,11 +70,19 @@ export type MyEngagement = Engagement & {
    *  cancel on a paid row. Same predicate as cancel_engagement (0022), so the
    *  confirm and the RPC cannot disagree on paid-ness. */
   settled: boolean | null;
+  /** The card's kind, for the cancellation split (N-20). NULL MEANS UNKNOWN —
+   *  a deleted card or a row RLS did not return — never "not a practice card".
+   *  The confirm copy names no refund window on null rather than guessing one;
+   *  the outcome itself always comes from the RPC's return (ruling 5). */
+  cardKind: string | null;
 };
 
 /** Raw select shape: the table row plus the embedded inbound (null when the
  *  FK is SET NULL or RLS hides the row from a buyer-side caller). */
-type EngagementRowRaw = Engagement & { inbound: { message: string | null } | null };
+type EngagementRowRaw = Engagement & {
+  inbound: { message: string | null } | null;
+  card: { kind: string | null } | null;
+};
 
 interface PeerRow {
   thread_id: string;
@@ -153,7 +176,7 @@ export default function useMyEngagements(): UseMyEngagements {
       }
 
       const next = rows.map(
-        ({ inbound, ...engagement }): MyEngagement => {
+        ({ inbound, card, ...engagement }): MyEngagement => {
           const peer = engagement.thread_id ? peerByThread.get(engagement.thread_id) : undefined;
           const oneLine = inbound?.message?.replace(/\s+/g, ' ').trim() ?? '';
           return {
@@ -163,6 +186,10 @@ export default function useMyEngagements(): UseMyEngagements {
             // Absent from the helper's result = not-yours-or-nonexistent, NOT
             // unsettled — those ids stay null (unknown), same as a failed call.
             settled: settledById ? (settledById.get(engagement.id) ?? null) : null,
+            // `?? null` collapses a missing embed and a null kind to one value,
+            // and they mean the same thing HERE: we do not know which refund
+            // rule applies. Never coerced to a string — see the type's note.
+            cardKind: card?.kind ?? null,
           };
         },
       );
