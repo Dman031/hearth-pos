@@ -27,9 +27,27 @@ const IDENTITY_EXPANDED =
   'A government photo ID was checked against a live selfie. That is all it means — nothing ' +
   'about this person’s health, history, or coverage was checked.';
 
+// ── S6-3: THE LITERAL "on this network", IN BOTH BRANCHES ───────────────────
+// "Expanded text must contain 'on this network' and must never imply a care
+// relationship." The scoping IS the point of the phrase: it says the fact is
+// about this network's records and nothing wider.
+//
+// NEITHER BRANCH CARRIED IT. This one said "here before" and then "a fact about
+// this network" — near the ruled wording, not it — and the established branch
+// said only "here before". The ruling-compliance sweep (2026-09-11) caught the
+// established branch and wrongly passed this one on the strength of "about this
+// network"; corrected here, and recorded because a near-match is exactly what a
+// literal requirement exists to refuse.
+//
+// Both now open on the same scoping clause and close on the same care
+// disclaimer, so the two states of one chip read as one statement.
 const HISTORY_FIRST_EXPANDED =
-  'You have not accepted anything from this person here before. That is a fact about this ' +
-  'network, not about their care — they may have been seen anywhere.';
+  'You have not accepted anything from this person on this network before. That is a fact ' +
+  'about this network, not about their care — they may have been seen anywhere.';
+
+const HISTORY_ESTABLISHED_EXPANDED =
+  'You have accepted something from this person on this network before. That is a fact ' +
+  'about this network, not about their care.';
 
 const DISCLAIMER_EXPANDED =
   'Nobody has assessed how urgent this is — not this network, not a clinician. What you see ' +
@@ -134,7 +152,7 @@ export default function HonestyChips({
           expanded={
             firstContact
               ? HISTORY_FIRST_EXPANDED
-              : 'You have accepted something from this person here before.'
+              : HISTORY_ESTABLISHED_EXPANDED
           }
         />
       ) : null}
