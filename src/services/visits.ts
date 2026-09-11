@@ -365,6 +365,63 @@ export async function queueEhrPush(engagementId: string): Promise<VisitResult<Qu
   };
 }
 
+/** What save_intake_note returns (live body :58-62, :98-102, :117-122). */
+export interface SavedIntakeNote {
+  intake_note_id: string;
+  saved_at: string;
+  snapshot_length: number;
+  /** True when a note already existed — a SECOND TAP IS NOT A SECOND COPY. */
+  idempotent: boolean;
+}
+
+/**
+ * The tap in the wrap (N-21-A, N-21-B item 5, N-21-C).
+ *
+ * SELLER-ONLY AND NEVER AUTOMATIC. save_intake_note resolves its actor with
+ * current_entity_id() and has no service-role arm — it goes one grant tighter
+ * than queue_ehr_push, which N-21-D item 5 records as deliberate. "A tap in the
+ * wrap" resolves to TWO ACTS ON ONE SCREEN (N-21-C): folding the snapshot into
+ * wrap_visit would make it automatic, which the ruling refuses.
+ *
+ * THE CALLER MUST READ `idempotent` BACK, exactly as queueEhrPush's caller reads
+ * `status`: an already-saved engagement returns the existing row with
+ * idempotent:true and writes nothing, so reporting a fresh save would be a
+ * claim without an action.
+ *
+ * IT REFUSES A TOMBSTONE RATHER THAN SNAPSHOTTING ONE (N-21-C item 9) — see
+ * INTAKE_ALREADY_REMOVED_COPY for why that refusal is the honest outcome.
+ */
+export async function saveIntakeNote(
+  engagementId: string,
+): Promise<VisitResult<SavedIntakeNote>> {
+  const { data, error } = await supabase.rpc('save_intake_note', {
+    p_engagement_id: engagementId,
+  });
+  if (error) {
+    const reason = classify(error);
+    console.warn('[visits] save_intake_note failed:', { reason, engagementId, error });
+    return { ok: false, reason };
+  }
+  const row = (data ?? {}) as Partial<SavedIntakeNote>;
+  // NO `??` FALLBACK ON THE ID (BUG-016's D1, and queueEhrPush's own posture).
+  // A null result with no error is a failure; dressing it as a saved note would
+  // be a plausible placeholder in the one place a clinician reads to learn
+  // whether their only copy of the intake exists.
+  if (typeof row.intake_note_id !== 'string' || typeof row.saved_at !== 'string') {
+    console.error('[visits] save_intake_note returned no row', { engagementId, data });
+    return { ok: false, reason: 'request_failed' };
+  }
+  return {
+    ok: true,
+    value: {
+      intake_note_id: row.intake_note_id,
+      saved_at: row.saved_at,
+      snapshot_length: typeof row.snapshot_length === 'number' ? row.snapshot_length : 0,
+      idempotent: row.idempotent === true,
+    },
+  };
+}
+
 /**
  * Every push the caller owns, newest first. The null argument is the shape
  * 0045:283 names for exactly this — "what a Today strip needs" — so the screen

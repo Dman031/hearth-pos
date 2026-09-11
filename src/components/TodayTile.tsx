@@ -8,6 +8,7 @@ import Toast from './Toast';
 import {
   deriveVisitState,
   queueEhrPush,
+  saveIntakeNote,
   startVisit,
   type DayVisit,
   type EhrPush,
@@ -15,6 +16,12 @@ import {
 import { issueSuperbill, signedSuperbillUrl } from '../services/superbill';
 import {
   CHIP_FIRST_VISIT,
+  INTAKE_ACTION,
+  INTAKE_ACTION_SAVED,
+  INTAKE_ALREADY_REMOVED_COPY,
+  INTAKE_NONE,
+  INTAKE_NOT_FULFILLED,
+  INTAKE_SAVED_TOAST,
   PUSH_ACTION,
   PUSH_ACTION_RETRY,
   PUSH_ACTION_SENT,
@@ -77,6 +84,15 @@ export default function TodayTile({
   const [busy, setBusy] = useState(false);
   const [superbillBusy, setSuperbillBusy] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
+  const [intakeBusy, setIntakeBusy] = useState(false);
+  // SESSION-LOCAL, AND DELIBERATELY NOT A CLAIM ABOUT THE DATABASE. There is no
+  // saved-note flag on get_my_day, so this records only "this screen saved it
+  // just now" and starts false on every mount. A tile that has not been tapped
+  // this session shows the plain label and lets the RPC answer — which it does
+  // idempotently, returning the existing row rather than a second copy. Item 6
+  // is the read that turns this into a fact; until then it must not look like
+  // one. (BUG-016's shape: bookkeeping that says yes on its own authority.)
+  const [intakeSaved, setIntakeSaved] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   const state = deriveVisitState(visit);
@@ -185,6 +201,49 @@ export default function TodayTile({
       return;
     }
     await openDocument(url);
+  };
+
+  /**
+   * THE TAP IN THE WRAP (N-21-A, N-21-B item 5, N-21-C).
+   *
+   * The clinician keeping their own copy of the intake before the network's
+   * purges. It is THEIR act and never automatic — N-21-C resolves "a tap in the
+   * wrap" to TWO ACTS ON ONE SCREEN, and folding it into wrap_visit is
+   * explicitly refused, which is why this sits beside Send-to-record rather
+   * than inside WrapSheet.
+   *
+   * THE RETURN DECIDES WHAT IS SAID, not the state on screen when the finger
+   * landed — same posture as sendToRecord below. An already-saved engagement
+   * comes back idempotent:true having written nothing, and saying "saved" again
+   * would be a claim without an action.
+   *
+   * TWO OF ITS THREE REFUSALS ARE PERMANENT and neither offers a retry: see
+   * INTAKE_NONE and INTAKE_ALREADY_REMOVED_COPY.
+   */
+  const saveIntake = async (): Promise<void> => {
+    if (intakeBusy) return;
+    setIntakeBusy(true);
+    const result = await saveIntakeNote(visit.engagement_id);
+    setIntakeBusy(false);
+
+    if (!result.ok) {
+      setToast(
+        result.reason === 'not_fulfilled'
+          ? INTAKE_NOT_FULFILLED
+          : result.reason === 'no_intake'
+            ? INTAKE_NONE
+            : result.reason === 'intake_already_removed'
+              ? INTAKE_ALREADY_REMOVED_COPY
+              : result.reason === 'not_seller'
+                ? 'Only the clinician who provided the visit can save it.'
+                : result.reason === 'unauthenticated'
+                  ? 'Sign in again to do that.'
+                  : 'Couldn’t save that just now. Nothing was changed — try again.',
+      );
+      return;
+    }
+    setIntakeSaved(true);
+    setToast(result.value.idempotent ? INTAKE_ACTION_SAVED : INTAKE_SAVED_TOAST);
   };
 
   /**
@@ -398,6 +457,26 @@ export default function TodayTile({
                 says so and does not offer one. Announcing "sent" for a call
                 that changes nothing is the claim-without-an-action this
                 codebase blocks everywhere else. */}
+            {/* THE INTAKE TAP (N-21). Beside Send-to-record, not inside the
+                wrap sheet: N-21-C resolves "a tap in the wrap" to two acts on
+                ONE SCREEN and refuses to fold it into wrap_visit, which would
+                make it automatic. Disabled only while in flight or after this
+                session saved it — never on a guess about the database. */}
+            <Pressable
+              style={[styles.outline, (intakeBusy || intakeSaved) && styles.off]}
+              disabled={intakeBusy || intakeSaved}
+              onPress={() => void saveIntake()}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: intakeBusy || intakeSaved }}
+            >
+              {intakeBusy ? (
+                <ActivityIndicator size="small" color={theme.colors.accent} />
+              ) : (
+                <Text style={styles.outlineLabel}>
+                  {intakeSaved ? INTAKE_ACTION_SAVED : INTAKE_ACTION}
+                </Text>
+              )}
+            </Pressable>
             <Pressable
               style={[styles.outline, (pushBusy || pushLine?.settled === true) && styles.off]}
               disabled={pushBusy || pushLine?.settled === true}
