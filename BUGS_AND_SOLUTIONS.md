@@ -878,3 +878,57 @@ So the null arm names **no window at all** and says the refund depends on notice
 The test, for any RPC whose body gained a dispatch or a second policy arm: **list every user-facing string derived from that call and re-read each against BOTH arms.** Not the call site — the strings. Here that was six confirm alerts and two post-call alerts, of which four were wrong.
 
 Sweep: `grep -rn "\.rpc('" src/` → for each RPC, `admin_functiondef` its live body and count the distinct outcomes it can return; then grep the screen for strings that name any of them. An RPC with more outcomes than the screen has sentences is either under-rendered or lying.
+
+## BUG-015: [OPEN · RULING-COMPLIANCE] N-2 says "ONE CONSUMER of get_my_day, not two" — there are two, and the second one's correctness rests on a comment
+
+**Category:** ruling-compliance / single-authority · **Severity:** low today (the second consumer renders a count, not a day) · **Status:** **OPEN — ledgered by ruling (Derrick, 2026-09-11), deliberately NOT fixed**
+**Introduced-by:** Claude-build, N-19 as implemented — `8890820` (2026-09-01), "PlexMed is one screen with four states". The count row added a second `useMyDay()` call and pre-empted the objection in a comment rather than in the roadmap.
+**Found:** 2026-09-11, the ruling-compliance sweep (single-authority pass), and re-verified at the time of writing.
+
+### Symptoms
+
+None visible. PlexMed's "Today" row shows a number and taps through to Engagement; Engagement shows the day. Nothing renders wrong on the happy path.
+
+### Root Cause
+
+N-2 (`DEUS_DAY_BY_DAY.md:2607-2614`):
+
+> ONE CONSUMER of get_my_day, not two. The room row and the wrap affordance are CONDITIONAL ON CARD KIND within that one surface; **a second Today for clinicians would be a second fold of the same read, and two folds drift.**
+
+Two consumers exist, verified at the time of writing (`grep -rn "useMyDay()" src/`):
+
+| file:line | Use |
+|---|---|
+| `src/screens/EngagementScreen.tsx:257` | the Today section — the one N-2 means |
+| `src/screens/PlexMedScreen.tsx:109` | `const { visits } = useMyDay()`, rendered at `:250` as `detail={`${visits.length}`}` |
+
+**They are two independent reads, not two views of one.** `useMyDay` (`src/hooks/useMyDay.ts:36-38`) holds its own `useState` per call — it is a hook, not a context — so each consumer issues its own `get_my_day` request, holds its own `visits` array and refreshes on its own schedule. Engagement refreshes its copy after a wrap or a cancellation (`refreshDay`); PlexMed's copy does not share that refresh and stays as it was until the screen remounts. **That is "two folds drift" in the ruling's own words**, even though the second fold only folds to a number.
+
+**THE FINDING IS WHERE THE CORRECTNESS LIVES, not that the count is wrong.** `PlexMedScreen.tsx:107-108` answers the ruling in advance:
+
+> N-2 SURVIVES: Today is generic and lives on Engagement. This is a COUNT AND A DESTINATION off the same service — never a second fold of get_my_day.
+
+That may well be the right reading of N-2 — one *rendered* Today, with a count elsewhere being harmless. But it is a reading, made by the builder, recorded in a comment, and never taken to the roadmap. The ruling as written still says "ONE CONSUMER", so the tree and the canon disagree, and the only thing reconciling them is a sentence a future session has no reason to trust over the ruling it contradicts. Per the canon hierarchy, a decision lives in the roadmap or it is not a decision.
+
+### Solution
+
+**Not applied, by ruling.** Two ways it can close, and choosing between them is a ruling, not a diff:
+
+- **Amend N-2** to say what the build assumed — one consumer that *renders* a day; counts and destinations may read the same service — and the comment becomes a citation instead of an argument.
+- **Hold N-2 as written** — PlexMed's count then has to come from the one consumer (a shared source), or go.
+
+### Cross-check Performed
+
+- **Every `get_my_day` caller in both repos:** app — the two above, both through `useMyDay` → `fetchMyDay` (`visits.ts:133`), no direct `.rpc('get_my_day')` anywhere else. hearth-network — `get_my_day` is an app read; the Worker has no caller (`grep -rn "get_my_day" ../hearth-network/src/` returns comments only).
+- **A BUG-013-class sibling in the same row — FLAGGED, NOT FIXED:** `PlexMedScreen.tsx:109` destructures only `visits`, never `failed` or `isLoading`. `visits` starts as `[]` and a failed read leaves it `[]`, so **a failed `get_my_day` renders "Today · 0"** — absence read as a count, telling a clinician they have no visits today when the app simply could not find out. The same shape this branch fixed for the push map (`d32be9c`). Out of scope for this entry by instruction; recorded so the second fold's two problems are found together.
+- **Other reads with a second consumer — the same shape, and this bullet's first draft got it wrong.** It said `useCardSlots` and `usePendingRequests` each had one consumer. **Both have two**, found by running the grep before committing rather than after (`grep -rn "useCardSlots(\|usePendingRequests(" src/`):
+  - `useCardSlots` — `PlexMedScreen.tsx:103` **and** `OpenTimesBoard.tsx:109`, and the board renders *inside* PlexMedScreen, so both read the same card's slots on the same screen at the same time: two requests, two arrays, two refresh schedules. The sharper of the two.
+  - `usePendingRequests` — `IncomingScreen.tsx:31` (the chips) **and** `ThreadDecisionBanner.tsx:209` (held_until, for the let-go state). Different screens, different columns used.
+  **Neither is a ruling violation** — no ruling names either read as single-consumer, so these are recorded as the same *shape* as this entry (a per-call hook read as though it were shared state), not as further instances of it. They are what makes this entry's pattern worth a rule rather than a one-off. The first draft's "no second instance found" was asserted from memory of the file list; it is corrected here rather than quietly removed, because a cross-check that clears itself without running is the thing this section exists to prevent.
+- **Out-of-scope-but-flagged:** the "Today · 0" failed-read render above.
+
+### Prevention
+
+**When a build departs from the letter of a ruling on the strength of its spirit, the argument goes to the roadmap, not into a comment.** A comment that pre-empts a ruling is a decision written where decisions are not kept: it cannot be found by reading the canon, it is not dated or owned, and a later session reading the ruling has every reason to "fix" the code back into compliance. Either the ruling is amended or the code complies. There is no third state that survives contact with the next reader.
+
+Sweep: `grep -rn "SURVIVES\|never a second\|is not a violation\|does not violate\|still honours" src/` — comments that argue with a ruling are the ones to read against the roadmap.
