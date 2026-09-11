@@ -78,11 +78,18 @@ const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 //                   seller, any notice            refund due
 // Both read from the live catalog 2026-09-10, not from a migration file.
 //
-// THE THIRD STATE IS UNKNOWN AND IT IS NOT "NOT PRACTICE". cardKind is null for
-// a deleted card or a row RLS did not return (see useMyEngagements), and a null
-// must not silently select the 14-day sentence — that is how a patient
-// cancelling a visit gets told the wrong rule. On null the copy names NO window
-// and lets the return speak, which ruling 5 already makes authoritative.
+// THE THIRD STATE IS UNKNOWN AND IT IS NOT "NOT PRACTICE". A null must not
+// silently select the 14-day sentence — that is how a patient cancelling a visit
+// gets told the wrong rule. On null the copy names NO window and lets the return
+// speak, which ruling 5 already makes authoritative.
+//
+// AND IT IS THE PATIENT'S LIVE PATH, MEASURED: scripts/probe-cards-rls.mjs
+// (2026-09-11) shows the card embed resolving for the seller and returning null
+// for the buyer, on a real signed-in session, with no error on either read. So a
+// clinician cancelling their own practice visit sees "24 hours"; a patient
+// cancelling the same visit reaches the unknown arm. Both sentences are true —
+// the patient's is just less useful, and closing that needs a network-side read.
+// See useMyEngagements' note for the full output and why the fix is not RLS.
 
 type RefundRule = 'practice_24h' | 'standard_14d' | 'unknown';
 

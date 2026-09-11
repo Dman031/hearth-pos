@@ -41,16 +41,33 @@ import type { Engagement } from '../types/engagement';
 // 14 days, and the confirm copy has to name the right one BEFORE the call.
 // Embedded the same way `inbound` already is.
 //
-// IT MAY COME BACK NULL, AND THE CALLER MUST TREAT THAT AS UNKNOWN — NOT AS
-// "not practice". Two ways it can be null: the FK is SET NULL (a deleted card),
-// or RLS hides the row. `public.cards` has RLS enabled (0000:141) and NO select
-// policy in any migration in either repo — the five that exist are on audit_log,
-// inbound, messages, threads and engagements — so whether an authenticated
-// caller can read a card they do not own is NOT ESTABLISHED HERE. Table RLS
-// cannot be read with the two sanctioned catalog helpers (admin_proacl covers
-// functions only), so this is stated as unverified rather than asserted either
-// way, and the confirm copy is built so that BOTH ANSWERS ARE SAFE: a null
-// names no window at all instead of defaulting to one that may be wrong.
+// ██ IT COMES BACK NULL FOR THE BUYER. MEASURED, NOT INFERRED. ███████████████
+//
+// `scripts/probe-cards-rls.mjs`, run 2026-09-11 against the live dev database
+// with a REAL signed-in session on the app's own anon key:
+//
+//     buyer  · direct card read (see_perm 'anyone')   : NO ROW
+//     buyer  · direct card read (see_perm 'verified') : NO ROW
+//     buyer  · ENGAGEMENT_SELECT embed -> card.kind   : null
+//     seller · direct card read                       : ROW RETURNED
+//     seller · ENGAGEMENT_SELECT embed -> card.kind   : "practice"
+//
+// No error on any read — RLS filters silently, which is why nothing about this
+// was visible from the app. `public.cards` has RLS enabled (0000:141) and no
+// select policy in any migration in either repo, so the policy that lets a
+// SELLER read was applied by hand and is owner-scoped.
+//
+// SO THIS EMBED IS SELLER-ONLY IN PRACTICE. On a practice booking the buyer is
+// the PATIENT, which means cardKind is null for every patient-initiated
+// cancellation from this app and the confirm's "unknown" arm is THE LIVE PATH
+// for them — it names no window and points at the unconditional seller-cancel
+// alternative. That is correct behaviour over a real gap, not a fallback nobody
+// reaches: closing it needs a narrow network-side read (a card_kind column on an
+// existing RPC, or a SECURITY DEFINER helper), NEVER a widened RLS policy on
+// `cards`. Flagged, not fixed here.
+//
+// The caller must therefore treat null as UNKNOWN and never as "not practice" —
+// which is also true of the other way it goes null, a deleted card (FK SET NULL).
 const ENGAGEMENT_SELECT =
   'id, inbound_id, kind, buyer_entity_id, seller_entity_id, card_id, thread_id, ' +
   'agreed_price_cents, currency, status, scheduled_for, visit_started_at, ' +
