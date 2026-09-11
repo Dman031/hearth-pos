@@ -64,6 +64,25 @@ function Chip({ label, tone, expanded }: { label: string; tone: ChipTone; expand
   );
 }
 
+// ── A3 IS NOT A FACT-CHIP, AND GROUPING IT WITH TWO WAS THE DEFECT ──────────
+//
+// S6-1: "UNCONDITIONAL, and that is load-bearing: this chip is a disclaimer
+// about the NETWORK, not a fact about the person. A disclaimer that renders
+// sometimes is a verdict by another name."
+//
+// A1 and A2 are facts about a person and come from get_my_pending_requests, so
+// when that read fails they are OMITTED rather than guessed — which is right,
+// and unchanged. A3 needs no read at all: it says what nobody did. It was
+// nonetheless rendered through the same props object behind the same `pending`
+// gate, so a failed chips read silently took the disclaimer down with the two
+// facts it has nothing to do with.
+//
+// THE FIX IS THE PROPS, NOT THE LAYOUT. idVerified and firstContact were always
+// optional-meaning-absent; callers now pass `pending?.x`, so a null read yields
+// undefined and those two chips disappear exactly as before while showDisclaimer
+// stays literal. One row, same order, same component — the S7 A3 instruction
+// ("reuse the S6 chip, do not re-author it") applies to this repair too.
+
 interface HonestyChipsProps {
   /** OPTIONAL, and undefined means NO IDENTITY CHIP AT ALL — not an unverified
    *  one. Passing `false` renders "Identity not verified", which is a fact;
@@ -83,7 +102,13 @@ interface HonestyChipsProps {
   firstContact?: boolean;
   /** A2's established-thread wording differs by surface; S7 uses its own. */
   historyLabels?: { first: string; established: string };
-  /** A3. Present on every practice REQUEST; absent on a booked visit. */
+  /**
+   * A3. Present on every practice REQUEST; absent on a booked visit.
+   *
+   * NEVER DERIVE THIS FROM A READ. It is true of every practice request whether
+   * or not anything loaded — see the block above. The only correct reason to
+   * pass false is that the surface is not a practice request.
+   */
   showDisclaimer?: boolean;
 }
 

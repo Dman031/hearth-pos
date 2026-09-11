@@ -160,13 +160,22 @@ export default function ClinicalRequestTile({
 
   return (
     <View style={styles.tile}>
-      {pending ? (
-        <HonestyChips
-          idVerified={pending.sender_id_verified}
-          firstContact={pending.first_contact}
-          showDisclaimer
-        />
-      ) : null}
+      {/* THE DISCLAIMER IS NOT BEHIND THE READ (S6-1). This block used to be
+          wrapped in `{pending ? … : null}`, which took A3 down with A1 and A2
+          whenever get_my_pending_requests failed or had not resolved — and A3
+          is a statement about what the NETWORK did not do, true on every
+          practice request with or without data. Every row this component
+          renders IS a practice request (InboundTile:102 routes on
+          card.kind === 'practice'), so the disclaimer is literal here.
+
+          THE TWO FACT-CHIPS ARE UNCHANGED: `pending?.x` is undefined on a
+          failed or pending read, and undefined has always meant NO CHIP rather
+          than a false one. Omit-on-failure survives exactly as written. */}
+      <HonestyChips
+        idVerified={pending?.sender_id_verified}
+        firstContact={pending?.first_contact}
+        showDisclaimer
+      />
 
       {/* T2 / T3 / T4 banners. */}
       {letGo ? (

@@ -18,6 +18,7 @@ import {
   LET_GO_TITLE,
   NOT_DECLINABLE_MESSAGE,
 } from '../services/practice';
+import HonestyChips from './HonestyChips';
 import { formatAcceptLabel, formatCents, ENGAGEMENT_KIND_LABEL, KIND_LABEL } from '../utils/format';
 import { formatForDisplay } from '../datetime';
 import type { Inbound } from '../types/inbound';
@@ -133,6 +134,25 @@ function DecisionPanel({
       </View>
       {cardTitle ? <Text style={styles.titleText}>{cardTitle}</Text> : null}
       {cardTerms ? <Text style={styles.termsText}>{cardTerms}</Text> : null}
+
+      {/* ── A3, WHICH THIS SURFACE DID NOT CARRY AT ALL (S6-1) ──────────────
+          "unconditional on every practice request." This panel renders practice
+          requests and offers Accept and Decline on them, and had no disclaimer
+          of any kind — so the same decision, on the same row, said one thing in
+          Incoming and nothing here. A disclaimer that depends on which screen
+          the clinician happened to open is the "renders sometimes" the ruling
+          names, in its second form.
+
+          THE DISCLAIMER ONLY, AND THAT IS DELIBERATE. A1 and A2 are facts about
+          the sender and come from get_my_pending_requests, which this component
+          does not read — it reads holds, for the let-go state, and nothing else
+          (see the header). Rendering a chip here with no source would be the
+          invented-value defect; rendering the disclaimer needs no source.
+
+          GATED ON isPracticeRequest, because unlike ClinicalRequestTile this
+          panel also renders ordinary bookings and orders, and A3 is a statement
+          about the practice surface. */}
+      {isPracticeRequest ? <HonestyChips showDisclaimer /> : null}
 
       {/* NOT AN ERROR STATE, and not styled as one — the clinician did nothing
           wrong and neither did the person who asked. Never "expired", and
