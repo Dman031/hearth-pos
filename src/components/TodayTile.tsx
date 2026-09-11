@@ -21,6 +21,7 @@ import {
   INTAKE_ALREADY_REMOVED_COPY,
   INTAKE_NONE,
   INTAKE_NOT_FULFILLED,
+  INTAKE_SAVED_AFTER_PUSH,
   INTAKE_SAVED_TOAST,
   PUSH_ACTION,
   PUSH_ACTION_RETRY,
@@ -243,7 +244,26 @@ export default function TodayTile({
       return;
     }
     setIntakeSaved(true);
-    setToast(result.value.idempotent ? INTAKE_ACTION_SAVED : INTAKE_SAVED_TOAST);
+    // ── N-21-D item 2 — SAY WHICH OF THE TWO THINGS HAPPENED ────────────────
+    // The outbox row is already on this tile (the `push` prop, from the screen's
+    // single get_my_ehr_pushes read), so the app can see that the bundle has
+    // drained: status 'sent'. One bundle, two documents — an intake saved after
+    // that row drained does NOT reach the EHR, because a 'sent' row is a
+    // deliberate no-op and save_intake_note is not a second writer of the
+    // outbox. The ruling accepts that cost and names this sentence as the
+    // mitigation.
+    //
+    // READ OFF THE ROW, NEVER GUESSED. push is null when nobody has tapped —
+    // which is not the same as "not sent yet" and not the same as "we could not
+    // tell"; in both of those cases the ordinary sentence is the true one.
+    const alreadyPushed = push?.status === 'sent';
+    setToast(
+      alreadyPushed
+        ? INTAKE_SAVED_AFTER_PUSH
+        : result.value.idempotent
+          ? INTAKE_ACTION_SAVED
+          : INTAKE_SAVED_TOAST,
+    );
   };
 
   /**

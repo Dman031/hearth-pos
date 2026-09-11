@@ -191,6 +191,30 @@ export const INTAKE_ACTION = 'Save to my notes';
 export const INTAKE_ACTION_SAVED = 'Saved to your notes';
 export const INTAKE_SAVED_TOAST = 'Saved to your notes. This copy is yours to keep.';
 
+/**
+ * N-21-D item 2. THE ACCEPTED COST OF SHAPE (A), SAID OUT LOUD.
+ *
+ * One bundle, two documents: the intake DocumentReference is a member of the
+ * one per-engagement FHIR bundle, and ehr_push_outbox's dedupe key and 'sent'
+ * posture are untouched. The consequence the ruling ACCEPTS is that an intake
+ * saved after that row has drained does not reach the EHR — a 'sent' row is a
+ * deliberate no-op (queue_ehr_push, the S8-3 reasoning) and save_intake_note is
+ * not a second writer of the outbox.
+ *
+ * THE RULING NAMES THIS SENTENCE AS THE MITIGATION AND CALLS IT A PRODUCT
+ * SENTENCE, NOT A TECHNICAL ONE: "saved to your notes, not sent" is true,
+ * complete, and says WHICH OF THE TWO THINGS the clinician got. It must not be
+ * softened into "may not have sent" — the outbox row says 'sent', so this is
+ * known, not suspected — and it must not offer a retry, because the row's no-op
+ * is deliberate and a second tap changes nothing.
+ *
+ * intake_notes survives regardless: the snapshot is the professional's copy and
+ * nothing deletes it (N-21-B item 5, "same retention" means KEPT).
+ */
+export const INTAKE_SAVED_AFTER_PUSH =
+  'Saved to your notes, not sent. This visit already went to your record, and it can’t be ' +
+  'added to that one — hand it over directly if it needs to go with the visit.';
+
 // ── THE REFUSALS, ONE SENTENCE EACH, AND TWO OF THE THREE ARE PERMANENT ─────
 //
 // Every one of these reached "Couldn't send that just now. Nothing was changed
