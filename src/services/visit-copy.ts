@@ -223,6 +223,26 @@ export const INTAKE_SAVED_AFTER_PUSH =
 // defect BUG-011 closed on Incoming, and it is why these strings exist before
 // the tap that can produce them.
 
+/** The saved note, read back (N-21-A: "the saved copy is theirs"). */
+export const INTAKE_VIEW_TITLE = 'The intake';
+
+/**
+ * N-21-B item 5's LABEL, ON THE APP SIDE. "The note is labeled
+ * patient-reported, assistant-composed — never a clinical note."
+ *
+ * The machine-visible half of that ruling is the FHIR type text (N-21-C item
+ * 11, 'Patient-reported intake (assistant-composed)'). This is the half a
+ * clinician actually reads, and it ships with the text every time the text is
+ * shown — never once at save time and then forgotten, because the label is what
+ * stops a free-text paragraph being read as an assessment.
+ */
+export const INTAKE_VIEW_LABEL =
+  'Patient-reported, composed by their assistant. Not a clinical note, and nobody assessed it.';
+
+/** Saved, then read back to nothing. Rare, and it must not read as a refusal. */
+export const INTAKE_VIEW_NONE =
+  'Nothing saved for this visit yet. Save it while the intake is still here.';
+
 /** NOT_FULFILLED (save_intake_note :40-44). Recoverable — wrap it and tap again. */
 export const INTAKE_NOT_FULFILLED = 'Wrap the visit first — the intake saves once the visit is done.';
 

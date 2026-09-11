@@ -422,6 +422,44 @@ export async function saveIntakeNote(
   };
 }
 
+/** get_my_intake_note's row (live body :2). */
+export interface IntakeNote {
+  intake_note_id: string;
+  engagement_id: string;
+  issued_by: string;
+  snapshot: string;
+  created_at: string;
+}
+
+/**
+ * Read the saved note back (N-21-A: "the saved copy is theirs").
+ *
+ * THREE OUTCOMES, THREE SHAPES, AND THE EMPTY ONE IS NOT A REFUSAL. The live
+ * body raises UNAUTHENTICATED, "engagement not found" and "caller is not the
+ * seller" — but returns ZERO ROWS when the seller simply has not saved one, and
+ * its own comment says why the two are kept apart: "The caller distinguishes
+ * this from the refusals above because those never return at all."
+ *
+ * So `ok: true` with `null` means NOT SAVED, and it is a fact rather than a
+ * failure. Collapsing it into an error would be the inverse of this repo's
+ * usual mistake — reporting a refusal the system never made.
+ */
+export async function fetchIntakeNote(
+  engagementId: string,
+): Promise<VisitResult<IntakeNote | null>> {
+  const { data, error } = await supabase.rpc('get_my_intake_note', {
+    p_engagement_id: engagementId,
+  });
+  if (error) {
+    const reason = classify(error);
+    console.warn('[visits] get_my_intake_note failed:', { reason, engagementId, error });
+    return { ok: false, reason };
+  }
+  // A set-returning function comes back as an array. Zero rows = none saved.
+  const rows = (data ?? []) as IntakeNote[];
+  return { ok: true, value: rows.length > 0 ? rows[0] : null };
+}
+
 /**
  * Every push the caller owns, newest first. The null argument is the shape
  * 0045:283 names for exactly this — "what a Today strip needs" — so the screen

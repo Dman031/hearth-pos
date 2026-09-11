@@ -7,6 +7,7 @@ import HonestyChips from './HonestyChips';
 import Toast from './Toast';
 import {
   deriveVisitState,
+  fetchIntakeNote,
   queueEhrPush,
   saveIntakeNote,
   startVisit,
@@ -22,6 +23,9 @@ import {
   INTAKE_NONE,
   INTAKE_NOT_FULFILLED,
   INTAKE_SAVED_AFTER_PUSH,
+  INTAKE_VIEW_LABEL,
+  INTAKE_VIEW_NONE,
+  INTAKE_VIEW_TITLE,
   INTAKE_SAVED_TOAST,
   PUSH_ACTION,
   PUSH_ACTION_RETRY,
@@ -90,9 +94,13 @@ export default function TodayTile({
   // saved-note flag on get_my_day, so this records only "this screen saved it
   // just now" and starts false on every mount. A tile that has not been tapped
   // this session shows the plain label and lets the RPC answer — which it does
-  // idempotently, returning the existing row rather than a second copy. Item 6
-  // is the read that turns this into a fact; until then it must not look like
-  // one. (BUG-016's shape: bookkeeping that says yes on its own authority.)
+  // idempotently, returning the existing row rather than a second copy.
+  // (BUG-016's shape: bookkeeping that says yes on its own authority.)
+  //
+  // AND IT IS CORRECTED BY THE READ, NOT ONLY SET BY THE WRITE: viewIntake puts
+  // it back to false when get_my_intake_note returns no row, so the flag can
+  // never outlive the thing it describes. That is the whole of what makes it
+  // safe to drive a label from session state.
   const [intakeSaved, setIntakeSaved] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -264,6 +272,53 @@ export default function TodayTile({
           ? INTAKE_ACTION_SAVED
           : INTAKE_SAVED_TOAST,
     );
+  };
+
+  /**
+   * Read the saved copy back (N-21-A, item 6).
+   *
+   * THIS IS WHY THE SAVED BUTTON IS NOT DISABLED. A control whose only outcome
+   * is nothing cannot act — the same reasoning P-6 used to strip the tap off the
+   * storefront row. Once a note exists the button stops being a save and becomes
+   * a view, which is the one thing a clinician actually wants from it: their own
+   * copy, after the network's has gone.
+   *
+   * ZERO ROWS IS NOT A REFUSAL. get_my_intake_note returns an empty set when
+   * nothing is saved and RAISES for the three real refusals, deliberately so the
+   * caller can tell them apart (live :29-30). `ok: true, value: null` therefore
+   * renders a fact, not an error.
+   *
+   * THE LABEL SHIPS WITH THE TEXT, EVERY TIME. N-21-B item 5 rules the note
+   * "patient-reported, assistant-composed — never a clinical note", and a label
+   * shown once at save time and dropped at read time is not a label.
+   */
+  const viewIntake = async (): Promise<void> => {
+    if (intakeBusy) return;
+    setIntakeBusy(true);
+    const result = await fetchIntakeNote(visit.engagement_id);
+    setIntakeBusy(false);
+
+    if (!result.ok) {
+      setToast(
+        result.reason === 'not_seller'
+          ? 'Only the clinician who provided the visit can read it.'
+          : result.reason === 'unauthenticated'
+            ? 'Sign in again to do that.'
+            : 'Couldn’t open that just now. Try again.',
+      );
+      return;
+    }
+    if (result.value === null) {
+      // Saved this session, absent on read — or never saved at all. Either way
+      // the honest move is to put the control back rather than leave a button
+      // claiming a copy that is not there.
+      setIntakeSaved(false);
+      setToast(INTAKE_VIEW_NONE);
+      return;
+    }
+    Alert.alert(INTAKE_VIEW_TITLE, `${INTAKE_VIEW_LABEL}\n\n${result.value.snapshot}`, [
+      { text: 'Close', style: 'cancel' },
+    ]);
   };
 
   /**
@@ -483,11 +538,11 @@ export default function TodayTile({
                 make it automatic. Disabled only while in flight or after this
                 session saved it — never on a guess about the database. */}
             <Pressable
-              style={[styles.outline, (intakeBusy || intakeSaved) && styles.off]}
-              disabled={intakeBusy || intakeSaved}
-              onPress={() => void saveIntake()}
+              style={[styles.outline, intakeBusy && styles.off]}
+              disabled={intakeBusy}
+              onPress={() => void (intakeSaved ? viewIntake() : saveIntake())}
               accessibilityRole="button"
-              accessibilityState={{ disabled: intakeBusy || intakeSaved }}
+              accessibilityState={{ disabled: intakeBusy }}
             >
               {intakeBusy ? (
                 <ActivityIndicator size="small" color={theme.colors.accent} />
