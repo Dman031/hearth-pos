@@ -105,6 +105,17 @@ export type VisitFailure =
   // user to tell, and a raise here reaches the finger that tapped.
   | 'not_wrapped'
   | 'cancelled'
+  // save_intake_note's three (live body, read 2026-09-10). EVERY ONE OF THESE
+  // WAS REACHING 'request_failed' BEFORE IT WAS NAMED, and TodayTile's last arm
+  // says "Couldn't send that just now. Nothing was changed — try again." Two of
+  // the three are PERMANENT, so that default was the same
+  // permanent-refusal-as-retry defect BUG-011 closed on the Incoming side —
+  // three more instances of it, queued and waiting for the tap to exist.
+  //
+  // ADDITIONS ONLY: nothing above changes shape, and no existing arm moves.
+  | 'not_fulfilled'
+  | 'no_intake'
+  | 'intake_already_removed'
   | 'request_failed';
 
 export type VisitResult<T> = { ok: true; value: T } | { ok: false; reason: VisitFailure };
@@ -130,11 +141,26 @@ function classify(err: unknown): VisitFailure {
       return 'no_plan';
     case 'NOT_WRAPPED':
       return 'not_wrapped';
+    // save_intake_note. All three carry an explicit (code: X) suffix, so they
+    // match here rather than by message like the four below.
+    case 'NOT_FULFILLED':
+      return 'not_fulfilled';
+    case 'NO_INTAKE':
+      return 'no_intake';
+    case 'INTAKE_ALREADY_REMOVED':
+      return 'intake_already_removed';
     default:
       break;
   }
   // These four raise without a code token; matched on the message, which is
   // stable in the migration and not user-facing either way.
+  //
+  // save_intake_note AND get_my_intake_note BOTH REUSE THIS EXACT STRING for
+  // their seller check — "caller is not the seller", verbatim but for the
+  // function name, which the live bodies say they do on purpose so a refusal
+  // matched BY MESSAGE reads one needle instead of three that drift
+  // (get_my_intake_note live :25-26). So this line already covers them and no
+  // fourth arm is owed.
   if (/caller is not the seller/i.test(message)) return 'not_seller';
   if (/at most 20 items/i.test(message)) return 'plan_too_many';
   if (/is cancelled \(terminal\)/i.test(message)) return 'cancelled';

@@ -170,6 +170,57 @@ export const PUSH_ACTION_SENT = 'Already sent';
 export const PUSH_ACTION_RETRY = 'Send it again';
 export const PUSH_QUEUED = 'Queued. It sends on the next round.';
 
+// ─── THE INTAKE SNAPSHOT (N-21-A / N-21-B item 5 / N-21-C) ──────────────────
+//
+// "A tap in the wrap, never automatic." The network's own copy of the intake
+// purges — at fulfilled_at + 24h, or cancelled, or scheduled_for + 7 days,
+// whichever comes first (purge_intakes live body :23, :26). This tap is how a
+// clinician keeps their own copy before that happens, and it is THEIR act: the
+// saved copy is governed by their obligations, not the network's.
+//
+// THE LABEL SAYS "NOTES", NOT "INTAKE RECORD" OR ANYTHING CLINICAL-SOUNDING.
+// N-21-B item 5 is explicit that the note is "patient-reported,
+// assistant-composed — never a clinical note", and the machine-visible half of
+// that is the FHIR type text (N-21-C item 11). The app-visible half is this
+// label: a clinician reading "Save to my notes" is not being told they have
+// captured a clinical assessment.
+
+export const INTAKE_ACTION = 'Save to my notes';
+/** The idempotent return (save_intake_note :58-62). A second tap is not a
+ *  second copy and must not read like one. */
+export const INTAKE_ACTION_SAVED = 'Saved to your notes';
+export const INTAKE_SAVED_TOAST = 'Saved to your notes. This copy is yours to keep.';
+
+// ── THE REFUSALS, ONE SENTENCE EACH, AND TWO OF THE THREE ARE PERMANENT ─────
+//
+// Every one of these reached "Couldn't send that just now. Nothing was changed
+// — try again." before it was named. For NO_INTAKE and INTAKE_ALREADY_REMOVED
+// that advice is false: no number of taps changes either. This is the same
+// defect BUG-011 closed on Incoming, and it is why these strings exist before
+// the tap that can produce them.
+
+/** NOT_FULFILLED (save_intake_note :40-44). Recoverable — wrap it and tap again. */
+export const INTAKE_NOT_FULFILLED = 'Wrap the visit first — the intake saves once the visit is done.';
+
+/** NO_INTAKE (:72-76). Nothing went wrong; this booking never carried one. */
+export const INTAKE_NONE =
+  'This booking didn’t come with an intake, so there’s nothing to save. Nothing went wrong.';
+
+/**
+ * INTAKE_ALREADY_REMOVED (:83-87). THE ONE N-21-C ITEM 9 WROTE A RULING ABOUT:
+ * "A silent push of 'Intake delivered and removed' is a lie in the record; a
+ * refusal is not." The refusal is honest and the copy has to be too — nothing
+ * went wrong, the record simply expired, and no tap brings it back.
+ *
+ * REACHABLE TWO WAYS AND THE SENTENCE COVERS BOTH: a visit wrapped and tapped
+ * more than 24 hours later, or one never wrapped and tapped after the 7-day
+ * floor. "after the visit" is true of both without naming a number the
+ * clinician would then have to reconcile against their own timing.
+ */
+export const INTAKE_ALREADY_REMOVED_COPY =
+  'The intake was removed after the visit and can’t be saved now. Nothing went wrong — the ' +
+  'network only keeps it as long as the visit needs it.';
+
 /** Where the one fixable skip points. Same pointing shape as WrapSheet's C5. */
 export const PUSH_NPI_POINTER = 'Verify your license in your account, under Verify my license.';
 
