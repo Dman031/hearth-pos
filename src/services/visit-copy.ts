@@ -211,6 +211,20 @@ export const INTAKE_SAVED_TOAST = 'Saved to your notes. This copy is yours to ke
  * intake_notes survives regardless: the snapshot is the professional's copy and
  * nothing deletes it (N-21-B item 5, "same retention" means KEPT).
  */
+/**
+ * The same save, when we could not find out whether the bundle had drained.
+ *
+ * N-21-D item 2's sentence is a CLAIM — "this visit already went to your
+ * record" — and it is only sayable off a read that succeeded. When the outbox
+ * read has never come back, the honest answer names the saved copy (which is
+ * certain: the RPC returned) and declines to characterise the push (which is
+ * not). It must not fall back to the plain sentence: that one implies the
+ * intake still has a route to the record, which is the half we do not know.
+ */
+export const INTAKE_SAVED_PUSH_UNKNOWN =
+  'Saved to your notes. We couldn’t check whether this visit had already gone to your ' +
+  'record — if it had, the intake won’t have gone with it.';
+
 export const INTAKE_SAVED_AFTER_PUSH =
   'Saved to your notes, not sent. This visit already went to your record, and it can’t be ' +
   'added to that one — hand it over directly if it needs to go with the visit.';

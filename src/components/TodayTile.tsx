@@ -7,6 +7,7 @@ import HonestyChips from './HonestyChips';
 import Toast from './Toast';
 import {
   deriveVisitState,
+  fetchEhrPushes,
   fetchIntakeNote,
   queueEhrPush,
   saveIntakeNote,
@@ -23,6 +24,7 @@ import {
   INTAKE_NONE,
   INTAKE_NOT_FULFILLED,
   INTAKE_SAVED_AFTER_PUSH,
+  INTAKE_SAVED_PUSH_UNKNOWN,
   INTAKE_VIEW_LABEL,
   INTAKE_VIEW_NONE,
   INTAKE_VIEW_TITLE,
@@ -71,9 +73,22 @@ interface TodayTileProps {
    *  thread. Null renders the kind noun rather than a placeholder. */
   peerName: string | null;
   tz: string;
-  /** This visit's push row, from the screen's single get_my_ehr_pushes read.
-   *  Null means NO ROW — nobody has tapped — never "we could not tell". */
+  /**
+   * This visit's push row, from the screen's single get_my_ehr_pushes read.
+   * Null means NO ROW — nobody has tapped. IT MEANS THAT ONLY WHEN pushKnown IS
+   * TRUE; read the two together and never the null alone.
+   */
   push: EhrPush | null;
+  /**
+   * Has that read ever succeeded this session?
+   *
+   * FALSE MEANS "WE COULD NOT TELL", which is the meaning `push === null` used
+   * to absorb and must not. The screen leaves its map intact on a failed
+   * refresh so a transient failure cannot erase a status mid-read — but on the
+   * FIRST load "intact" is empty, and every tile then received null with no way
+   * to distinguish an untapped visit from an unread outbox.
+   */
+  pushKnown: boolean;
   onWrap: (visit: DayVisit) => void;
   onChanged: () => void;
 }
@@ -83,6 +98,7 @@ export default function TodayTile({
   peerName,
   tz,
   push,
+  pushKnown,
   onWrap,
   onChanged,
 }: TodayTileProps) {
@@ -261,16 +277,39 @@ export default function TodayTile({
     // outbox. The ruling accepts that cost and names this sentence as the
     // mitigation.
     //
-    // READ OFF THE ROW, NEVER GUESSED. push is null when nobody has tapped —
-    // which is not the same as "not sent yet" and not the same as "we could not
-    // tell"; in both of those cases the ordinary sentence is the true one.
-    const alreadyPushed = push?.status === 'sent';
+    // READ OFF THE ROW, NEVER GUESSED — AND NEVER OFF A NULL WHOSE MEANING IS
+    // UNSETTLED. This branch read `push?.status === 'sent'` against a prop that
+    // was null both when nobody had tapped AND when the outbox read had never
+    // come back, so a clinician owed "saved to your notes, NOT SENT" could be
+    // told the plain sentence instead — the one case N-21-D item 2 exists for.
+    //
+    // WHEN WE DO NOT KNOW, WE GO AND FIND OUT. fetchEhrPushes already takes an
+    // engagement id (0045:283's shape), so one targeted read answers the
+    // question at the only moment it matters, instead of hedging on every save.
+    let pushRow = push;
+    let known = pushKnown;
+    if (!known) {
+      const pushResult = await fetchEhrPushes(visit.engagement_id);
+      if (pushResult.ok) {
+        pushRow = pushResult.value[0] ?? null;
+        known = true;
+      } else {
+        console.warn('[TodayTile] targeted get_my_ehr_pushes failed after save', {
+          engagementId: visit.engagement_id,
+          reason: pushResult.reason,
+        });
+      }
+    }
     setToast(
-      alreadyPushed
-        ? INTAKE_SAVED_AFTER_PUSH
-        : result.value.idempotent
-          ? INTAKE_ACTION_SAVED
-          : INTAKE_SAVED_TOAST,
+      // Unknown FIRST: it outranks both other arms, because each of them makes
+      // a claim about the push that an unread outbox cannot support.
+      !known
+        ? INTAKE_SAVED_PUSH_UNKNOWN
+        : pushRow?.status === 'sent'
+          ? INTAKE_SAVED_AFTER_PUSH
+          : result.value.idempotent
+            ? INTAKE_ACTION_SAVED
+            : INTAKE_SAVED_TOAST,
     );
   };
 
@@ -357,6 +396,15 @@ export default function TodayTile({
     onChanged();
   };
 
+  // WHEN pushKnown IS FALSE THIS IS NULL AND NO STATUS LINE RENDERS, which is
+  // the right silence: an unread outbox has no status to report, and the tile
+  // says nothing rather than "Not sent". The Send-to-record control then shows
+  // its plain label and stays enabled — a tap in that state is safe, because a
+  // 'sent' row is a deliberate no-op server-side and queueEhrPush reports the
+  // status it gets BACK rather than the one that was on screen. Considered and
+  // left as it is; the branch that could not be left alone was the intake
+  // sentence above, which makes a claim rather than offering an action.
+  //
   // The push row, as a clinician reads it. pushed_at is formatted HERE, through
   // src/datetime.ts and in the practice's own zone — the copy module holds no
   // timezone, and the DATE/TIME rule forbids formatting at a display site.

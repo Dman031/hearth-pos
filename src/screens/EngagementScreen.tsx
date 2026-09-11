@@ -262,6 +262,19 @@ export default function EngagementScreen() {
   // which is what a Today strip needs" — so the screen fetches once and indexes
   // it, rather than one RPC per wrapped tile.
   const [pushes, setPushes] = useState<Map<string, EhrPush>>(new Map());
+  // ── THE MAP'S THIRD STATE, WHICH IT DID NOT HAVE ──────────────────────────
+  //
+  // An EMPTY map and a map that has never successfully loaded are the same
+  // object, so `pushes.get(id) ?? null` answered "no row — nobody tapped" in
+  // both cases. TodayTile's prop doc asserted exactly that and was wrong on a
+  // cold failed read: refreshPushes deliberately leaves the map alone on
+  // failure ("a failed read and an empty outbox must not look alike"), but on
+  // the FIRST load "alone" is empty.
+  //
+  // NULL KEEPS ITS ONE MEANING — no row. The knownness rides beside it rather
+  // than as a third value in the same variable, because a nullable that means
+  // three things is how the first two got confused.
+  const [pushesKnown, setPushesKnown] = useState(false);
   // C5's handoff target. Holds the practice CARD id, not the visit — the times
   // board posts against a card. Null means no board is open, which is the state
   // after every wrap where the clinician did not ask for one.
@@ -273,7 +286,9 @@ export default function EngagementScreen() {
     if (!result.ok) {
       // A failed read and an empty outbox must not look alike: the map is left
       // as it was rather than cleared, so a transient failure cannot silently
-      // erase a status a clinician is reading.
+      // erase a status a clinician is reading. `pushesKnown` is likewise NOT
+      // set — if a previous read succeeded the tiles keep both the rows and the
+      // knownness; if none ever did, the tiles are told so.
       console.warn('[EngagementScreen] get_my_ehr_pushes failed', { reason: result.reason });
       return;
     }
@@ -285,6 +300,7 @@ export default function EngagementScreen() {
       if (!next.has(row.engagement_id)) next.set(row.engagement_id, row);
     }
     setPushes(next);
+    setPushesKnown(true);
   }, []);
 
   useEffect(() => {
@@ -722,6 +738,7 @@ export default function EngagementScreen() {
                     }
                     tz={dayTz}
                     push={pushes.get(v.engagement_id) ?? null}
+                    pushKnown={pushesKnown}
                     onWrap={setWrapping}
                     onChanged={() => {
                       void refreshDay();
