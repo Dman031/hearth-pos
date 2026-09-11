@@ -50,7 +50,14 @@ interface PendingMessage {
 }
 
 type Row =
-  | { kind: 'message'; key: string; body: string; mine: boolean }
+  | {
+      kind: 'message';
+      key: string;
+      body: string;
+      mine: boolean;
+      /** N-21: non-null on an origin 'ai' row — the label under the bubble. */
+      assistantLabel: string | null;
+    }
   // `path` is the SUPERBILL row's storage path, from the message payload
   // (0042:139-146). It is mutually exclusive with `url` in practice: the room
   // link's URL is in the BODY, the superbill's pointer is in the PAYLOAD, and
@@ -314,6 +321,18 @@ export default function PlexChatScreen() {
     // clinician would have appeared to type a link at their own patient an hour
     // before the visit. That is the same authorship lie E-3a ruled against in
     // the From line — she tapped Accept, she did not write it.
+    //
+    // ORIGIN 'ai' IS THE THIRD VALUE AND IT IS NEITHER OF THE OTHER TWO. It is
+    // not 'human' — a person did not type these words — and it is not 'system',
+    // because a person DID author it through their assistant and approved it
+    // before it was sent. So it keeps the bubble and the side, and carries a
+    // label. See the mapping below; the ruling is N-21 as decided 2026-09-10.
+    //
+    // THE PURGE FLIPS 'ai' TO 'system' (purge_intakes live body :31-35), which
+    // means a tombstoned intake stops taking this branch and starts taking the
+    // one above — the centred row, reading "Intake delivered and removed after
+    // the visit". That is correct and needs no extra code: after the purge
+    // nobody authored anything, and the row should stop claiming they did.
     ...messages.map((m) =>
       m.origin === 'system'
         ? {
@@ -328,6 +347,31 @@ export default function PlexChatScreen() {
             key: m.id,
             body: m.body,
             mine: m.from_entity_id === myEntityId,
+            // ── N-21 / N-21-B: origin 'ai' IS THE INTAKE ────────────────────
+            // confirm_slot_booking is the first and only writer of this value
+            // (live body :152-153): the person's assistant composed the reason
+            // for the booking, the person approved it, and it arrives as the
+            // thread's first message with from_entity_id = THE PERSON.
+            //
+            // SAME SIDE, SAME BUBBLE, PER THE RULING. Not a system row — someone
+            // authored this and the person stands behind it, which is exactly
+            // what a centred no-bubble row denies. But not unmarked either: the
+            // clinician must know a person did not type it word for word.
+            //
+            // THE LABEL IS THE WHOLE DIFFERENCE, and `mine` decides its wording
+            // because the same message reads from two sides. It is derived HERE
+            // rather than in the renderer so the row carries its own attribution
+            // and the render stays a render.
+            //
+            // NO CARD-KIND GATE, BY RULING: attribution is a property of the
+            // message, not of the surface it is read on. A message's authorship
+            // must not depend on which tab you reached it from.
+            assistantLabel:
+              m.origin === 'ai'
+                ? m.from_entity_id === myEntityId
+                  ? 'Sent by your assistant'
+                  : 'Sent by their assistant'
+                : null,
           },
     ),
     ...visiblePending.map((p) => ({
@@ -383,6 +427,24 @@ export default function PlexChatScreen() {
       );
     }
     if (item.kind === 'message') {
+      // The bubble is UNCHANGED — same speaker derivation, same component. The
+      // label sits under it and is aligned to the bubble's own side, so it reads
+      // as belonging to that message rather than to the conversation.
+      if (item.assistantLabel !== null) {
+        return (
+          <View>
+            <ConversationBubble speaker={item.mine ? 'vendor' : 'hearth'} text={item.body} />
+            <Text
+              style={[
+                styles.assistantCaption,
+                item.mine ? styles.captionMine : styles.captionTheirs,
+              ]}
+            >
+              {item.assistantLabel}
+            </Text>
+          </View>
+        );
+      }
       return <ConversationBubble speaker={item.mine ? 'vendor' : 'hearth'} text={item.body} />;
     }
     if (item.status === 'failed') {
@@ -528,6 +590,16 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     marginTop: theme.spacing.sm,
   },
+  // N-21's attribution label. Muted and small: it qualifies the message, it does
+  // not compete with it. Tone matches sendingCaption rather than the system row —
+  // this is a note ABOUT a person's message, not the network speaking.
+  assistantCaption: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    marginTop: theme.spacing.xs,
+  },
+  captionMine: { textAlign: 'right' },
+  captionTheirs: { textAlign: 'left' },
   sendingCaption: {
     ...theme.typography.caption,
     color: theme.colors.textMuted,
