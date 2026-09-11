@@ -160,7 +160,16 @@ export const WRAP_FOOTER =
 // prompt named. A reason with no copy would render as a bare "Not sent", which
 // is the silent failure this whole surface exists to prevent.
 
-/** Mirrors PUSH_MAX_ATTEMPTS (hearth-network src/fhir/push.ts:55). */
+/**
+ * Mirrors PUSH_MAX_ATTEMPTS (hearth-network src/fhir/push.ts:77).
+ *
+ * THE CITATION SAID :55 AND THE CONSTANT IS AT :77 — the network file grew 22
+ * lines above it. The values never disagreed; the POINTER did, which is the
+ * failure mode that makes a declared mirror decay: the comment exists so a
+ * reader can go and check the other half, and a reader who follows a stale line
+ * number finds unrelated prose and either gives up or re-derives the number.
+ * Verified against the live file at hearth-network 3600446.
+ */
 export const PUSH_MAX_ATTEMPTS = 5;
 
 /** The tap. Reads as the far side of the spec's own "Sent to your record". */
