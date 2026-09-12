@@ -932,3 +932,72 @@ That may well be the right reading of N-2 — one *rendered* Today, with a count
 **When a build departs from the letter of a ruling on the strength of its spirit, the argument goes to the roadmap, not into a comment.** A comment that pre-empts a ruling is a decision written where decisions are not kept: it cannot be found by reading the canon, it is not dated or owned, and a later session reading the ruling has every reason to "fix" the code back into compliance. Either the ruling is amended or the code complies. There is no third state that survives contact with the next reader.
 
 Sweep: `grep -rn "SURVIVES\|never a second\|is not a violation\|does not violate\|still honours" src/` — comments that argue with a ruling are the ones to read against the roadmap.
+
+## BUG-016: a visit whose intake did not reach the record still read "Sent to your record"
+
+**Category:** ai-tool-calling / clinical-record-copy · **Severity:** high (tells a clinician a clinical record went out complete when a document did not go, on the surface they check to find out) · **Status:** fixed
+**Introduced-by:** upstream ruling, not a slip. N-21-D item 1 put a SECOND document in the one per-engagement bundle, and `loadIntake` gained two omission values hearth-pos did not know (`hearth-network/src/fhir/push.ts:299`, `:312`). `pushStatusCopy`'s list was written when the bundle carried one document and was correct then. The same shape as BUG-011 and BUG-014: a server grew an outcome underneath a rendering that still compiled.
+**Found:** 2026-09-11, investigating a different reported defect. **The reported premise was wrong and the stop is part of the record** — see Prevention.
+
+### Symptoms
+
+A clinician taps Send to your record. The bundle posts, the row goes `sent`, and the intake DocumentReference is not in it — the intake note lookup failed, or its snapshot was empty. The tile reads:
+
+> **Sent to your record · 29 Aug 2026, 17:34 PDT**
+
+No caveat. The clinician has been told the visit went to their EHR complete, on the one surface built to tell them whether it did. Nothing errors, nothing retries, and the row is terminal — a `sent` row is a deliberate no-op, so the intake will never go.
+
+### Root Cause
+
+`visit-copy.ts`'s `DOCUMENT_OMISSIONS` held only the two SUPERBILL values, and the `sent` branch rendered the caveat line only when one of those matched. The drain concatenates both documents' omissions (`push.ts:400`), so a row carrying only `['intake_lookup_failed']` matched nothing and fell through to the clean return.
+
+**The comment above the list is what let it go unnoticed, and it was stale twice:**
+
+1. It claimed to be *"The omission values hearth-network can write"* — it was the superbill's values only. A reader checking whether the list was complete was told by the comment that it was.
+2. Its citations read `push.ts:210,225,230`. The superbill values are at **`:232`, `:247`, `:252`**. Following the stale pointers lands on nothing, so the one action that would have exposed (1) — go and read the other side — dead-ends.
+
+That pairing is the mechanism: **a list that is wrong, under a comment that says it is complete, above citations that cannot be followed.** Each alone is survivable; together they close every route to noticing.
+
+### Solution
+
+`src/services/visit-copy.ts` — two lists, four arms, and the comment rewritten.
+
+- `INTAKE_OMISSIONS = ['intake_lookup_failed', 'intake_snapshot_empty']`, cited at `push.ts:299` and `:312`.
+- **Kept as TWO lists, not merged.** The families need different sentences — the superbill's fallback is "make the PDF and hand it over" (S10-14), the intake's is "your saved copy is in your notes" — and one list would force one wording onto two situations, which is exactly how the superbill line would have ended up describing a missing intake.
+- **Four arms, most specific first:** both dropped → both named; superbill only → unchanged, byte for byte; intake only → the new line; **anything dropped that neither list knows → "something did not go"**.
+- Every citation re-verified line by line against hearth-network `3600446` at commit time.
+
+**The both-dropped arm exists because the drain says it can happen:** the two loaders run in parallel and *"their omissions concatenate: an outbox row can legitimately report that the superbill's object was gone AND that the intake lookup failed, and collapsing that to one reason would lose half the answer"* (`push.ts:391-393`). A line naming only one would be that same half-answer on the reading side.
+
+**Why the intake hint can safely point at the notes:** `loadIntake` returns NO omission when there is simply no note (`push.ts:301`). A clinician who never tapped Save produces a clean row, not this one. So an intake omission means a note row was there — or the lookup failed and we cannot say — and the hint POINTS at the notes rather than guaranteeing content, because `intake_snapshot_empty` means the row exists and is empty, which the notes view will show them.
+
+**`?? []` IS KEPT AND IS CORRECT.** Stated because the fix was requested as a null-handling bug and it is not one: the drain writes `omissions.length > 0 ? omissions : null` at all three `finish()` calls (`:437`, `:471`, `:490`) after computing the list at `:400`, and `push.ts:468` is the only writer of `'sent'` (`queue_ehr_push`, read live, never writes it — it resets failed/skipped to pending and treats sent as a no-op). So on a sent row, null is the drain's own encoding of "checked, nothing dropped", and `?? []` restores precisely what was written. The reasoning is now recorded at the line so the next reader does not re-open it.
+
+### Cross-check Performed
+
+- **Every consumer of `pushStatusCopy`:** one — `TodayTile.tsx`'s `pushLine`. `line`, `hint`, `retryable` and `settled` keep their shapes, so the button label and disabled state (`pushLine?.settled`) are unaffected; all four new arms return `retryable: false, settled: true`, matching the existing superbill arm, because a `sent` row is terminal on every path.
+- **The other branches of `pushStatusCopy`** (`sending`, `pending`, `failed`, `skipped`): none reads `omissions`. Unchanged.
+- **The other direction of the same gap — N-21-D item 2**, the intake saved AFTER the bundle drained. Already handled on this branch (`8d831c3`, and `d32be9c` for its unknown state). This entry is the intake that was there and still did not make it; the clinician is owed the same two facts either way, and the two surfaces now say them in the same terms.
+- **Every cross-repo citation in the app, swept by actually running the grep.** The first draft of this bullet claimed there was no third mirror. **There are five**, and the sweep produced a sharper result than the claim it replaced (`grep -rn "hearth-network src/" src/`):
+
+  | Site | Cites | Lands? |
+  |---|---|---|
+  | `visit-copy.ts:305` `DOCUMENT_OMISSIONS` | `push.ts:210,225,230` | **NO** — this entry; now `:232,:247,:252` |
+  | `visit-copy.ts:164` `PUSH_MAX_ATTEMPTS` | `push.ts:55` | **NO** — fixed in `d5c9543`; now `:77` |
+  | `visits.ts:10` plan numbering | `get-messages.ts:85` | yes — `:85` is `items.push({ n: i + 1, … })`, the 1-based fold it names |
+  | `card-gating.ts:57` verified-tier | `auth.ts`, no line, **quotes the derivation** | yes |
+  | `card-fields.ts:23` CardField contract | `shared.ts CardField`, no line, **quotes the contract** | yes |
+  | `visit-copy.ts:5` copy provenance | `card-copy.ts`, no line | yes |
+
+  **EVERY citation that carried a LINE NUMBER was stale; every citation that named a symbol or quoted the code was not.** Both stale ones are in this file, both were mirrors of `push.ts`, and both had drifted by 20+ lines. A cross-repo line number decays silently on the other side's next commit and nothing on this side can notice; a quoted contract fails loudly when it stops matching. That is a finding about the FORM of a citation, not about diligence.
+- **Out-of-scope-but-flagged:** nothing new.
+
+### Prevention
+
+**A LIST MIRRORED FROM ANOTHER REPO IS A CONTRACT, AND IT NEEDS THE SAME TREATMENT AS AN RPC'S COLUMNS.** The SPEC-CONTRACT rule already says a rendered example may only use columns its data contract returns; this is its sibling — **a rendered branch may only claim completeness over a value set it has re-read.** Both failures look identical from inside the file: everything compiles, and the comment agrees with the code.
+
+Sweep: `grep -rn "hearth-network src/" src/` — every mirrored list or constant, and for each, open the cited file at the cited line. **If the citation does not land on the thing it names, the mirror is unverified, not merely untidy.**
+
+**PREFER A SYMBOL OR A QUOTE TO A LINE NUMBER when citing across repos.** The cross-check above found this the hard way: both stale citations in the app were line numbers into `push.ts`, and all four that named a symbol or quoted the contract still land. A line number is a pointer into a file the other repo rewrites freely; a quoted contract carries its own proof and fails loudly. Cite `push.ts loadIntake`, not `push.ts:299` — or cite both, so the name survives the number.
+
+**And the second lesson, which is about the report rather than the code.** This fix was requested as a null-handling bug: `omissions ?? []` treating "never computed" as "nothing dropped". Investigation showed the premise was false — the drain writes null deliberately for the empty case — and the instruction to STOP and report rather than pivot (CLAUDE.md, INVESTIGATE BEFORE IMPLEMENTING) is what turned up the real defect sitting beside it. **Had the reported bug been "fixed" as described, the change would have been a no-op dressed as a repair, the ledger would carry a wrong root cause, and the intake values would still be unrecognised.** Recorded as evidence for the rule: the stop is not friction, it is the step that found this.

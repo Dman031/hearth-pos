@@ -302,8 +302,40 @@ export interface PushStatusLine {
   settled: boolean;
 }
 
-/** The omission values hearth-network can write (push.ts:210,225,230). */
+// ─── THE OMISSION VALUES, BY DOCUMENT (hearth-network src/fhir/push.ts) ─────
+//
+// THIS COMMENT WAS STALE TWICE, AND BOTH HALVES MATTERED.
+//   * It claimed to be "the omission values hearth-network can write". It was
+//     the SUPERBILL's values only. N-21-D item 1 put a second document in the
+//     same bundle and loadIntake gained two more, which this module did not
+//     know — so a sent row carrying ONLY an intake omission matched nothing
+//     here and rendered the clean "Sent to your record". A clinician was told
+//     their record went out complete when the intake had not gone with it.
+//   * Its citations pointed at :210, :225, :230. The superbill values are at
+//     :232, :247 and :252 (read from hearth-network 3600446). A stale pointer
+//     in the comment that exists so a reader can go and check the other side is
+//     what let the first half go unnoticed: following it lands on nothing.
+//
+// KEPT AS TWO LISTS, NOT MERGED INTO ONE. The two families need DIFFERENT
+// sentences — the superbill's fallback is "make the PDF and hand it over", the
+// intake's is "your saved copy is in your notes" — so a single list would force
+// one wording onto two different situations, which is how the superbill line
+// would have ended up describing a missing intake.
+
+/** Superbill omissions — push.ts:232 (lookup), :247 and :252 (object). */
 const DOCUMENT_OMISSIONS = ['superbill_object_missing', 'superbill_lookup_failed'];
+
+/** Intake omissions — push.ts:299 (lookup), :312 (empty snapshot). N-21-D. */
+const INTAKE_OMISSIONS = ['intake_lookup_failed', 'intake_snapshot_empty'];
+
+// WHY AN OMISSION IMPLIES A SAVED COPY EXISTS, which is what makes the intake
+// hint safe to say: loadIntake returns NO omission when there is simply no note
+// (push.ts:301, `if (!note) return { intake: null, omissions: [] }`). A
+// clinician who never tapped Save produces a clean row, not this one. So an
+// intake omission means a note row was there — or the lookup failed and we
+// cannot say — and pointing at their notes is true in both. The hint POINTS
+// rather than guarantees content: intake_snapshot_empty means the row exists
+// and is empty, which the notes view will show them.
 
 /**
  * One push row, as a clinician reads it.
@@ -326,15 +358,70 @@ export function pushStatusCopy(
   if (status === 'sent') {
     // APPROVED (spec §4). The omission wins the line: a clinician who is owed
     // a document must learn it did not go before they learn when it went.
-    const droppedDocument = (opts.omissions ?? []).some((o) => DOCUMENT_OMISSIONS.includes(o));
+    //
+    // NULL IS NOT "NOT CHECKED" HERE, and `?? []` is right rather than lax: the
+    // drain writes `omissions.length > 0 ? omissions : null` at every one of its
+    // three finish() calls (push.ts:437, :471, :490), computing the list first
+    // (:400). So on a SENT row — and push.ts:468 is the only writer of 'sent',
+    // queue_ehr_push never writing it — null is the drain's own encoding of
+    // "checked, nothing dropped", and `?? []` restores exactly what was written.
+    const dropped = opts.omissions ?? [];
+    const droppedDocument = dropped.some((o) => DOCUMENT_OMISSIONS.includes(o));
+    const droppedIntake = dropped.some((o) => INTAKE_OMISSIONS.includes(o));
+
+    // NEITHER HINT MAY PROMISE A SECOND SEND. 0045:254-259 makes a 'sent' row a
+    // deliberate no-op, so "send it again" would be an instruction the code
+    // refuses to carry out. Each arm names the honest alternative instead:
+    // S10-14's superbill PDF, and the clinician's own saved intake.
+    if (droppedDocument && droppedIntake) {
+      // BOTH CAN HAPPEN AT ONCE and the drain says so: the two loaders run in
+      // parallel and "their omissions concatenate … collapsing that to one
+      // reason would lose half the answer" (push.ts:391-400). A line that named
+      // only one would be the same half-answer on the reading side.
+      return {
+        line: 'Sent to your record · the superbill and the intake did not go',
+        hint:
+          'The visit went; neither document went with it, and they can’t be added to this one. ' +
+          'Make the superbill, and your saved intake is in your notes — hand both over directly.',
+        retryable: false,
+        settled: true,
+      };
+    }
     if (droppedDocument) {
-      // THE HINT MUST NOT PROMISE A SECOND SEND. 0045:254-259 makes a 'sent'
-      // row a deliberate no-op, so "send it again" would be an instruction the
-      // code refuses to carry out. S10-14 names the honest alternative: the
-      // superbill PDF is the fallback and the universal answer.
+      // S10-14 names the honest alternative: the superbill PDF is the fallback
+      // and the universal answer.
       return {
         line: 'Sent to your record · the superbill did not go',
         hint: 'Make the superbill and hand it over directly — it can’t be attached to this one.',
+        retryable: false,
+        settled: true,
+      };
+    }
+    if (droppedIntake) {
+      // N-21-D item 2's cost, arriving from the other direction. That ruling
+      // covers the intake saved AFTER the bundle drained; this is the intake
+      // that was there and still did not make it. The clinician is owed the
+      // same two facts either way: which of the two things they got, and that
+      // the saved copy is theirs regardless (N-21-B item 5 — nothing deletes
+      // intake_notes).
+      return {
+        line: 'Sent to your record · the intake did not go',
+        hint:
+          'The visit went to your record; the intake didn’t go with it and can’t be added to ' +
+          'this one. Your saved copy is in your notes.',
+        retryable: false,
+        settled: true,
+      };
+    }
+    if (dropped.length > 0) {
+      // SOMETHING WAS DROPPED AND THIS MODULE DOES NOT KNOW WHAT — the exact
+      // state that produced this defect, now caught instead of rendering clean.
+      // A third document family would otherwise match neither list and silently
+      // read as a complete send, which is how the intake values went unnoticed
+      // for a whole ruling. Says less than the arms above and nothing false.
+      return {
+        line: 'Sent to your record · something did not go',
+        hint: 'Part of this visit didn’t go with it. Check your record before relying on it.',
         retryable: false,
         settled: true,
       };
