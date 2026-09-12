@@ -5180,3 +5180,105 @@ SCOPE. The identity chip on Today is gated on card kind practice
 (hearth-pos TodayTile). The first-visit chip's behaviour is unchanged. This
 withdraws a reason, not a discipline: S6-1's unconditional disclaimer and
 S6-3's network-scoped wording both still bind.
+
+## N-23 — The cancellation policy is one answer, served
+Amends N-21-B (the cancellation policy as a network constant) and N-20-AMENDED-6
+and -7 (which hold the two refund windows). RECORDED 2026-09-11. Text of the
+ruling below is Derrick's, verbatim.
+MIRROR OBLIGATION: copy to hearth-pos. THIS BLOCK CARRIES WORK IN BOTH REPOS —
+the migration and the two amended writers are hearth-network's; the deletions and
+the render are hearth-pos's.
+
+THE SHAPE. The server answers the question; the app renders the answer and
+holds no policy.
+
+1. THE AUTHORITY IS THE READ. get_engagement_cancellation_terms(p_engagement_id)
+   is SECURITY DEFINER, participant-only, and returns THE ANSWER, not the
+   ingredients: whether a slot is bound, who the caller is relative to the
+   engagement, the window in hours, what a cancellation right now would
+   refund, and whether the caller is inside or outside the window.
+   Both arms, the 0009 pattern: app via current_entity_id(), service-role via
+   an explicit p_from_entity_id.
+
+2. cancel_engagement AND cancel_slot_booking READ IT AND STOP HOLDING THEIR
+   OWN LITERALS. The 14-day and 24-hour intervals move out of their branches
+   and into the one function. Their behaviour is otherwise unchanged — who
+   may cancel, what they write, what they return. Only the source of the
+   number moves.
+
+3. IT SHIPS WHOLE. No read-only interim. A terms function that exists while
+   the two writers still hold their literals is FOUR places, which is worse
+   than today's three. Either the number has one home or this ruling has not
+   landed.
+
+4. BOTH CANCEL RETURNS CARRY THE WINDOW THEY APPLIED. Without it the app
+   keeps both phrases for the near-boundary alert and this fails at the last
+   inch.
+
+5. THE RETURN STAYS AUTHORITATIVE AND THE TERMS READ IS ADVISORY. The
+   boundary can cross between the read and the tap. wasSlotPath and the
+   near-boundary handling stay exactly as they are; ruling 5 is untouched.
+
+6. THE card_kind EMBED GOES. It was added to ENGAGEMENT_SELECT for this one
+   question and resolves to null for patients — the people the policy is
+   about. Once the server answers, it has no reader.
+
+7. NO WIDENED RLS POLICY ON cards. Not as part of this, not as a shortcut to
+   it, not ever. A SECURITY DEFINER read returning a fact about the caller's
+   own engagement is the answer; read access to the card is not.
+
+8. cancel_slot_booking's ACTOR ARM IS A SEPARATE ITEM. It resolves
+   current_entity_id() and falls back to p_from_entity_id without consulting
+   auth.uid(), so a signed-in caller with no entity row is accepted on a
+   money path with a self-named actor. Its own ruling, its own migration.
+   Ledgered, not folded in.
+
+BUILD NOTES (2026-09-11) — catalog-verified, NOT part of the ruling. Every fact
+read from the live database via public.admin_functiondef, never from a migration
+file (CATALOG-READ discipline, BUGS_AND_SOLUTIONS.md PROCESS-004).
+
+  ON 2 — THERE IS NOTHING TO READ TODAY, WHICH IS WHY ITEM 1 IS AN AUTHORITY
+  AND NOT A VIEW. Both intervals are bare literals inside their own decision
+  branches: cancel_engagement's `now() <= v_engagement.scheduled_for - interval
+  '14 days'`, cancel_slot_booking's `now() <= v_engagement.scheduled_for -
+  interval '24 hours'`. No helper, no table, no third function holds either. A
+  new read that did not become the authority would have had to restate one of
+  them, which is item 3's whole subject.
+
+  ON 2 — IT IS TWO STRUCTURES, NOT ONE NUMBER. The window, and the actor rule
+  (seller refunds unconditionally; buyer is tested against the window). A helper
+  returning an interval would capture the first and leave the second restated in
+  both writers — the same defect one layer down. The terms function returns the
+  decision, which is why it can be the single home.
+
+  ON 2 — THE ACL COST IS NIL AND THE RULING COST IS NOT. Same-signature CREATE
+  OR REPLACE preserves the existing ACL, so no grant block is owed on the two
+  writers (the new function needs the full block, anon line included). What it
+  does touch is the branch that decides refunds, ruled by N-20, AMENDED-6 and -7
+  decision 6, and Day 21 STOP 2 rulings 1 and 2 — which is why this is a ruling
+  and not a diff.
+
+  ON 6 — MEASURED, NOT INFERRED. hearth-pos scripts/probe-cards-rls.mjs, run
+  against the live database with a real signed-in session on the app's own anon
+  key: the buyer's direct card read returns NO ROW on see_perm 'anyone' AND
+  'verified', the ENGAGEMENT_SELECT embed resolves card.kind null for the buyer
+  and "practice" for the seller, and no read errors. RLS filters silently, which
+  is why nothing about it was visible from inside the app.
+
+  ON 8 — THE DIVERGENCE, QUOTED. cancel_engagement branches on auth.uid()
+  ("app path: self-authorize, IGNORE passed entity" / "service-role caller must
+  supply p_from_entity_id"). cancel_slot_booking does not:
+    v_actor := public.current_entity_id();
+    if v_actor is null then
+      if p_from_entity_id is null then raise ...;
+      v_actor := p_from_entity_id;
+  The two agree everywhere except a signed-in caller with no entity row, where
+  the first raises and the second accepts a caller-supplied actor.
+
+  ON THE APP — WHAT ITEM 6 AND ITEM 1 DELETE. EngagementScreen's
+  FOURTEEN_DAYS_MS, TWENTY_FOUR_HOURS_MS, the RefundRule type, refundRule,
+  refundWindowMs and windowPhrase; inside confirmCancel, the rule/windowMs/
+  phrase/outsideWindow derivations and the unknown-window arm that exists only
+  because the app cannot see card_kind. The six confirm cases collapse to three
+  rendered shapes — nothing to refund, full refund, no refund — with role
+  deciding wording rather than outcome.
