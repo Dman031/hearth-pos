@@ -122,9 +122,18 @@ function EngagementRow({
   const active = engagement.status === 'accepted' || engagement.status === 'paid';
   const busy = completing || cancelling || checkingTerms;
   const noun = ENGAGEMENT_KIND_LABEL[engagement.kind].toLowerCase();
-  // CASE 4 (buyer + paid + undated): NO tap — guidance only, mirroring the
-  // server's refusal (0022:184). settled is ledger truth; null (unknown)
-  // does NOT land here — it gets the tap, and the confirm refuses honestly.
+  // BUYER + PAID + UNDATED: NO tap — guidance only, mirroring cancel_engagement's
+  // own refusal ("this order has no scheduled date; ask the seller to cancel").
+  // THIS IS ROW-LEVEL AND IT IS NOT ONE OF THE CONFIRM'S THREE SHAPES: after
+  // N-23 the confirm holds no policy, so the pre-emption lives here or nowhere.
+  // SUPPRESSION NEEDS settled === true. On null (the settlement helper failed —
+  // ledger truth is unknown) the tap STAYS, and the sentence that used to follow
+  // here, "the confirm refuses honestly", is no longer true of it: the confirm
+  // now reads the terms, gets 'none' (an undated engagement is inside every
+  // window — there is no instant to measure from) and offers the no-refund
+  // shape. The server then refuses with the message above, surfaced as-is. That
+  // residual is ledgered under BUG-014's amendment rather than closed with a
+  // fourth arm, which would be this screen holding policy again.
   const buyerUndatedPaid =
     !isSeller && active && engagement.settled === true && !engagement.scheduled_for;
   // A refund-pending row hides both controls: the cancel already happened
