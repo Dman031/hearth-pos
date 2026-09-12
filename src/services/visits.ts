@@ -7,7 +7,8 @@
 // p_index >= jsonb_array_length(items), and reads v_items ->> p_index, which is
 // 0-based jsonb subscripting (0041:428-465).
 // get_messages emits n as 1-BASED: items.push({ n: i + 1, text }) — because n is
-// the number a PERSON says out loud (hearth-network src/tools/get-messages.ts:85).
+// the number a PERSON says out loud (hearth-network src/tools/get-messages.ts,
+// `planFor`).
 //
 // SO: THE NUMBER SHOWN IS n; THE NUMBER WRITTEN IS n - 1. A screen that displays
 // the array index would show "item 0". A screen that passes the displayed number

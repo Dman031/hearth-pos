@@ -167,8 +167,8 @@ export function readPracticeFields(entries: FieldEntry[]): Partial<PracticeDraft
  * reach_entity keeps 'reach' open on a practice card by ruling ("A visit is
  * booked, never ordered. 'reach' stays open — asking a clinician a question
  * before booking is the whole point of Ask-first, and it claims nothing",
- * reach-entity.ts:393-395), and only claim_slot_and_knock takes a hold — which
- * always mints kind='booking' (live body :59). So every practice reach reported
+ * reach-entity.ts, the practice fork), and only claim_slot_and_knock takes a
+ * hold — which always mints kind='booking'. So every practice reach reported
  * a null held_until, satisfied `isPracticeRequest`, and rendered "That time was
  * let go" about a request that never asked for a time — AND LOST ITS ACCEPT
  * CONTROL, because T4 removes Accept on a let-go row.

@@ -351,6 +351,78 @@ SWEEP PERFORMED 2026-08-28 across all four specs in `hearth-network/docs/` again
 migrations; the four above are the complete result, plus one benign case (S7 A2's derivation
 names `cancelled_at`, which `get_my_day` does not return — `status = 'cancelled'` covers it).
 
+**CROSS-REPO CITATION RULE — MANDATORY**
+
+A citation that crosses the repo boundary NAMES A SYMBOL OR QUOTES THE CONTRACT. **Never a line number.**
+
+hearth-pos mirrors things it cannot import — hearth-network's value lists, constants, refusal
+sets, derivations — because the two repos share no build. Every mirror carries a pointer back to
+its source, and that pointer is the only way a reader can check whether the mirror is still true.
+**A line number is the one form of pointer that decays without anyone here being able to notice:**
+hearth-network rewrites its own `src/` freely, every edit above a cited line silently moves it,
+nothing in this repo compiles against it, and no test fails. The comment goes on reading correct.
+
+Write `push.ts`'s `loadIntake`, or quote the line of code itself. Not `push.ts:299`.
+
+SCOPE — and the carve-out is load-bearing, so state it rather than sweeping past it:
+
+- **GOVERNED: citations into hearth-network `src/`** (and any other repo's live source). Those
+  files are edited continuously.
+- **NOT GOVERNED: citations into APPLIED MIGRATIONS** (`0045:254-259`, `0022:140`, `0038b:767`).
+  An applied migration is frozen by the RECEIPT RULE — the file and its ledger row landed in one
+  transaction and neither is edited afterwards — so its line numbers do not decay. There are ~39
+  of these in `src/` and they are correct as they stand. Do not "fix" them.
+- **NOT GOVERNED: `BUGS_AND_SOLUTIONS.md`.** A ledger entry is dated evidence about the state of
+  the world on the day it was written; its citations are a record, not a live pointer. ~41 of
+  them. Leave them.
+- **LIVE FUNCTION BODIES ARE A THIRD THING, AND THIS RULE DOES NOT LEGISLATE THEM.** A line
+  number into a body read from the catalog (`admin_functiondef`) decays too — a migration that
+  replaces the function moves every line — but it is not a citation into another repo's *file*,
+  which is what this rule governs and what the promoting sweep covered. **Recorded as an awareness
+  item, deliberately not promoted:** the comments across this repo pair the FUNCTION NAME with the
+  line (`cancel_slot_booking` live `:82`), so the name survives the number, which is the property
+  this rule is actually asking for. Legislating it here would have made this rule violate itself in
+  dozens of places the same day it shipped — so it is named as the next thing to look at rather
+  than half-swept and declared done.
+
+EVIDENCE — **eight** cross-repo line-number citations existed when this rule was promoted (six in
+`src/`, one in this file, one found only by running the rule's own sweep after the first six were
+fixed). **Four were stale. Every symbol-or-quote citation was correct.**
+
+| Site | Cited | Verdict |
+|---|---|---|
+| `visit-copy.ts` `DOCUMENT_OMISSIONS` | `push.ts:210,225,230` | **STALE** — values were at `:232,:247,:252`, and the unfollowable pointer is what hid an incomplete list (BUG-016) |
+| `visit-copy.ts` `PUSH_MAX_ATTEMPTS` | `push.ts:55` | **STALE** — constant at `:77`, 22 lines of drift |
+| `visit-copy.ts` skipped-reason count | `push.ts:272,273,286` + `compose.ts:148-151` | **STALE** — those lines are prose, a function parameter, and a `pdfBase64` type field. The real sources are `push.ts`'s three `skip()` calls and `compose.ts`'s four `refusal` literals. The CLAIM (seven values) was still true; only the pointers had rotted |
+| `CLAUDE.md` token plane 2 | `handler.ts:185-203` | **STALE** — now a URL-query builder. The binding is `handleAuthorizePost`'s `.eq('user_id', signIn.user.id)`. **The instruction file was violating this rule two sections above where the rule now lives** |
+| `visits.ts` plan numbering | `get-messages.ts:85` | lands — but rewritten to name `planFor`, because landing today is not the property being asked for |
+| `EngagementScreen.tsx` refund provenance | `stripe-webhook.ts:378-396` | lands — rewritten to name `handleChargeRefunded` |
+| `practice.ts` ask-first gate | `reach-entity.ts:393-395` | lands — already quoted the contract too; rewritten to name the practice fork |
+| `visit-copy.ts` last_error scrubbing | `medplum.ts:28-32` | lands — rewritten to name that module's "errors never carry the credential" header |
+
+Four of eight stale, and the four that landed were luck rather than design — two of them were
+found only when the rule's own sweep was RUN, after a narrower grep had already reported the file
+clean. That is the second lesson: **the sweep is the command in this rule, not an approximation of
+it.** Every symbol-or-quote
+citation in `src/` — `card-gating.ts`'s verified-tier derivation, `card-fields.ts`'s CardField
+contract, `visit-copy.ts:5`'s copy provenance — was correct, and each survives because it carries
+its own proof: when a quoted contract stops matching, it reads wrong instead of pointing nowhere.
+
+SWEEP: `grep -rnoE "[a-z/-]+\.ts:[0-9]+" src/ CLAUDE.md` — every hit into ANOTHER REPO's source is
+a violation. Three classes of hit are NOT violations and are expected every time: this rule's own
+evidence table (it quotes the bad citations on purpose), `supabase/functions/` (hearth-pos's own
+edge functions — in-repo), and hearth-pos-internal references like `useUnreadCount.ts:88`.
+
+**One-time sweep performed 2026-09-11 in the promoting commit: all eight sites brought into
+compliance, including this file's own.** Applied-migration and ledger citations were deliberately
+excluded per the scope block.
+
+ORIGIN: BUG-016 — a list mirrored from `push.ts` that had gone incomplete, under a comment
+claiming to be the full set, above citations that could not be followed. Each alone is survivable;
+together they close every route to noticing. This rule is the SPEC-CONTRACT RULE's sibling: that
+one says a rendered example may only use columns its contract returns, and this one says **a
+mirrored list may only claim completeness over a value set someone can still go and re-read.**
+
 **DATE/TIME DISPLAY RULE — MANDATORY**
 
 All vendor-facing and admin-facing date formatting MUST go through `src/datetime.ts`. Never use raw `toLocaleDateString()`, `toLocaleString()`, date-fns `format()` without TZ, or inline timezone math at display sites.
@@ -422,7 +494,7 @@ Deliberate, scoped gaps that are wired to be completed later. Each must carry a 
 The Worker at mcp.teleoplexy.ai accepts exactly TWO token planes. Adding a third is a ruling, not a diff.
 
 1. **MCP OAuth — `/mcp` only.** `Authorization: Bearer` validated by SHA-256 hash against `mcp_oauth_tokens` (hearth-network `src/middleware/auth.ts`). Agent-facing. Never accepts a Supabase session token.
-2. **App Supabase session — `/money/*` only.** The iOS app forwards its EXISTING Supabase access token as `Authorization: Bearer`. The Worker validates it with `auth.getUser(jwt)` — the sanctioned anon-key auth-plane call — and binds the entity server-side via the unique `entities.user_id` (the consent page's binding, hearth-network `src/oauth/handler.ts:185-203`, applied to a forwarded session instead of typed credentials). App-facing. Never accepts an MCP OAuth token.
+2. **App Supabase session — `/money/*` only.** The iOS app forwards its EXISTING Supabase access token as `Authorization: Bearer`. The Worker validates it with `auth.getUser(jwt)` — the sanctioned anon-key auth-plane call — and binds the entity server-side via the unique `entities.user_id` (the consent page's binding — hearth-network `src/oauth/handler.ts`, `handleAuthorizePost`, which selects the entity on `.eq('user_id', signIn.user.id)` — applied to a forwarded session instead of typed credentials). App-facing. Never accepts an MCP OAuth token.
 
 The planes never cross. The settled ledger is deliberately NOT a Worker endpoint: the app calls `public.get_my_settled_payments` (migration 0027, granted to `authenticated`) directly with its own session — `current_entity_id()` does the scoping. A Worker settled proxy would be a second read path beside 0027 and is forbidden.
 

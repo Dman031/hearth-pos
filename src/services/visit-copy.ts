@@ -156,12 +156,13 @@ export const WRAP_FOOTER =
 // is why the copy below is a function and not a lookup table.
 //
 // THE SEVEN SKIPS ARE ALL RENDERED. hearth-network writes seven skipped_reason
-// values (push.ts:272,273,286 and compose.ts:148-151), not the four the S10 tap
+// values — push.ts's three skip() calls and compose.ts's four compose refusals
+// — not the four the S10 tap
 // prompt named. A reason with no copy would render as a bare "Not sent", which
 // is the silent failure this whole surface exists to prevent.
 
 /**
- * Mirrors PUSH_MAX_ATTEMPTS (hearth-network src/fhir/push.ts:77).
+ * Mirrors PUSH_MAX_ATTEMPTS (hearth-network src/fhir/push.ts, same name).
  *
  * THE CITATION SAID :55 AND THE CONSTANT IS AT :77 — the network file grew 22
  * lines above it. The values never disagreed; the POINTER did, which is the
@@ -322,15 +323,15 @@ export interface PushStatusLine {
 // one wording onto two different situations, which is how the superbill line
 // would have ended up describing a missing intake.
 
-/** Superbill omissions — push.ts:232 (lookup), :247 and :252 (object). */
+/** Superbill omissions — every value push.ts's `loadDocument` can return. */
 const DOCUMENT_OMISSIONS = ['superbill_object_missing', 'superbill_lookup_failed'];
 
-/** Intake omissions — push.ts:299 (lookup), :312 (empty snapshot). N-21-D. */
+/** Intake omissions — every value push.ts's `loadIntake` can return. N-21-D. */
 const INTAKE_OMISSIONS = ['intake_lookup_failed', 'intake_snapshot_empty'];
 
 // WHY AN OMISSION IMPLIES A SAVED COPY EXISTS, which is what makes the intake
 // hint safe to say: loadIntake returns NO omission when there is simply no note
-// (push.ts:301, `if (!note) return { intake: null, omissions: [] }`). A
+// (push.ts `loadIntake`: `if (!note) return { intake: null, omissions: [] }`). A
 // clinician who never tapped Save produces a clean row, not this one. So an
 // intake omission means a note row was there — or the lookup failed and we
 // cannot say — and pointing at their notes is true in both. The hint POINTS
@@ -361,8 +362,8 @@ export function pushStatusCopy(
     //
     // NULL IS NOT "NOT CHECKED" HERE, and `?? []` is right rather than lax: the
     // drain writes `omissions.length > 0 ? omissions : null` at every one of its
-    // three finish() calls (push.ts:437, :471, :490), computing the list first
-    // (:400). So on a SENT row — and push.ts:468 is the only writer of 'sent',
+    // three finish() calls, computing the list once before them
+    // (push.ts `pushOne`). So on a SENT row — and `pushOne` is the only writer of 'sent',
     // queue_ehr_push never writing it — null is the drain's own encoding of
     // "checked, nothing dropped", and `?? []` restores exactly what was written.
     const dropped = opts.omissions ?? [];
@@ -376,7 +377,7 @@ export function pushStatusCopy(
     if (droppedDocument && droppedIntake) {
       // BOTH CAN HAPPEN AT ONCE and the drain says so: the two loaders run in
       // parallel and "their omissions concatenate … collapsing that to one
-      // reason would lose half the answer" (push.ts:391-400). A line that named
+      // reason would lose half the answer" (push.ts `pushOne`). A line that named
       // only one would be the same half-answer on the reading side.
       return {
         line: 'Sent to your record · the superbill and the intake did not go',
@@ -456,7 +457,8 @@ export function pushStatusCopy(
 
   if (status === 'failed') {
     // last_error is the target server's own text, capped at 400 and scrubbed by
-    // the adapter (0045:285-288, medplum.ts:28-32). It is safe to show and it
+    // the adapter (0045:285-288, and medplum.ts's "errors never carry the
+    // credential" header). It is safe to show and it
     // is the only thing that tells a clinician WHY.
     return {
       line: opts.lastError ? `Not sent · ${opts.lastError}` : 'Not sent',

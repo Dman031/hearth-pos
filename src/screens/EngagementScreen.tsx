@@ -422,8 +422,8 @@ export default function EngagementScreen() {
         // "PROCESSED MANUALLY" IS TRUE ON BOTH AND STAYS. Checked rather than
         // assumed: cancel_slot_booking's comment says the refund "is issued by
         // the Worker", but nothing in hearth-network/src issues one off that
-        // imprint — stripe-webhook.ts:378-396 only READS it as a provenance flag
-        // on refund_finalized. A person issues it in the Stripe dashboard on
+        // imprint — stripe-webhook.ts's `handleChargeRefunded` only READS it as
+        // a provenance flag on refund_finalized. A person issues it in the Stripe dashboard on
         // both paths. (The imprint's missing `event` key is BUG-012, network.)
         const settlingLine = wasSlotPath
           ? `Refunds are processed manually, not instantly, so it may take a few days to appear. This ${noun} has already moved to the Past list.`
