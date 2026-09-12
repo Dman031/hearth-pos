@@ -1003,3 +1003,57 @@ Sweep: `grep -rn "hearth-network src/" src/` — every mirrored list or constant
 **PREFER A SYMBOL OR A QUOTE TO A LINE NUMBER when citing across repos.** The cross-check above found this the hard way: both stale citations in the app were line numbers into `push.ts`, and all four that named a symbol or quoted the contract still land. A line number is a pointer into a file the other repo rewrites freely; a quoted contract carries its own proof and fails loudly. Cite `push.ts loadIntake`, not `push.ts:299` — or cite both, so the name survives the number.
 
 **And the second lesson, which is about the report rather than the code.** This fix was requested as a null-handling bug: `omissions ?? []` treating "never computed" as "nothing dropped". Investigation showed the premise was false — the drain writes null deliberately for the empty case — and the instruction to STOP and report rather than pivot (CLAUDE.md, INVESTIGATE BEFORE IMPLEMENTING) is what turned up the real defect sitting beside it. **Had the reported bug been "fixed" as described, the change would have been a no-op dressed as a repair, the ledger would carry a wrong root cause, and the intake values would still be unrecognised.** Recorded as evidence for the rule: the stop is not friction, it is the step that found this.
+
+## BUG-017: [NETWORK · OPEN] cancel_slot_booking accepts a caller-supplied actor on a money path when the caller is signed in but has no entity row
+
+**Category:** auth / actor-resolution · **Severity:** medium (narrow reachability; a self-named actor on a function that decides refunds and releases a booked time) · **Status:** **OPEN — hearth-network item. Ledgered by ruling (N-23 item 8, 2026-09-11); its own ruling and its own migration. DELIBERATELY NOT folded into the N-23 build.**
+**Introduced-by:** hearth-network `0050` as built. `cancel_slot_booking` was written after `cancel_engagement` and resolved its actor with a try-then-fall-back rather than copying the `auth.uid()` branch. Both shapes read as "prefer the session, else the passed entity", and they differ only in a state neither author had in mind.
+**Found:** 2026-09-11, the N-23 investigation, reading both live bodies via `admin_functiondef` to decide which arm the new terms read should copy.
+
+### Symptoms
+
+None observed. Both functions behave identically on every path an ordinary session or the Worker takes.
+
+### Root Cause
+
+`cancel_engagement` branches on `auth.uid()` — the 0009 pattern — and treats the two planes as mutually exclusive:
+
+> `if v_uid is not null then` — *app path: self-authorize, IGNORE passed entity* — `v_actor := public.current_entity_id(); if v_actor is null then raise …`
+> `else` — *service-role/network path* — `v_actor := p_from_entity_id; if v_actor is null then raise 'service-role caller must supply p_from_entity_id'`
+
+`cancel_slot_booking` never consults `auth.uid()`:
+
+```
+v_actor := public.current_entity_id();
+if v_actor is null then
+  if p_from_entity_id is null then
+    raise exception 'cancel_slot_booking: no entity bound to the caller';
+  end if;
+  v_actor := p_from_entity_id;
+end if;
+```
+
+The two agree everywhere except **a signed-in caller with no entity row** — `auth.uid()` non-null, `current_entity_id()` null. There, `cancel_engagement` raises *"no entity bound to the caller"*; `cancel_slot_booking` falls through and **takes `p_from_entity_id` from the caller**.
+
+`v_actor` then decides everything downstream: the participant check, `v_is_seller` (which grants an unconditional refund), and the slot disposition — withdrawn versus reopened. A caller who names themselves the seller gets the seller's refund arm on someone else's booking, if they can reach the function in that state at all.
+
+**Reachability is narrow and is NOT the finding.** The app creates an entity at setup, so an authenticated user without one is an incomplete-signup or hand-created row. The finding is that **a money path derives its actor from client input on any code path at all**, and that two functions ruled to behave alike do not.
+
+### Solution
+
+**Not applied.** Owed to hearth-network: conform `cancel_slot_booking`'s arm to `cancel_engagement`'s `auth.uid()` branch, so a signed-in caller either resolves an entity or is refused, and `p_from_entity_id` is reachable only under service role. Same-signature `CREATE OR REPLACE` preserves the ACL, so no grant block is owed — but it changes a refusal on a money path, which is why N-23 item 8 ruled it a separate item rather than a line in someone else's migration.
+
+### Cross-check Performed
+
+- **Every function taking a `p_from_entity_id`**, checked live for which arm it uses: `cancel_engagement` (auth.uid() branch — the pattern), `cancel_slot_booking` (**this entry**), `respond_to_inbound` — **body read, not inferred from its raise text**: it carries the `if v_uid is not null then … else …` branch and `cancel_engagement`'s two comments verbatim (*"app path: self-authorize, IGNORE passed entity"* / *"service-role/network path"*). `claim_slot_and_knock` contains no `auth.uid()` and no `current_entity_id()` at all — `p_from_entity_id` is a required positional on a service-role-only path, so it has no app arm to diverge.
+
+  **Three functions have both a `p_from_entity_id` and an app arm. Two use the 0009 branch; this one does not.** That ratio is the argument for conforming it rather than declaring the fallback an equivalent idiom.
+- **hearth-pos call sites:** `EngagementScreen`'s `cancelEngagement` passes only `p_engagement_id` and never supplies an actor, and the app cannot call `cancel_slot_booking` directly — `cancel_engagement` dispatches to it (N-20-AMENDED-7 §4). **So no app change is owed by this entry, now or when it is fixed.**
+- **The N-23 build must not "tidy" this.** The terms function will copy `cancel_engagement`'s arm per N-23 item 1; touching `cancel_slot_booking`'s arm in the same migration is the scope creep the ruling explicitly refused.
+- **Out-of-scope-but-flagged:** nothing further.
+
+### Prevention
+
+**Two functions ruled to behave alike must share the arm, not resemble it.** Both of these read as "prefer the session, else the passed entity" in English, and an English summary is what a reviewer carries between two files. The difference lives in a state neither author was thinking about — signed in, no entity — and it is invisible unless the two bodies are read side by side, which is what the N-23 investigation happened to do for an unrelated reason.
+
+Sweep, whenever a function gains a `p_from_entity_id`: `admin_functiondef` each one and diff the resolution blocks against `cancel_engagement`'s, which is the 0009 pattern of record. **A body that does not consult `auth.uid()` cannot distinguish the two planes**, whatever its fallback looks like.
