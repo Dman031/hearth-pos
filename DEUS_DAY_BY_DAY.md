@@ -5147,3 +5147,32 @@ is a MEMBER of the one per-engagement bundle, never a push of its own.
   item 6) — and item 1's "zero outbox change" is not a ruling against a second
   target, which would add a `target` VALUE, never a kind. Images stay deferred
   (N-21). The S8-3 corrections gap stays deferred and is now explicitly wider.
+
+## N-22 — N-17's merits argument is withdrawn
+Withdraws the second half of N-17. N-21-B item 4 closed its evidential half
+and never engaged its merits half; this closes that gap rather than leaving
+the older ruling standing against shipped code.
+
+N-17 gave two reasons Today carries no identity chip:
+  EVIDENTIAL — get_my_day returned no verification flag. Closed by N-21-B
+  item 4; migration 0056 added sender_id_verified.
+  MERITS — "by Today the decision is made… a chip that cannot change a
+  decision is decoration on a clinical surface," recorded so nobody would add
+  it back as an oversight.
+
+THE MERITS ARGUMENT WAS RIGHT UNDER THE MODEL IT WAS WRITTEN FOR AND IS WRONG
+UNDER N-20. It assumed a booking reached Today only after the clinician
+accepted it — the decision already made, on Incoming, with the chips in front
+of them. N-20 moved consent to posting time. A clinician never sees an
+incoming practice booking at all; it confirms and charges without them. Today
+is now the FIRST and ONLY surface where they learn who they are about to see.
+The chip is not decoration on a made decision; it is the only disclosure there
+is.
+
+The remedy N-20 leaves them is cancellation, and a chip they see the morning
+of a visit is what a cancellation decision would rest on.
+
+SCOPE. The identity chip on Today is gated on card kind practice
+(hearth-pos TodayTile). The first-visit chip's behaviour is unchanged. This
+withdraws a reason, not a discipline: S6-1's unconditional disclaimer and
+S6-3's network-scoped wording both still bind.
