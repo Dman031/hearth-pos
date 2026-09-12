@@ -879,6 +879,66 @@ The test, for any RPC whose body gained a dispatch or a second policy arm: **lis
 
 Sweep: `grep -rn "\.rpc('" src/` → for each RPC, `admin_functiondef` its live body and count the distinct outcomes it can return; then grep the screen for strings that name any of them. An RPC with more outcomes than the screen has sentences is either under-rendered or lying.
 
+### AMENDMENT 2026-09-11 — THE REMAINING HALF IS CLOSED, AND NOT BY THE FIX ABOVE
+
+The Solution above is **superseded in the app**, deliberately. It closed the wrong-window and false-promise symptoms by teaching the client to pick between two policies — which made the client a third place the policy lived, and left a third state it could not resolve. N-23 (ruled 2026-09-11) removes the policy from the app entirely: `get_engagement_cancellation_terms` is the one home, the two writers read it, both cancel returns carry `window_hours`, and the app renders the answer.
+
+**What the half actually was.** The section above, THE THIRD STATE, ends "Both answers to the RLS question are safe under this shape, which is why it was built this way instead of waiting on the answer." The answer arrived: `scripts/probe-cards-rls.mjs`, run 2026-09-11 against the live database with a real signed-in session on the app's own anon key —
+
+```
+buyer  · direct card read (see_perm 'anyone')   : NO ROW
+buyer  · direct card read (see_perm 'verified') : NO ROW
+buyer  · ENGAGEMENT_SELECT embed -> card.kind   : null
+seller · direct card read                       : ROW RETURNED
+seller · ENGAGEMENT_SELECT embed -> card.kind   : "practice"
+```
+
+— and it is the bad one. The null arm was not a rare fallback; it was **the live path for every patient-initiated cancellation**, i.e. for exactly the person whose money the copy is about. A clinician cancelling their own practice visit was told "24 hours"; the patient cancelling the same visit was told the window could not be checked. Both sentences were true. One of them was useless to the only reader who needed it.
+
+**What closed it (this branch, `feat/n23-app`).**
+
+| Deleted from `EngagementScreen.tsx` | Replaced by |
+|---|---|
+| `FOURTEEN_DAYS_MS`, `TWENTY_FOUR_HOURS_MS` | `window_hours` off the terms read / the cancel return |
+| `RefundRule`, `refundRule()`, `refundWindowMs()`, `windowPhrase()` | `refund_if_cancelled_now` ∈ {`nothing_paid`,`full`,`none`} |
+| `confirmCancel`'s `rule` / `windowMs` / `phrase` / `outsideWindow` derivations | the server's `inside_window`, already decided |
+| the unknown-window arm | nothing — it existed only because `card_kind` was invisible |
+| the six confirm cases | three rendered shapes; role decides wording only |
+| `useMyEngagements`' `card:card_id ( kind )`, `EngagementRowRaw.card`, `MyEngagement.cardKind` | — (no reader) |
+
+`formatWindowHours()` is the one new function and it is **a formatter, not a policy**: `hours >= 48 && hours % 24 === 0` renders days, otherwise hours. It has no list of known windows, so a window this app has never seen renders correctly and neither deleted literal comes back as a `case` label.
+
+**KEPT, BY RULING (N-23 item 5).** `wasSlotPath` and the near-boundary flip alert. The boundary can cross between the terms read and the tap, so the cancel RPC's own return stays authoritative. What changed is the flip's NUMBER: it came from `result.path === 'n20_patient_cancel_lt_24h'`, which could only ever name windows the app had been told about, and now comes from `result.window_hours` through the formatter — absent, it omits the number rather than inventing one. The path-specific settling clause this entry established is likewise kept and re-sourced from the server's `is_slot_booking`, which is a fact about which writer runs, not a policy.
+
+**A FAILED TERMS READ REFUSES.** Not a fourth shape — the same posture as the `settled === null` arm it replaces: "nothing was changed". The `console.warn` names the engagement id and distinguishes an error from an empty set (`termsErr ? termsErr.message : 'no row returned'`) rather than defaulting to a string that would read like the opposite of what happened.
+
+**Catalog-verified at build time, not read from the migration files** (`public.admin_functiondef`, 2026-09-11):
+
+- `get_engagement_cancellation_terms(uuid,uuid)` — `STABLE SECURITY DEFINER`, the 0009 two-arm actor, participant check, and `v_window_h := case when v_is_slot then 24 else 336 end;   -- 336h = 14 days`. Returns the seven columns `src/types/cancellation-terms.ts` mirrors.
+- `admin_proacl` on it: `["postgres=X/postgres","authenticated=X/postgres","service_role=X/postgres"]` — `authenticated` holds EXECUTE, anon and PUBLIC hold none. The app path cannot 42501.
+- `cancel_engagement(uuid,uuid)` — `select * into v_terms from public.get_engagement_cancellation_terms(p_engagement_id, v_actor);`, then `if v_terms.refund_if_cancelled_now = 'full'`; both money arms return `'window_hours', v_terms.window_hours`.
+- `cancel_slot_booking(uuid,uuid)` — same read, `elsif not v_terms.inside_window`, return carries `'window_hours', v_terms.window_hours` beside `path` and `slot_id`.
+
+### Cross-check Performed — AMENDMENT
+
+- **Every consumer of `MyEngagement`** (`grep -rn "MyEngagement\|cardKind" src/`): `EngagementRow`, `EngagementCalendar` (generic over the row type), `useEngagementActionCount` (comment only). **No reader of `cardKind` anywhere but the deleted derivation** — removing the field breaks nothing, and `tsc --noEmit` is clean at each commit.
+- **Every `cancel_*` call site** (`grep -rn "\.rpc('cancel" src/`): one, `EngagementScreen`'s `cancel_engagement`. The app still never calls `cancel_slot_booking` directly — the dispatch is the contract.
+- **The policy-literal assertion, run after the second commit** — `grep -rn "14 days\|24 hours\|FOURTEEN_DAYS_MS\|TWENTY_FOUR_HOURS_MS" src/` returns exactly one line, `visit-copy.ts:284`, a comment about **intake retention** ("a visit wrapped and tapped more than 24 hours later"). Widened to `14 day|14-day|24 hour|24-hour|336`, the only other hit is `OpenTimesBoard.tsx:172`, a comment about **VL-1's slot decision window**. Neither is cancellation policy and neither is executable. **The app holds no cancellation policy.**
+- **`MyEngagement.settled` — kept, doc corrected, and the correction is the point.** It said "the cancel confirm refuses to guess on null", which stopped being true the moment the confirm stopped reading it. Its one reader now is the ROW's tap suppression for buyer+paid+undated, which requires `true`.
+- **Out-of-scope-but-flagged — the residual this leaves.** `settled === null` + paid + undated + buyer: the row does not suppress the tap (suppression needs `true`), the confirm now renders the `none` shape, and `cancel_engagement` refuses with *"this order has no scheduled date; ask the seller to cancel"* — surfaced as an alert with the server's own message. Previously the app pre-empted that with a friendlier sentence (case 4). Three shapes is the ruling, and a fourth arm reproducing the server's refusal would be policy again — the mismatch is one alert's wording on a path that requires the settlement helper to have failed. Flagged, not silently dropped.
+- **Out-of-scope-but-flagged — stale live-body line citations.** `settlingLine`'s comment still cites `:112-114` / `:131-132`; 0057 and 0058 replaced both bodies, so those numbers moved. Not governed by the CROSS-REPO CITATION RULE (live function bodies are that rule's named awareness item, not its scope) and the comments pair the behaviour with the function NAME, which survives. Untouched deliberately: rewriting comments this commit does not otherwise touch is the scope creep the bug protocol forbids.
+- **BUG-012** (the imprint's missing `event` key, network-side) is unchanged by this and stays open.
+- **`DEFERRED.md`**: `grep -n "cardKind\|card:card_id\|probe-cards-rls\|N-20" DEFERRED.md` returns nothing — the gap was ledgered here and in the roadmap, never as a deferred item, so there is no entry to move to Done.
+- **THE SAME SHAPE ELSEWHERE IN `src/` — RUN, NOT ASSERTED FROM MEMORY** (`grep -rn "_MS = \|_MS=" src/`, twelve hits). Ten are UI timings and cache TTLs — `TYPING_MS`, `TOAST_MS`, `ENTRANCE_DURATION_MS`, `DOT_*`, `SLOW_AFTER_MS`, `RECENT_TWIN_MS`, `FAST_*`/`SLOW_INTERVAL_MS`, `FAST_WINDOW_MS`, `CACHE_TTL_MS` — no server holds any of them, so they are not this pattern. **One is:** `AddTimesSheet.tsx:60`, `const LEAD_MS = 60 * 60 * 1000;` under the comment *"Nothing inside this window can be posted (VL-2, enforced server-side too)"* — a client copy of a rule the server also holds, self-declared as such. **Flagged, not folded in, and the distinction is load-bearing rather than an excuse:** `LEAD_MS` pre-filters the chips this app will let a clinician POST, and the server refuses independently if it is wrong, so a drifted copy offers or hides a chip. The deleted constants made a PROMISE ABOUT SOMEONE'S MONEY that the server would then contradict. Same shape, different cost — and the sweep line below exists so the cheaper one is not discovered the same way this one was.
+
+### Prevention — AMENDMENT
+
+**A client that has to CHOOSE between two server policies is already the bug; teaching it to choose correctly only moves the day it goes wrong.** The fix above was right about the symptoms and right about the evidence, and it still produced a third home for the policy plus a state the client could not resolve. The question that would have caught it: *does this client need the ANSWER or the INGREDIENTS?* Copy needs the answer. The ingredients were `card_kind` — a column the client could not read on the rows that mattered, which is how the shape announced itself before anything shipped.
+
+The corollary is the one worth keeping: **when a rendering needs a fact the caller is not entitled to see, the answer is a SECURITY DEFINER read that returns the derived fact, never a widened RLS policy on the source** (N-23 item 7). A wider `cards` policy would have handed every buyer every seller's card to fix one sentence about refunds.
+
+Sweep: `grep -rn "_MS = \|_MS=" src/` → for each hit, ask whether a SERVER also holds that number. If nothing does, it is a UI timing and fine. If something does, the client is a second home for a rule, and the question is what a drift costs: an offer made wrongly, or a promise about money the server will contradict. Run at the time of writing: twelve hits, eleven benign, one flagged above.
+
 ## BUG-015: [OPEN · RULING-COMPLIANCE] N-2 says "ONE CONSUMER of get_my_day, not two" — there are two, and the second one's correctness rests on a comment
 
 **Category:** ruling-compliance / single-authority · **Severity:** low today (the second consumer renders a count, not a day) · **Status:** **OPEN — ledgered by ruling (Derrick, 2026-09-11), deliberately NOT fixed**
