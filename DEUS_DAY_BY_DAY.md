@@ -2774,6 +2774,8 @@ vertical. These five rulings are the answer. They are canon; the specs bend to t
        about to join a room. The decision is made, and identity verification no longer changes
        anything they would do. A chip that cannot change a decision is decoration on a
        clinical surface.
+       WITHDRAWN BY N-22 (2026-09-11) — the merits argument assumed a clinician decides on
+       Incoming; N-20 moved that decision to posting time.
        RECORDED SO NOBODY ADDS IT BACK AS AN OVERSIGHT. Today shows "First visit on this
        network" (first_visit_on_network IS returned) and no identity chip. HonestyChips already
        takes firstContact as optional for exactly this — the component is unchanged.
@@ -5149,9 +5151,11 @@ is a MEMBER of the one per-engagement bundle, never a push of its own.
   (N-21). The S8-3 corrections gap stays deferred and is now explicitly wider.
 
 ## N-22 — N-17's merits argument is withdrawn
-Withdraws the second half of N-17. N-21-B item 4 closed its evidential half
-and never engaged its merits half; this closes that gap rather than leaving
-the older ruling standing against shipped code.
+Withdraws the second half of N-17. RECORDED 2026-09-11. Text of the ruling below
+is Derrick's, verbatim.
+MIRROR OBLIGATION: copy to hearth-pos with the back-reference this block adds to N-17.
+N-21-B item 4 closed its evidential half and never engaged its merits half; this
+closes that gap rather than leaving the older ruling standing against shipped code.
 
 N-17 gave two reasons Today carries no identity chip:
   EVIDENTIAL — get_my_day returned no verification flag. Closed by N-21-B
