@@ -36,43 +36,29 @@ import type { Engagement } from '../types/engagement';
 // after its own writes stays: it is idempotent redundancy, not a workaround
 // to remove (PLEXMED S7 spec, app-side gap 2).
 
-// `card:card_id ( kind )` is N-20's cancellation split reaching the app: the
-// network refunds a practice slot on a 24-hour boundary and everything else on
-// 14 days, and the confirm copy has to name the right one BEFORE the call.
-// Embedded the same way `inbound` already is.
+// ── THE CARD-KIND EMBED IS GONE (N-23 item 6) ───────────────────────────────
 //
-// ██ IT COMES BACK NULL FOR THE BUYER. MEASURED, NOT INFERRED. ███████████████
+// `card:card_id ( kind )` was added here for exactly one question — which refund
+// window a cancellation falls under — and it could not answer it for the people
+// the policy is about. MEASURED, NOT INFERRED: scripts/probe-cards-rls.mjs, run
+// 2026-09-11 against the live database with a real signed-in session on the
+// app's own anon key, showed the embed resolving for the SELLER and returning
+// null for the BUYER, with no error on either read. On a practice booking the
+// buyer is the patient, so every patient-initiated cancellation reached the
+// "we don't know" arm. RLS filters silently, which is why nothing about it was
+// visible from inside the app.
 //
-// `scripts/probe-cards-rls.mjs`, run 2026-09-11 against the live dev database
-// with a REAL signed-in session on the app's own anon key:
-//
-//     buyer  · direct card read (see_perm 'anyone')   : NO ROW
-//     buyer  · direct card read (see_perm 'verified') : NO ROW
-//     buyer  · ENGAGEMENT_SELECT embed -> card.kind   : null
-//     seller · direct card read                       : ROW RETURNED
-//     seller · ENGAGEMENT_SELECT embed -> card.kind   : "practice"
-//
-// No error on any read — RLS filters silently, which is why nothing about this
-// was visible from the app. `public.cards` has RLS enabled (0000:141) and no
-// select policy in any migration in either repo, so the policy that lets a
-// SELLER read was applied by hand and is owner-scoped.
-//
-// SO THIS EMBED IS SELLER-ONLY IN PRACTICE. On a practice booking the buyer is
-// the PATIENT, which means cardKind is null for every patient-initiated
-// cancellation from this app and the confirm's "unknown" arm is THE LIVE PATH
-// for them — it names no window and points at the unconditional seller-cancel
-// alternative. That is correct behaviour over a real gap, not a fallback nobody
-// reaches: closing it needs a narrow network-side read (a card_kind column on an
-// existing RPC, or a SECURITY DEFINER helper), NEVER a widened RLS policy on
-// `cards`. Flagged, not fixed here.
-//
-// The caller must therefore treat null as UNKNOWN and never as "not practice" —
-// which is also true of the other way it goes null, a deleted card (FK SET NULL).
+// The answer was never a widened SELECT policy on `cards` (N-23 item 7 — "not
+// as part of this, not as a shortcut to it, not ever"). It is a SECURITY DEFINER
+// read that returns a fact about the caller's OWN engagement:
+// get_engagement_cancellation_terms, which EngagementScreen's confirm calls.
+// With that in place this embed had no reader, so it goes rather than lingering
+// as a column nothing consults. The probe script stays — it is the evidence.
 const ENGAGEMENT_SELECT =
   'id, inbound_id, kind, buyer_entity_id, seller_entity_id, card_id, thread_id, ' +
   'agreed_price_cents, currency, status, scheduled_for, visit_started_at, ' +
   'room_url, room_provider, room_created_at, fulfilled_at, cancelled_at, ' +
-  'created_at, updated_at, inbound:inbound_id ( message ), card:card_id ( kind )';
+  'created_at, updated_at, inbound:inbound_id ( message )';
 
 /** An engagement row + the app-side display context joined at load time.
  *  Wrapper type on purpose: types/engagement.ts mirrors the network-owned
@@ -82,23 +68,20 @@ export type MyEngagement = Engagement & {
   excerpt: string | null;
   /** LEDGER truth via get_my_engagement_settlement (0023): true = a succeeded
    *  charge stands; false = none; null = UNKNOWN (helper call failed, or the
-   *  id was absent from its result). Null is never coerced to false — the
-   *  cancel confirm refuses to guess on null instead of promising a free
-   *  cancel on a paid row. Same predicate as cancel_engagement (0022), so the
-   *  confirm and the RPC cannot disagree on paid-ness. */
+   *  id was absent from its result). Null is never coerced to false.
+   *  SINCE N-23 ITS ONE READER IS THE ROW'S TAP GATING — the buyer+paid+undated
+   *  state that has no tap, only guidance — and true is required for that
+   *  suppression, so an unknown leaves the tap in place. The cancel CONFIRM no
+   *  longer reads it: paid-ness now comes from the same server answer as the
+   *  window (get_engagement_cancellation_terms' refund_if_cancelled_now), which
+   *  uses this same ledger predicate. */
   settled: boolean | null;
-  /** The card's kind, for the cancellation split (N-20). NULL MEANS UNKNOWN —
-   *  a deleted card or a row RLS did not return — never "not a practice card".
-   *  The confirm copy names no refund window on null rather than guessing one;
-   *  the outcome itself always comes from the RPC's return (ruling 5). */
-  cardKind: string | null;
 };
 
 /** Raw select shape: the table row plus the embedded inbound (null when the
  *  FK is SET NULL or RLS hides the row from a buyer-side caller). */
 type EngagementRowRaw = Engagement & {
   inbound: { message: string | null } | null;
-  card: { kind: string | null } | null;
 };
 
 interface PeerRow {
@@ -193,7 +176,7 @@ export default function useMyEngagements(): UseMyEngagements {
       }
 
       const next = rows.map(
-        ({ inbound, card, ...engagement }): MyEngagement => {
+        ({ inbound, ...engagement }): MyEngagement => {
           const peer = engagement.thread_id ? peerByThread.get(engagement.thread_id) : undefined;
           const oneLine = inbound?.message?.replace(/\s+/g, ' ').trim() ?? '';
           return {
@@ -203,10 +186,6 @@ export default function useMyEngagements(): UseMyEngagements {
             // Absent from the helper's result = not-yours-or-nonexistent, NOT
             // unsettled — those ids stay null (unknown), same as a failed call.
             settled: settledById ? (settledById.get(engagement.id) ?? null) : null,
-            // `?? null` collapses a missing embed and a null kind to one value,
-            // and they mean the same thing HERE: we do not know which refund
-            // rule applies. Never coerced to a string — see the type's note.
-            cardKind: card?.kind ?? null,
           };
         },
       );
