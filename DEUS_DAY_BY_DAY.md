@@ -5366,6 +5366,7 @@ FK list in ON (vii) is file-side and is NOT catalog-verified.
   row there REFUSES the delete outright. S3-3's
   "idempotent" is likewise unaddressed, and the drain is a cron that re-runs.
   Both need a ruling before the transaction is built.
+  RESOLVED BY N-24-A (2026-09-14).
 
   ON ATOMICITY — WHAT "IN THE ORDER THE CONSTRAINTS FORCE" REQUIRES OF THE
   ARCHITECTURE. The drain reaches the database only through supabase-js — the
