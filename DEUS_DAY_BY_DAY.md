@@ -5282,3 +5282,129 @@ file (CATALOG-READ discipline, BUGS_AND_SOLUTIONS.md PROCESS-004).
   because the app cannot see card_kind. The six confirm cases collapse to three
   rendered shapes — nothing to refund, full refund, no refund — with role
   deciding wording rather than outcome.
+
+## N-24 — The claim: entity survives, card is replaced, the drain does it
+Reconciles S3-3 invariant 2 and THE CLAIM PATH (2026-09-03). Rules the
+mechanism per the 2026-09-14 investigation.
+RECORDED 2026-09-14. The text below — WHERE, KEY, TRANSACTION, NOT V1 — is
+Derrick's, verbatim. S3-3 invariant 2 is at roadmap:1580; THE CLAIM PATH is the
+unnumbered paragraph inside the SEED-5 block at roadmap:4140.
+MIRROR OBLIGATION: byte-identical in both repos. THIS BLOCK CARRIES WORK IN BOTH
+REPOS — the drain, the claim transaction and the seed's NPI are hearth-network's;
+CredentialPanel's NPI field and the address message are hearth-pos's.
+
+WHERE. The claim runs inside the credential drain, on the verified outcome.
+Not an app RPC (a signed-in caller cannot read unbound entities or seeded
+cards; entity_identity_sessions is hearth-pos-owned; credential_verified's
+canonical writer excludes authenticated). Not a Worker route (the fourth
+token plane THE CLAIM PATH forbids). The drain is already service-role,
+already async, already the ceremony's outcome handler.
+
+KEY. NPI. The ceremony collects NPI alongside the licence — p_type 'npi' is
+already accepted; CredentialPanel gains the field. The seeded record carries
+its NPI. Licence numbers are the weak key; names are never stored.
+
+TRANSACTION, on verified, in the order the constraints force:
+  (i)   move verifications rows to the record entity
+  (ii)  move entity_identity_sessions — UPDATE of the PK row, never
+        copy-then-delete; cross-repo write into a hearth-pos-owned table,
+        permitted by this ruling explicitly
+  (iii) release user_id from the provisional; set it on the record entity
+  (iv)  retire the record card
+  (v)   mint the practice card on the record entity — LAST, the trigger
+        requires (i) first — act_perm 'verified', the sheet's default
+  (vi)  reproject credential_verified on BOTH entities via
+        record_verification_outcome's canonical predicate — never a second
+        writer
+  (vii) delete the provisional entity — cascades are the reason it is last
+The Teleoplexy ID never moves: the record entity's is the one that survives.
+The app tells the person plainly that their address is now the record's;
+the provisional one is retired.
+
+NOT V1. The public claim page, deep links into the ceremony, the demand
+counter, and the share link. The match at licence entry is the discovery
+mechanism for launch.
+
+BUILD NOTES (2026-09-14) — from the investigation of the same date, NOT part of
+the ruling. Function bodies and ACLs below were read from the live database via
+public.admin_functiondef / public.admin_proacl, never from a migration file
+(CATALOG-READ discipline, BUGS_AND_SOLUTIONS.md PROCESS-004). Everything else is
+file-side, from the migration trees. Per the CROSS-REPO CITATION RULE the src
+citations below name a symbol or quote the contract and carry no line number;
+the migration citations do carry one, which that rule's scope block permits
+because an applied migration is frozen by the RECEIPT RULE. No sanctioned
+catalog helper reads pg_constraint (admin_proacl covers functions only), so the
+FK list in ON (vii) is file-side and is NOT catalog-verified.
+
+  ON (iv)+(v) — THIS SUPERSEDES S3-3's FLIP, AND THAT IS THE RECONCILIATION.
+  S3-3 (roadmap:1586) says "the card flips record -> practice in the same
+  transaction". THE CLAIM PATH (roadmap:4140) says the opposite and says why:
+  "A record states what a registry publishes; a practice card is an offer the
+  owner makes. Those are different things and must not be the same row."
+  N-24 takes the second: retire, then mint. Two consequences close with it —
+  S5-6's deferral of a 'record' kind (roadmap:1850) and 0038a's header note that
+  'record' lands "with the claim-convergence build" are both moot, because
+  SEED-3 already ruled no new enum value: kind 'content' + act_perm 'off' IS the
+  record card. 0038a's header is stale, not wrong at the time.
+
+  ON (vii) — S3-3's STRICT FRESHNESS GUARD IS NOT ADDRESSED BY THIS RULING AND
+  IS FLAGGED, NOT RESOLVED. S3-3: "the merge is permitted only if the
+  provisional entity has zero cards, threads, inbound rows and transactions —
+  otherwise manual_review." N-24's text is silent on it. The guard is not
+  decoration. Every FK on entities in both migration trees, by on-delete action:
+  ON DELETE CASCADE — `cards`, `connections` (x2), `groups.owner_id`,
+  `group_members`, `threads` (x2), `inbound` (x2), `messages.from_entity_id`,
+  `oauth_codes` (+ the refresh-token add-column), `device_tokens`, `contacts`
+  (x2), `verifications.entity_id`, `email_outbox.to_entity_id`,
+  `visit_access_tokens.to_entity_id`, `entity_stripe_accounts`,
+  `credential_verification_requests` and `entity_identity_sessions` — step (vii)
+  destroys all of them silently. ON DELETE SET NULL — `audit_log.entity_id`,
+  `transactions` (x2), `engagements` (x2), `card_slots.held_by`, and the
+  `issued_by` / `requested_by` columns on the visit-wrap, intake-snapshot and
+  EHR-push tables: those rows survive, their provenance does not. And
+  `verifications.reviewed_by` (0035:86) carries NO on-delete clause at all, so a
+  row there REFUSES the delete outright. S3-3's
+  "idempotent" is likewise unaddressed, and the drain is a cron that re-runs.
+  Both need a ruling before the transaction is built.
+
+  ON ATOMICITY — WHAT "IN THE ORDER THE CONSTRAINTS FORCE" REQUIRES OF THE
+  ARCHITECTURE. The drain reaches the database only through supabase-js — the
+  ceremony's `recordOutcome` helper calls
+  `supabase.rpc('record_verification_outcome', ...)` on a client built by
+  `createServiceClient`, and there is no other write path in it.
+  PostgREST has no multi-statement transaction, so seven ordered statements are
+  atomic ONLY inside one SQL function the drain invokes — the posture
+  record_verification_outcome already holds. Recorded as what the shape requires,
+  not ruled here.
+
+  ON (vi) — WHY THE WORD "REPROJECT" IS LOAD-BEARING. The live body's tail is
+  scoped to ONE entity, captured before the move:
+    update public.entities e
+       set credential_verified = exists (
+             select 1 from public.verifications v
+              where v.entity_id = e.id and v.type = 'license'
+                and v.status = 'verified' and v.voided_at is null),
+           updated_at = now()
+     where e.id = v_row.entity_id;
+  So moving the rows in (i) leaves the flag stale on both sides unless it is
+  recomputed. Its ACL is ["postgres=X/postgres","service_role=X/postgres"] —
+  `authenticated` deliberately absent (0035:43) — which is one of the three
+  reasons WHERE gives for the drain. Whether (vi) calls the function or extracts
+  its predicate to a shared helper is a build decision; what the ruling forbids
+  is a second place that writes the column.
+
+  ON (v) — THE DEFAULT IS VERIFIED, CHECKED. hearth-pos's PracticeCardSheet
+  declares `const DEFAULT_ACT: ActPerm = 'verified'` and seeds its actPerm state
+  from it. The trigger that forces (v) last is cards_practice_requires_licence
+  (live body; trigger 0038b:205-208, BEFORE INSERT OR UPDATE OF kind), which
+  tests `verifications where entity_id = new.entity_id` — the SURVIVING entity —
+  so (i) must already have landed or the insert raises LICENCE_NOT_VERIFIED.
+
+  ON KEY — WHAT THE APP MUST GAIN. request_credential_verification's live body
+  already carries the npi arm (`v_type := 'npi'; v_source := 'nppes'; v_ref :=
+  p_number`, guarded by `p_number !~ '^[0-9]{10}$'`), and the table constraint
+  verifications_npi_ref_digits (0035:91-92) holds it. Nothing in the app sends
+  one: CredentialPanel's `submit` hardcodes `type: 'license'`, and the only
+  values offered are the three Oregon boards in services/credentials.ts's
+  SUPPORTED_BOARDS. The RPC needs no change for the key; the panel and the
+  service do.
