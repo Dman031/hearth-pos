@@ -5408,3 +5408,49 @@ FK list in ON (vii) is file-side and is NOT catalog-verified.
   values offered are the three Oregon boards in services/credentials.ts's
   SUPPORTED_BOARDS. The RPC needs no change for the key; the panel and the
   service do.
+
+## SEED-6 — Two bands
+Supersedes SEED-5's tranche taxonomy. Ruled 2026-09-12.
+RECORDED 2026-09-14; the two-day gap between ruling and recording is recorded,
+not smoothed. The text below is Derrick's, verbatim. The superseded paragraph is
+SEED-5's "FIRST TRANCHE FOR OREGON, NPI-1 ONLY" at roadmap:4165; the ordering
+principle it keeps is SEED-5's point 3, "Sort by it, descending", at
+roadmap:4161-4164; the {SOURCE} it resolves is in SEED-5's RATIFIED COPY at
+roadmap:4131. Nothing else in SEED-5 is touched — the superseding block carries
+the pointer, as N-24 does for S3-3's flip.
+MIRROR OBLIGATION: byte-identical in both repos. THE WORK IS HEARTH-NETWORK'S —
+the seed build and its report. This block has no hearth-pos surface.
+
+  Band 1: family medicine, internal medicine, general practice, and nurse
+  practitioner taxonomies.
+  Band 2: psychiatry, clinical psychology, LPC, LMFT, LCSW.
+  NPPES Entity Type 1, Oregon practice address, 500–1,000 per band to
+  start. Taxonomy codes are read from the bulk file's own taxonomy columns
+  at build time and enumerated in the seed's report — never written from
+  memory. SEED-5's ordering within a band stands: populated licence first.
+  Every record carries its NPI (N-24). The {SOURCE} in SEED-5's governance
+  line is a constant, "the U.S. provider registry" — no column, no field;
+  every seeded record has one source.
+
+## N-24-A — Freshness and idempotency
+Amends N-24 with S3-3's two guards, which N-24 did not carry.
+RECORDED 2026-09-14. The text below is Derrick's, verbatim. This is the ruling
+N-24's own build note called for: "ON (vii) — S3-3's STRICT FRESHNESS GUARD IS
+NOT ADDRESSED BY THIS RULING AND IS FLAGGED, NOT RESOLVED" (roadmap:5350) ends
+"Both need a ruling before the transaction is built." N-24 is at roadmap:5286;
+S3-3 is at roadmap:1580. N-24's body is not edited; this block carries the
+amendment.
+MIRROR OBLIGATION: byte-identical in both repos. THE WORK IS HEARTH-NETWORK'S —
+the SQL function and the drain that invokes it. This block has no hearth-pos
+surface.
+
+  FRESHNESS. S3-3 stands: the handoff runs only if the provisional entity
+  has zero cards, threads, inbound rows, and transactions. Anything else →
+  manual_review, never a merge. A person who used the network before
+  verifying keeps what they built; the record is claimed by hand.
+  IDEMPOTENCY. The drain re-runs. The handoff is keyed on the record
+  entity's user_id: already set to this user → no-op, return the existing
+  state. Set to a different user → manual_review.
+  ATOMICITY. The seven steps are one SQL function, service_role only,
+  invoked by the drain. PostgREST has no transaction; the function is the
+  transaction.
